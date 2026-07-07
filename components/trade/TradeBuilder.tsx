@@ -25,6 +25,11 @@ const ALL_CATEGORIES_VALUE = "all";
 
 type CategoryFilterValue = TradeCategory | typeof ALL_CATEGORIES_VALUE;
 
+type QuantityTradeCard = TradeCard & {
+  quantity?: number;
+  registeredItemId?: string;
+};
+
 const TRADE_CONDITIONS = [
   "현장 직거래 가능",
   "N:1 가능",
@@ -48,6 +53,34 @@ function sortKoreanTitles(titles: string[]) {
       numeric: true,
       sensitivity: "base",
     }),
+  );
+}
+
+function getCardQuantity(card: TradeCard) {
+  const quantity = (card as QuantityTradeCard).quantity ?? 1;
+
+  if (!Number.isFinite(quantity)) return 1;
+
+  return Math.max(1, Math.floor(quantity));
+}
+
+function isSameRegisteredCard(
+  card: TradeCard,
+  item: RegisteredTradeItem,
+  side: TradeSide,
+) {
+  const quantityCard = card as QuantityTradeCard;
+
+  if (quantityCard.registeredItemId) {
+    return quantityCard.registeredItemId === item.id && card.side === side;
+  }
+
+  return (
+    card.side === side &&
+    card.category === item.category &&
+    card.imageUrl === item.imageUrl &&
+    card.workTitle === item.workTitle &&
+    card.memo === item.itemName
   );
 }
 
@@ -98,6 +131,18 @@ export function TradeBuilder({
 
   const wantCards = useMemo(() => {
     return board.cards.filter((card) => card.side === "want");
+  }, [board.cards]);
+
+  const haveCardCount = useMemo(() => {
+    return haveCards.reduce((total, card) => total + getCardQuantity(card), 0);
+  }, [haveCards]);
+
+  const wantCardCount = useMemo(() => {
+    return wantCards.reduce((total, card) => total + getCardQuantity(card), 0);
+  }, [wantCards]);
+
+  const totalSelectedCount = useMemo(() => {
+    return board.cards.reduce((total, card) => total + getCardQuantity(card), 0);
   }, [board.cards]);
 
   const canDownload = useMemo(() => {
@@ -175,23 +220,46 @@ export function TradeBuilder({
   }
 
   function addRegisteredItem(item: RegisteredTradeItem, side: TradeSide) {
-    const newCard: TradeCard = {
-      id: nanoid(),
-      side,
-      category: item.category,
-      imageUrl: item.imageUrl,
-      workTitle: item.workTitle,
-      memo: item.itemName,
-    };
+    setBoard((prev) => {
+      const existingCard = prev.cards.find((card) =>
+        isSameRegisteredCard(card, item, side),
+      );
 
-    setBoard((prev) => ({
-      ...prev,
-      cards: [...prev.cards, newCard],
-    }));
+      if (existingCard) {
+        return {
+          ...prev,
+          cards: prev.cards.map((card) =>
+            card.id === existingCard.id
+              ? {
+                  ...card,
+                  quantity: getCardQuantity(card) + 1,
+                  registeredItemId: item.id,
+                }
+              : card,
+          ),
+        };
+      }
+
+      const newCard: QuantityTradeCard = {
+        id: nanoid(),
+        side,
+        category: item.category,
+        imageUrl: item.imageUrl,
+        workTitle: item.workTitle,
+        memo: item.itemName,
+        quantity: 1,
+        registeredItemId: item.id,
+      };
+
+      return {
+        ...prev,
+        cards: [...prev.cards, newCard],
+      };
+    });
   }
 
   function addUploadedCards(side: TradeSide, files: FileList) {
-    const newCards: TradeCard[] = Array.from(files)
+    const newCards: QuantityTradeCard[] = Array.from(files)
       .filter((file) => file.type.startsWith("image/"))
       .map((file) => ({
         id: nanoid(),
@@ -203,6 +271,7 @@ export function TradeBuilder({
         imageUrl: URL.createObjectURL(file),
         workTitle: file.name.replace(/\.[^/.]+$/, ""),
         memo: "",
+        quantity: 1,
       }));
 
     if (newCards.length === 0) return;
@@ -213,7 +282,7 @@ export function TradeBuilder({
     }));
   }
 
-  function updateCard(cardId: string, patch: Partial<TradeCard>) {
+  function updateCard(cardId: string, patch: Partial<QuantityTradeCard>) {
     setBoard((prev) => ({
       ...prev,
       cards: prev.cards.map((card) =>
@@ -408,14 +477,14 @@ export function TradeBuilder({
             <AddSideButton
               title="있어요"
               emoji="🙋🏻‍♀️"
-              count={haveCards.length}
+              count={haveCardCount}
               onClick={() => openAddModal("have")}
             />
 
             <AddSideButton
               title="구해요"
               emoji="❤️"
-              count={wantCards.length}
+              count={wantCardCount}
               onClick={() => openAddModal("want")}
             />
           </div>
@@ -428,7 +497,7 @@ export function TradeBuilder({
             </h2>
 
             <p className="text-xs font-bold text-neutral-400">
-              총 {board.cards.length}개
+              총 {totalSelectedCount}개
             </p>
           </div>
 
@@ -747,7 +816,7 @@ function RegisteredItemCard({ item, onAdd }: RegisteredItemCardProps) {
 
 type CardEditorProps = {
   card: TradeCard;
-  onUpdate: (patch: Partial<TradeCard>) => void;
+  onUpdate: (patch: Partial<QuantityTradeCard>) => void;
   onRemove: () => void;
 };
 
@@ -755,6 +824,17 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
   const categoryLabel =
     TRADE_CATEGORIES.find((category) => category.id === card.category)?.label ??
     card.category;
+  const quantity = getCardQuantity(card);
+
+  function decreaseQuantity() {
+    if (quantity <= 1) return;
+
+    onUpdate({ quantity: quantity - 1 });
+  }
+
+  function increaseQuantity() {
+    onUpdate({ quantity: quantity + 1 });
+  }
 
   return (
     <div className="relative grid grid-cols-[64px_1fr] gap-3 rounded-xl bg-neutral-50 p-3 pr-10">
@@ -767,11 +847,19 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
         ×
       </button>
 
-      <img
-        src={card.imageUrl}
-        alt=""
-        className="h-16 w-16 rounded-lg bg-white object-contain p-1"
-      />
+      <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-white">
+        <img
+          src={card.imageUrl}
+          alt=""
+          className="h-full w-full object-contain p-1"
+        />
+
+        {quantity > 1 ? (
+          <span className="absolute right-1 top-1 rounded-full bg-neutral-950 px-1.5 py-0.5 text-[10px] font-black text-white">
+            ×{quantity}
+          </span>
+        ) : null}
+      </div>
 
       <div className="min-w-0 space-y-2">
         <div className="grid grid-cols-2 gap-2 pr-7">
@@ -807,13 +895,38 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
           </select>
         </div>
 
-        <div className="space-y-0.5 pr-7 text-xs leading-5">
-          <p className="truncate font-black text-neutral-950">
-            {card.workTitle || '작품명 없음'}
-          </p>
-          <p className="truncate text-neutral-500">
-            {card.memo || categoryLabel}
-          </p>
+        <div className="flex items-center justify-between gap-3 pr-7">
+          <div className="min-w-0 space-y-0.5 text-xs leading-5">
+            <p className="truncate font-black text-neutral-950">
+              {card.workTitle || "작품명 없음"}
+            </p>
+            <p className="truncate text-neutral-500">
+              {card.memo || categoryLabel}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 items-center overflow-hidden rounded-full border border-neutral-200 bg-white">
+            <button
+              type="button"
+              onClick={decreaseQuantity}
+              disabled={quantity <= 1}
+              className="flex h-8 w-8 items-center justify-center text-sm font-black text-neutral-500 disabled:text-neutral-200"
+              aria-label="수량 줄이기"
+            >
+              −
+            </button>
+            <span className="min-w-8 px-1 text-center text-xs font-black text-neutral-950">
+              {quantity}
+            </span>
+            <button
+              type="button"
+              onClick={increaseQuantity}
+              className="flex h-8 w-8 items-center justify-center text-sm font-black text-neutral-500"
+              aria-label="수량 늘리기"
+            >
+              +
+            </button>
+          </div>
         </div>
       </div>
     </div>

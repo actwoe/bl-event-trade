@@ -13,6 +13,10 @@ type TradePreviewProps = {
   collectionTitle: string;
 };
 
+type QuantityTradeCard = TradeCard & {
+  quantity?: number;
+};
+
 type CategorySectionProps = {
   category: TradeCategory;
   cards: TradeCard[];
@@ -27,6 +31,14 @@ type PreviewCardProps = {
   card: TradeCard;
 };
 
+function getCardQuantity(card: TradeCard) {
+  const quantity = (card as QuantityTradeCard).quantity ?? 1;
+
+  if (!Number.isFinite(quantity)) return 1;
+
+  return Math.max(1, Math.floor(quantity));
+}
+
 export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
   function TradePreview({ board, collectionTitle }, ref) {
     const hasCards = board.cards.length > 0;
@@ -40,7 +52,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
 
     return (
       <div ref={ref} className="w-[560px] bg-white p-5 text-neutral-950">
-        <div className="overflow-hidden rounded-[34px] border-2 border-neutral-950 bg-white shadow-[10px_10px_0_#171717]">
+        <div className="overflow-hidden rounded-[34px] bg-white">
           <header className="bg-neutral-950 px-6 py-6 text-white">
             <p className="text-[11px] font-black uppercase tracking-[0.28em] text-neutral-400">
               Goods Trade Board
@@ -126,30 +138,30 @@ function CategorySection({ category, cards }: CategorySectionProps) {
         {categoryLabel}
       </h2>
 
-      <div
-        className={
-          hasHaveCards && hasWantCards
-            ? 'grid grid-cols-2 gap-4'
-            : 'grid grid-cols-1 gap-4'
-        }
-      >
-        {hasHaveCards ? <SideBlock label="있어요" cards={haveCards} /> : null}
-        {hasWantCards ? <SideBlock label="구해요" cards={wantCards} /> : null}
+      <div className="grid grid-cols-2 gap-4">
+        <SideBlock label="있어요" cards={haveCards} />
+        <SideBlock label="구해요" cards={wantCards} />
       </div>
     </section>
   );
 }
 
 function SideBlock({ label, cards }: SideBlockProps) {
+  const hasCards = cards.length > 0;
+
   return (
     <div>
-      <div className="mb-2 flex items-center justify-center">
-        <span className="rounded-full bg-neutral-950 px-4 py-1.5 text-xs font-black text-white">
-          {label}
-        </span>
-      </div>
+      {hasCards ? (
+        <div className="mb-2 flex items-center justify-center">
+          <span className="rounded-full bg-neutral-950 px-4 py-1.5 text-xs font-black text-white">
+            {label}
+          </span>
+        </div>
+      ) : (
+        <div className="mb-2 h-[30px]" aria-hidden="true" />
+      )}
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-1.5">
         {cards.map((card) => (
           <PreviewCard key={card.id} card={card} />
         ))}
@@ -159,13 +171,21 @@ function SideBlock({ label, cards }: SideBlockProps) {
 }
 
 function PreviewCard({ card }: PreviewCardProps) {
+  const quantity = getCardQuantity(card);
+
   return (
-    <article className="overflow-hidden rounded-2xl bg-white">
+    <article className="relative overflow-hidden rounded-xl bg-white">
       <img
         src={card.imageUrl}
         alt={card.memo || card.workTitle}
-        className="aspect-[3/4] w-full bg-white object-contain p-1"
+        className="aspect-[3/4] w-full bg-white object-contain p-0.5"
       />
+
+      {quantity > 1 ? (
+        <span className="absolute right-1 top-1 rounded-full bg-neutral-950 px-1.5 py-0.5 text-[10px] font-black leading-none text-white">
+          ×{quantity}
+        </span>
+      ) : null}
     </article>
   );
 }
