@@ -1273,7 +1273,7 @@ export default function AdminEventManagePage() {
                   <img
                     src={imagePreviewUrl}
                     alt="굿즈 이미지 미리보기"
-                    className="aspect-[3/4] w-32 rounded-2xl bg-white object-contain p-1 shadow-sm"
+                    className="aspect-square w-32 rounded-2xl bg-white object-contain p-1 shadow-sm"
                   />
                 ) : (
                   <>
@@ -1331,7 +1331,7 @@ export default function AdminEventManagePage() {
                     key={item.id}
                     className="overflow-hidden rounded-2xl border border-neutral-200 bg-white"
                   >
-                    <div className="relative aspect-[3/4] bg-neutral-100">
+                    <div className="relative aspect-square bg-neutral-100">
                       <img
                         src={getTradeAssetUrl(item.image_path)}
                         alt={item.work_title}

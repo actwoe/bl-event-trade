@@ -871,7 +871,7 @@ function RegisteredItemCard({
         <img
           src={item.imageUrl}
           alt={item.itemName}
-          className="aspect-[3/4] w-full bg-white object-contain p-1"
+          className="aspect-square w-full bg-white object-contain p-1"
         />
 
         {selected ? (

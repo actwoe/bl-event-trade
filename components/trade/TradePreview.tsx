@@ -101,29 +101,25 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
       .filter(Boolean);
 
     return (
-      <div ref={ref} className="w-[560px] bg-white p-4 text-neutral-950">
-        <div className="overflow-hidden rounded-[30px] bg-white">
-          <header className="bg-neutral-950 px-6 py-5 text-center text-white">
-            <p className="text-[11px] font-black uppercase tracking-[0.28em] text-neutral-400">
-              Goods Trade Board
-            </p>
-
-            <h1 className="mt-2 break-keep text-[30px] font-black leading-[1.08] tracking-tight">
+      <div ref={ref} className="w-[560px] bg-white p-3 text-neutral-950">
+        <div className="overflow-hidden rounded-[26px] bg-white">
+          <header className="border-b border-neutral-200 bg-white px-5 py-3 text-center">
+            <h1 className="break-keep text-[24px] font-black leading-[1.12] tracking-tight text-neutral-950">
               {collectionTitle}
             </h1>
 
             {profileTexts.length > 0 ? (
-              <p className="mt-2 break-keep text-sm font-bold leading-6 text-neutral-200">
+              <p className="mt-1 break-keep text-[12px] font-extrabold leading-5 text-neutral-500">
                 {profileTexts.join(' · ')}
               </p>
             ) : null}
 
             {conditionChips.length > 0 ? (
-              <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <div className="mt-2 flex flex-wrap justify-center gap-1.5">
                 {conditionChips.map((chip) => (
                   <span
                     key={chip}
-                    className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-neutral-950"
+                    className="rounded-full bg-neutral-100 px-2.5 py-1 text-[9px] font-black leading-none text-neutral-600"
                   >
                     {chip}
                   </span>
@@ -132,7 +128,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
             ) : null}
           </header>
 
-          <section className="bg-white px-4 py-4">
+          <section className="bg-white px-3 py-3">
             {hasCards ? (
               visibleCategories.map((category, index) => (
                 <CategorySection
@@ -142,20 +138,16 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
                 />
               ))
             ) : (
-              <div className="rounded-[28px] border-2 border-dashed border-neutral-200 px-6 py-16 text-center">
-                <p className="text-lg font-black text-neutral-300">
+              <div className="rounded-[22px] border-2 border-dashed border-neutral-200 px-5 py-12 text-center">
+                <p className="text-base font-black text-neutral-300">
                   선택된 이미지가 없습니다
                 </p>
               </div>
             )}
           </section>
 
-          <footer className="border-t border-neutral-200 bg-neutral-50 px-5 py-3 text-center text-[9px] font-bold leading-4 text-neutral-400">
-            <p>본 이미지는 비공식 교환판입니다.</p>
-            <p>
-              사이트에 기재된 모든 이미지의 저작권은 키다리스튜디오와 각
-              작가님들께 있습니다.
-            </p>
+          <footer className="border-t border-neutral-200 bg-neutral-50 px-4 py-2 text-center text-[8px] font-bold leading-3 text-neutral-400">
+            비공식 교환판 · 이미지 저작권은 원저작권자에게 있습니다.
           </footer>
         </div>
       </div>
@@ -165,12 +157,12 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
 
 function CategorySection({ category, isFirst }: CategorySectionProps) {
   return (
-    <section className={isFirst ? 'pb-4' : 'border-t border-neutral-200 py-4'}>
-      <h2 className="mb-2 text-lg font-black tracking-tight text-neutral-950">
+    <section className={isFirst ? 'pb-3' : 'border-t border-neutral-200 py-3'}>
+      <h2 className="mb-2 text-center text-sm font-black tracking-tight text-neutral-950">
         {category.label}
       </h2>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5">
         <SideBlock
           label="있어요"
           cards={category.haveCards}
@@ -192,12 +184,12 @@ function SideBlock({ label, cards, columnCount }: SideBlockProps) {
 
   return (
     <div>
-      <div className="mb-1.5 flex items-center justify-center">
+      <div className="mb-1.5 border-b border-neutral-200 pb-1 text-center">
         <span
           className={
             hasCards
-              ? 'rounded-full bg-neutral-950 px-4 py-1.5 text-xs font-black text-white'
-              : 'rounded-full bg-neutral-100 px-4 py-1.5 text-xs font-black text-neutral-300'
+              ? 'text-[11px] font-black text-neutral-950'
+              : 'text-[11px] font-black text-neutral-300'
           }
         >
           {label}
@@ -217,11 +209,11 @@ function PreviewCard({ card }: PreviewCardProps) {
   const quantity = getCardQuantity(card);
 
   return (
-    <article className="relative overflow-hidden rounded-xl bg-white">
+    <article className="relative overflow-hidden rounded-lg bg-white">
       <img
         src={card.imageUrl}
         alt={card.memo || card.workTitle}
-        className="aspect-square w-full bg-white object-contain p-0.5"
+        className="aspect-square w-full bg-white object-contain"
       />
 
       {quantity > 1 ? (
