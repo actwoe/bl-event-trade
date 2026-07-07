@@ -1246,7 +1246,43 @@ export default function AdminEventManagePage() {
               </select>
             </label>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="shrink-0 text-sm font-bold text-neutral-800">
+                  굿즈 이미지
+                </span>
+
+                <label className="flex min-h-[56px] flex-1 cursor-pointer items-center justify-between gap-3 rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-3 hover:border-neutral-950">
+                  {imagePreviewUrl ? (
+                    <span className="flex items-center gap-3">
+                      <img
+                        src={imagePreviewUrl}
+                        alt="굿즈 이미지 미리보기"
+                        className="aspect-square w-12 rounded-xl bg-white object-contain p-1 shadow-sm"
+                      />
+                      <span className="text-xs font-bold text-neutral-500">
+                        다른 이미지 선택
+                      </span>
+                    </span>
+                  ) : (
+                    <span className="text-sm font-black text-neutral-700">
+                      이미지 선택
+                    </span>
+                  )}
+
+                  <span className="hidden text-xs text-neutral-400 sm:inline">
+                    교환판에 표시될 이미지를 업로드합니다.
+                  </span>
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
               <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
                 <span>
                   <span className="block text-sm font-bold text-neutral-800">
@@ -1264,38 +1300,6 @@ export default function AdminEventManagePage() {
                   className="h-5 w-5"
                 />
               </label>
-
-              <div>
-                <span className="text-sm font-bold text-neutral-800">
-                  굿즈 이미지
-                </span>
-
-                <label className="mt-1 flex min-h-[92px] cursor-pointer items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-3 text-center hover:border-neutral-950">
-                  {imagePreviewUrl ? (
-                    <img
-                      src={imagePreviewUrl}
-                      alt="굿즈 이미지 미리보기"
-                      className="aspect-square w-20 rounded-2xl bg-white object-contain p-1 shadow-sm"
-                    />
-                  ) : (
-                    <span>
-                      <span className="block text-sm font-black text-neutral-700">
-                        이미지 선택
-                      </span>
-                      <span className="mt-1 block text-xs leading-5 text-neutral-400">
-                        교환판에 표시될 굿즈 이미지를 업로드합니다.
-                      </span>
-                    </span>
-                  )}
-
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
-                </label>
-              </div>
             </div>
 
             <button
