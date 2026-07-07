@@ -48,18 +48,14 @@ function getCardQuantity(card: TradeCard) {
   return Math.max(1, Math.floor(quantity));
 }
 
-function getQuantityTotal(cards: TradeCard[]) {
-  return cards.reduce((total, card) => total + getCardQuantity(card), 0);
-}
-
 function getColumnCount(haveCards: TradeCard[], wantCards: TradeCard[]): 1 | 2 | 3 {
-  const haveCount = getQuantityTotal(haveCards);
-  const wantCount = getQuantityTotal(wantCards);
-  const totalCount = haveCount + wantCount;
-  const maxSideCount = Math.max(haveCount, wantCount);
+  const haveCardCount = haveCards.length;
+  const wantCardCount = wantCards.length;
+  const totalCardCount = haveCardCount + wantCardCount;
+  const maxSideCardCount = Math.max(haveCardCount, wantCardCount);
 
-  const columnsByTotal = totalCount <= 2 ? 1 : totalCount <= 4 ? 2 : 3;
-  const columnsBySide = maxSideCount <= 1 ? 1 : maxSideCount <= 2 ? 2 : 3;
+  const columnsByTotal = totalCardCount <= 2 ? 1 : totalCardCount <= 4 ? 2 : 3;
+  const columnsBySide = maxSideCardCount <= 1 ? 1 : maxSideCardCount <= 2 ? 2 : 3;
 
   return Math.max(columnsByTotal, columnsBySide) as 1 | 2 | 3;
 }
