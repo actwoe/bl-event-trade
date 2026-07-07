@@ -64,10 +64,10 @@ function getColumnCount(haveCards: TradeCard[], wantCards: TradeCard[]): 1 | 2 |
   return 3;
 }
 
-function getGridColumnClass(columnCount: 1 | 2 | 3) {
-  if (columnCount === 1) return 'grid-cols-1';
-  if (columnCount === 2) return 'grid-cols-2';
-  return 'grid-cols-3';
+function getCardWidth(columnCount: 1 | 2 | 3) {
+  if (columnCount === 1) return '100%';
+  if (columnCount === 2) return 'calc((100% - 0.25rem) / 2)';
+  return 'calc((100% - 0.5rem) / 3)';
 }
 
 function getVisibleCategories(cards: TradeCard[]): VisibleCategory[] {
@@ -99,11 +99,10 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
     const nickname = board.nickname.trim();
     const contact = board.contact.trim();
     const hasProfile = nickname.length > 0 || contact.length > 0;
-    const conditionText = board.memo
+    const conditionItems = board.memo
       .split(' · ')
       .map((item) => item.trim())
-      .filter(Boolean)
-      .join(' · ');
+      .filter(Boolean);
 
     return (
       <div ref={ref} className="w-[560px] bg-white p-3 text-neutral-950">
@@ -136,11 +135,16 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
                 )}
               </div>
 
-              {conditionText.length > 0 ? (
-                <div className="flex max-w-[190px] shrink-0 justify-end">
-                  <div className="rounded-2xl border border-white/25 bg-white px-3 py-2 text-right text-[9px] font-black leading-[1.25] text-neutral-950">
-                    {conditionText}
-                  </div>
+              {conditionItems.length > 0 ? (
+                <div className="flex max-w-[220px] shrink-0 flex-wrap justify-end gap-1">
+                  {conditionItems.map((condition) => (
+                    <span
+                      key={condition}
+                      className="rounded-full border border-white/25 bg-white px-2.5 py-1 text-[8px] font-black leading-none text-neutral-950"
+                    >
+                      {condition}
+                    </span>
+                  ))}
                 </div>
               ) : null}
             </div>
@@ -202,7 +206,7 @@ function CategorySection({ category, isFirst }: CategorySectionProps) {
 
 function SideBlock({ label, cards, columnCount }: SideBlockProps) {
   const hasCards = cards.length > 0;
-  const gridClassName = getGridColumnClass(columnCount);
+  const cardWidth = getCardWidth(columnCount);
 
   return (
     <div>
@@ -218,9 +222,17 @@ function SideBlock({ label, cards, columnCount }: SideBlockProps) {
         </span>
       </div>
 
-      <div className={`grid ${gridClassName} gap-1`}>
+      <div
+        className={
+          cards.length < columnCount
+            ? 'flex flex-wrap justify-center gap-1'
+            : 'flex flex-wrap justify-start gap-1'
+        }
+      >
         {cards.map((card) => (
-          <PreviewCard key={card.id} card={card} />
+          <div key={card.id} style={{ width: cardWidth }}>
+            <PreviewCard card={card} />
+          </div>
         ))}
       </div>
     </div>
@@ -231,7 +243,7 @@ function PreviewCard({ card }: PreviewCardProps) {
   const quantity = getCardQuantity(card);
 
   return (
-    <article className="relative overflow-hidden rounded-lg bg-white ring-1 ring-neutral-200">
+    <article className="relative overflow-hidden rounded-lg bg-white">
       <img
         src={card.imageUrl}
         alt={card.memo || card.workTitle}
