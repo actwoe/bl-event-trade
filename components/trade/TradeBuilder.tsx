@@ -10,6 +10,7 @@ import {
   TradeCard,
   TradeCategory,
   TradeCollectionSummary,
+  TradeImageRatio,
   TradeSide,
 } from "@/lib/trade-types";
 import { TradePreview } from "./TradePreview";
@@ -105,6 +106,41 @@ function getCategoryLabel(category: TradeCategory) {
   );
 }
 
+function getItemImageRatio(item: RegisteredTradeItem): TradeImageRatio {
+  return item.imageRatio === "photocard" ? "photocard" : "square";
+}
+
+
+function getImageRatioClass(ratio: TradeImageRatio) {
+  return ratio === "photocard" ? "aspect-[55/85]" : "aspect-square";
+}
+
+function getBenefitSubcategoryLabel(value?: string | null) {
+  return value?.trim() || "";
+}
+
+function getItemMetaLabel(item: RegisteredTradeItem) {
+  const categoryLabel = getCategoryLabel(item.category);
+  const benefitSubcategory = getBenefitSubcategoryLabel(item.benefitSubcategory);
+
+  if (item.category === "benefit" && benefitSubcategory) {
+    return `${categoryLabel} · ${benefitSubcategory}`;
+  }
+
+  return categoryLabel;
+}
+
+function getCardMetaLabel(card: TradeCard) {
+  const categoryLabel = getCategoryLabel(card.category);
+  const benefitSubcategory = getBenefitSubcategoryLabel(card.benefitSubcategory);
+
+  if (card.category === "benefit" && benefitSubcategory) {
+    return `${categoryLabel} · ${benefitSubcategory}`;
+  }
+
+  return card.memo || categoryLabel;
+}
+
 function getCategorySortIndex(category: TradeCategory) {
   const index = TRADE_CATEGORIES.findIndex((option) => option.id === category);
 
@@ -118,6 +154,19 @@ function sortRegisteredItems(items: RegisteredTradeItem[]) {
 
     if (categoryDiff !== 0) {
       return categoryDiff;
+    }
+
+    if (a.category === "benefit" && b.category === "benefit") {
+      const subcategoryDiff = getBenefitSubcategoryLabel(
+        a.benefitSubcategory,
+      ).localeCompare(getBenefitSubcategoryLabel(b.benefitSubcategory), "ko-KR", {
+        numeric: true,
+        sensitivity: "base",
+      });
+
+      if (subcategoryDiff !== 0) {
+        return subcategoryDiff;
+      }
     }
 
     const titleDiff = a.workTitle.localeCompare(b.workTitle, "ko-KR", {
@@ -302,6 +351,8 @@ export function TradeBuilder({
                   imageUrl: item.imageUrl,
                   workTitle: item.workTitle,
                   memo: item.itemName,
+                  imageRatio: getItemImageRatio(item),
+                  benefitSubcategory: item.benefitSubcategory ?? null,
                   quantity: safeQuantity,
                   registeredItemId: item.id,
                 }
@@ -317,6 +368,8 @@ export function TradeBuilder({
         imageUrl: item.imageUrl,
         workTitle: item.workTitle,
         memo: item.itemName,
+        imageRatio: getItemImageRatio(item),
+        benefitSubcategory: item.benefitSubcategory ?? null,
         quantity: safeQuantity,
         registeredItemId: item.id,
       };
@@ -351,6 +404,8 @@ export function TradeBuilder({
         imageUrl: URL.createObjectURL(file),
         workTitle: file.name.replace(/\.[^/.]+$/, ""),
         memo: "",
+        imageRatio: "square",
+        benefitSubcategory: null,
         quantity: 1,
       }));
 
@@ -888,7 +943,8 @@ function RegisteredItemCard({
   onDecrease,
 }: RegisteredItemCardProps) {
   const selected = quantity > 0;
-  const categoryLabel = getCategoryLabel(item.category);
+  const metaLabel = getItemMetaLabel(item);
+  const imageRatio = getItemImageRatio(item);
 
   return (
     <article
@@ -902,7 +958,7 @@ function RegisteredItemCard({
         <img
           src={item.imageUrl}
           alt={item.itemName}
-          className="aspect-square w-full bg-white object-contain p-1"
+          className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1`}
         />
 
         {selected ? (
@@ -917,7 +973,7 @@ function RegisteredItemCard({
           {item.workTitle}
         </p>
         <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">
-          {categoryLabel}
+          {metaLabel}
         </p>
 
         {selected ? (
@@ -964,8 +1020,8 @@ type CardEditorProps = {
 };
 
 function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
-  const categoryLabel = getCategoryLabel(card.category);
   const quantity = getCardQuantity(card);
+  const metaLabel = getCardMetaLabel(card);
 
   function decreaseQuantity() {
     if (quantity <= 1) {
@@ -1045,7 +1101,7 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
               {card.workTitle || "작품명 없음"}
             </p>
             <p className="truncate text-neutral-500">
-              {card.memo || categoryLabel}
+              {metaLabel}
             </p>
           </div>
 

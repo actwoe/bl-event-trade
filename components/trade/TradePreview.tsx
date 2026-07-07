@@ -6,6 +6,7 @@ import {
   TradeBoard,
   TradeCard,
   TradeCategory,
+  TradeImageRatio,
 } from '@/lib/trade-types';
 
 type TradePreviewProps = {
@@ -18,6 +19,7 @@ type QuantityTradeCard = TradeCard & {
 };
 
 type VisibleCategory = {
+  key: string;
   id: TradeCategory;
   label: string;
   haveCards: TradeCard[];
@@ -70,26 +72,89 @@ function getCardWidth(columnCount: 1 | 2 | 3) {
   return 'calc((100% - 0.5rem) / 3)';
 }
 
+function getImageRatio(card: TradeCard): TradeImageRatio {
+  return card.imageRatio === 'photocard' ? 'photocard' : 'square';
+}
+
+function getImageRatioClass(card: TradeCard) {
+  return getImageRatio(card) === 'photocard' ? 'aspect-[55/85]' : 'aspect-square';
+}
+
+function getBenefitSubcategory(card: TradeCard) {
+  return card.benefitSubcategory?.trim() || '';
+}
+
+function compareKorean(a: string, b: string) {
+  return a.localeCompare(b, 'ko-KR', {
+    numeric: true,
+    sensitivity: 'base',
+  });
+}
+
+function getBenefitSectionLabel(subcategory: string) {
+  return subcategory ? `특전 · ${subcategory}` : '특전';
+}
+
+function createBenefitSections(cards: TradeCard[]) {
+  const benefitCards = cards.filter((card) => card.category === 'benefit');
+  const subcategories = Array.from(
+    new Set(benefitCards.map((card) => getBenefitSubcategory(card))),
+  ).sort((a, b) => {
+    if (!a && b) return 1;
+    if (a && !b) return -1;
+    return compareKorean(a, b);
+  });
+
+  return subcategories
+    .map((subcategory) => {
+      const scopedCards = benefitCards.filter(
+        (card) => getBenefitSubcategory(card) === subcategory,
+      );
+      const haveCards = scopedCards.filter((card) => card.side === 'have');
+      const wantCards = scopedCards.filter((card) => card.side === 'want');
+
+      return {
+        key: `benefit-${subcategory || 'none'}`,
+        id: 'benefit' as TradeCategory,
+        label: getBenefitSectionLabel(subcategory),
+        haveCards,
+        wantCards,
+        columnCount: getColumnCount(haveCards, wantCards),
+      };
+    })
+    .filter(
+      (category) => category.haveCards.length > 0 || category.wantCards.length > 0,
+    );
+}
+
 function getVisibleCategories(cards: TradeCard[]): VisibleCategory[] {
-  return TRADE_CATEGORIES.map((category) => {
-    const haveCards = cards.filter(
-      (card) => card.category === category.id && card.side === 'have',
+  const benefitSections = createBenefitSections(cards);
+  const otherSections = TRADE_CATEGORIES.filter(
+    (category) => category.id !== 'benefit',
+  )
+    .map((category) => {
+      const haveCards = cards.filter(
+        (card) => card.category === category.id && card.side === 'have',
+      );
+
+      const wantCards = cards.filter(
+        (card) => card.category === category.id && card.side === 'want',
+      );
+
+      return {
+        key: category.id,
+        id: category.id,
+        label: category.label,
+        haveCards,
+        wantCards,
+        columnCount: getColumnCount(haveCards, wantCards),
+      };
+    })
+    .filter(
+      (category) => category.haveCards.length > 0 || category.wantCards.length > 0,
     );
 
-    const wantCards = cards.filter(
-      (card) => card.category === category.id && card.side === 'want',
-    );
-
-    return {
-      id: category.id,
-      label: category.label,
-      haveCards,
-      wantCards,
-      columnCount: getColumnCount(haveCards, wantCards),
-    };
-  }).filter(
-    (category) => category.haveCards.length > 0 || category.wantCards.length > 0,
-  );
+  return [...benefitSections, ...otherSections];
 }
 
 export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
@@ -154,7 +219,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
             {hasCards ? (
               visibleCategories.map((category, index) => (
                 <CategorySection
-                  key={category.id}
+                  key={category.key}
                   category={category}
                   isFirst={index === 0}
                 />
@@ -225,8 +290,8 @@ function SideBlock({ label, cards, columnCount }: SideBlockProps) {
       <div
         className={
           cards.length < columnCount
-            ? 'flex flex-wrap justify-center gap-1'
-            : 'flex flex-wrap justify-start gap-1'
+            ? 'flex flex-wrap items-start justify-center gap-1'
+            : 'flex flex-wrap items-start justify-start gap-1'
         }
       >
         {cards.map((card) => (
@@ -247,7 +312,7 @@ function PreviewCard({ card }: PreviewCardProps) {
       <img
         src={card.imageUrl}
         alt={card.memo || card.workTitle}
-        className="aspect-square w-full bg-white object-contain"
+        className={`${getImageRatioClass(card)} w-full bg-white object-contain`}
       />
 
       {quantity > 1 ? (
