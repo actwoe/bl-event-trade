@@ -4,7 +4,11 @@ import Link from 'next/link';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
-import { TRADE_CATEGORIES, TradeCategory } from '@/lib/trade-types';
+import {
+  TRADE_CATEGORIES,
+  TradeCategory,
+  TradeImageRatio,
+} from '@/lib/trade-types';
 
 type AdminState = 'checking' | 'admin' | 'not-admin' | 'signed-out';
 
@@ -27,6 +31,15 @@ type TradeWorkRow = {
   created_at: string;
 };
 
+type TradeBenefitSubcategoryRow = {
+  id: string;
+  collection_id: string;
+  name: string;
+  is_visible: boolean;
+  sort_order: number;
+  created_at: string;
+};
+
 type TradeItemRow = {
   id: string;
   collection_id: string;
@@ -36,6 +49,8 @@ type TradeItemRow = {
   image_path: string;
   is_visible: boolean;
   sort_order: number;
+  image_ratio: TradeImageRatio | null;
+  benefit_subcategory: string | null;
   created_at: string;
 };
 
@@ -84,10 +99,50 @@ function sortKoreanTitles<T extends { title: string }>(rows: T[]) {
   );
 }
 
+function sortBenefitSubcategories(rows: TradeBenefitSubcategoryRow[]) {
+  return [...rows].sort((a, b) => {
+    const sortDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+
+    if (sortDiff !== 0) {
+      return sortDiff;
+    }
+
+    return a.name.localeCompare(b.name, 'ko-KR', {
+      numeric: true,
+      sensitivity: 'base',
+    });
+  });
+}
+
 function getCategoryLabel(category: TradeCategory) {
   return (
     TRADE_CATEGORIES.find((option) => option.id === category)?.label ?? category
   );
+}
+
+function getSafeImageRatio(value?: string | null): TradeImageRatio {
+  return value === 'photocard' ? 'photocard' : 'square';
+}
+
+function getImageRatioClass(ratio?: string | null) {
+  return getSafeImageRatio(ratio) === 'photocard'
+    ? 'aspect-[55/85]'
+    : 'aspect-square';
+}
+
+function getBenefitSubcategoryLabel(value?: string | null) {
+  return value?.trim() || '';
+}
+
+function getTradeItemMetaLabel(item: TradeItemRow) {
+  const categoryLabel = getCategoryLabel(item.category);
+  const subcategory = getBenefitSubcategoryLabel(item.benefit_subcategory);
+
+  if (item.category === 'benefit' && subcategory) {
+    return `${categoryLabel} · ${subcategory}`;
+  }
+
+  return categoryLabel;
 }
 
 function getCategorySortIndex(category: TradeCategory) {
@@ -103,6 +158,19 @@ function sortTradeItems(rows: TradeItemRow[]) {
 
     if (categoryDiff !== 0) {
       return categoryDiff;
+    }
+
+    if (a.category === 'benefit' && b.category === 'benefit') {
+      const subcategoryDiff = getBenefitSubcategoryLabel(
+        a.benefit_subcategory,
+      ).localeCompare(getBenefitSubcategoryLabel(b.benefit_subcategory), 'ko-KR', {
+        numeric: true,
+        sensitivity: 'base',
+      });
+
+      if (subcategoryDiff !== 0) {
+        return subcategoryDiff;
+      }
     }
 
     const titleDiff = a.work_title.localeCompare(b.work_title, 'ko-KR', {
@@ -127,6 +195,9 @@ export default function AdminEventManagePage() {
   const [adminState, setAdminState] = useState<AdminState>('checking');
   const [eventData, setEventData] = useState<TradeCollectionRow | null>(null);
   const [works, setWorks] = useState<TradeWorkRow[]>([]);
+  const [benefitSubcategories, setBenefitSubcategories] = useState<
+    TradeBenefitSubcategoryRow[]
+  >([]);
   const [items, setItems] = useState<TradeItemRow[]>([]);
 
   const [title, setTitle] = useState('');
@@ -146,8 +217,22 @@ export default function AdminEventManagePage() {
   const [editingWorkTitle, setEditingWorkTitle] = useState('');
   const [editingWorkIsVisible, setEditingWorkIsVisible] = useState(true);
 
+  const [newBenefitSubcategoryName, setNewBenefitSubcategoryName] =
+    useState('');
+  const [newBenefitSubcategoryIsVisible, setNewBenefitSubcategoryIsVisible] =
+    useState(true);
+
+  const [editingBenefitSubcategoryId, setEditingBenefitSubcategoryId] =
+    useState('');
+  const [editingBenefitSubcategoryName, setEditingBenefitSubcategoryName] =
+    useState('');
+  const [editingBenefitSubcategoryIsVisible, setEditingBenefitSubcategoryIsVisible] =
+    useState(true);
+
   const [selectedWorkTitle, setSelectedWorkTitle] = useState('');
   const [category, setCategory] = useState<TradeCategory>('benefit');
+  const [benefitSubcategory, setBenefitSubcategory] = useState('');
+  const [imageRatio, setImageRatio] = useState<TradeImageRatio>('square');
   const [itemIsVisible, setItemIsVisible] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
@@ -156,6 +241,10 @@ export default function AdminEventManagePage() {
   const [editingItemWorkTitle, setEditingItemWorkTitle] = useState('');
   const [editingItemCategory, setEditingItemCategory] =
     useState<TradeCategory>('benefit');
+  const [editingItemBenefitSubcategory, setEditingItemBenefitSubcategory] =
+    useState('');
+  const [editingItemImageRatio, setEditingItemImageRatio] =
+    useState<TradeImageRatio>('square');
   const [editingItemIsVisible, setEditingItemIsVisible] = useState(true);
 
   const [itemFilterWorkTitle, setItemFilterWorkTitle] = useState('all');
@@ -166,6 +255,12 @@ export default function AdminEventManagePage() {
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
   const [isSubmittingWork, setIsSubmittingWork] = useState(false);
   const [isUpdatingWorkId, setIsUpdatingWorkId] = useState('');
+  const [isSubmittingBenefitSubcategory, setIsSubmittingBenefitSubcategory] =
+    useState(false);
+  const [isUpdatingBenefitSubcategoryId, setIsUpdatingBenefitSubcategoryId] =
+    useState('');
+  const [isDeletingBenefitSubcategoryId, setIsDeletingBenefitSubcategoryId] =
+    useState('');
   const [isSubmittingItem, setIsSubmittingItem] = useState(false);
   const [isUpdatingItemId, setIsUpdatingItemId] = useState('');
   const [isDeletingWorkId, setIsDeletingWorkId] = useState('');
@@ -179,9 +274,19 @@ export default function AdminEventManagePage() {
     return sortKoreanTitles(works.filter((work) => work.is_visible));
   }, [works]);
 
+  const visibleBenefitSubcategories = useMemo(() => {
+    return sortBenefitSubcategories(
+      benefitSubcategories.filter((subcategory) => subcategory.is_visible),
+    );
+  }, [benefitSubcategories]);
+
   const itemFilterWorks = useMemo(() => {
     const titles = Array.from(
-      new Set(items.map((item) => item.work_title).filter(Boolean)),
+      new Set(
+        items
+          .map((item) => item.work_title)
+          .filter((title): title is string => Boolean(title)),
+      ),
     );
 
     return titles.sort((a, b) =>
@@ -251,7 +356,7 @@ export default function AdminEventManagePage() {
       setSortOrder(String(typedEvent.sort_order ?? 0));
       setThumbnailPreviewUrl(getTradeAssetUrl(typedEvent.thumbnail_path));
 
-      await Promise.all([loadWorks(), loadItems()]);
+      await Promise.all([loadWorks(), loadBenefitSubcategories(), loadItems()]);
     }
 
     loadPageData();
@@ -296,11 +401,30 @@ export default function AdminEventManagePage() {
     });
   }
 
+  async function loadBenefitSubcategories() {
+    const { data, error } = await supabase
+      .from('trade_benefit_subcategories')
+      .select('id, collection_id, name, is_visible, sort_order, created_at')
+      .eq('collection_id', eventId)
+      .order('sort_order', { ascending: true })
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error(error);
+      setMessage('특전 하위 분류 목록을 불러오지 못했습니다. SQL 추가 여부를 확인해 주세요.');
+      return;
+    }
+
+    setBenefitSubcategories(
+      sortBenefitSubcategories((data ?? []) as TradeBenefitSubcategoryRow[]),
+    );
+  }
+
   async function loadItems() {
     const { data, error } = await supabase
       .from('trade_items')
       .select(
-        'id, collection_id, category, work_title, item_name, image_path, is_visible, sort_order, created_at',
+        'id, collection_id, category, work_title, item_name, image_path, is_visible, sort_order, image_ratio, benefit_subcategory, created_at',
       )
       .eq('collection_id', eventId)
       .order('created_at', { ascending: true });
@@ -631,6 +755,200 @@ export default function AdminEventManagePage() {
     }
   }
 
+  async function handleAddBenefitSubcategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!eventData) {
+      setMessage('행사 정보를 불러온 뒤 다시 시도해 주세요.');
+      return;
+    }
+
+    const nextName = newBenefitSubcategoryName.trim();
+
+    if (!nextName) {
+      setMessage('특전 하위 분류명을 입력해 주세요.');
+      return;
+    }
+
+    try {
+      setIsSubmittingBenefitSubcategory(true);
+      setMessage('');
+
+      const { error } = await supabase
+        .from('trade_benefit_subcategories')
+        .insert({
+          collection_id: eventData.id,
+          name: nextName,
+          sort_order: benefitSubcategories.length,
+          is_visible: newBenefitSubcategoryIsVisible,
+        });
+
+      if (error) {
+        console.error(error);
+        setMessage('특전 하위 분류 등록에 실패했습니다. 이미 등록된 이름일 수 있습니다.');
+        return;
+      }
+
+      setNewBenefitSubcategoryName('');
+      setNewBenefitSubcategoryIsVisible(true);
+
+      await loadBenefitSubcategories();
+      setMessage('특전 하위 분류가 등록되었습니다.');
+    } catch (error) {
+      console.error(error);
+      setMessage('특전 하위 분류 등록 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmittingBenefitSubcategory(false);
+    }
+  }
+
+  function handleStartEditBenefitSubcategory(
+    subcategory: TradeBenefitSubcategoryRow,
+  ) {
+    setEditingBenefitSubcategoryId(subcategory.id);
+    setEditingBenefitSubcategoryName(subcategory.name);
+    setEditingBenefitSubcategoryIsVisible(subcategory.is_visible);
+  }
+
+  function handleCancelEditBenefitSubcategory() {
+    setEditingBenefitSubcategoryId('');
+    setEditingBenefitSubcategoryName('');
+    setEditingBenefitSubcategoryIsVisible(true);
+  }
+
+  async function handleUpdateBenefitSubcategory(
+    subcategory: TradeBenefitSubcategoryRow,
+  ) {
+    const nextName = editingBenefitSubcategoryName.trim();
+
+    if (!nextName) {
+      setMessage('수정할 특전 하위 분류명을 입력해 주세요.');
+      return;
+    }
+
+    try {
+      setIsUpdatingBenefitSubcategoryId(subcategory.id);
+      setMessage('');
+
+      const oldName = subcategory.name;
+      const nameChanged = oldName !== nextName;
+
+      const { error: updateError } = await supabase
+        .from('trade_benefit_subcategories')
+        .update({
+          name: nextName,
+          is_visible: editingBenefitSubcategoryIsVisible,
+        })
+        .eq('id', subcategory.id);
+
+      if (updateError) {
+        console.error(updateError);
+        setMessage('특전 하위 분류 수정에 실패했습니다. 이미 등록된 이름일 수 있습니다.');
+        return;
+      }
+
+      if (nameChanged) {
+        const { error: updateItemsError } = await supabase
+          .from('trade_items')
+          .update({
+            benefit_subcategory: nextName,
+          })
+          .eq('collection_id', subcategory.collection_id)
+          .eq('category', 'benefit')
+          .eq('benefit_subcategory', oldName);
+
+        if (updateItemsError) {
+          console.error(updateItemsError);
+          setMessage(
+            '하위 분류명은 수정됐지만, 기존 특전 이미지 반영에 실패했습니다.',
+          );
+          return;
+        }
+
+        if (benefitSubcategory === oldName) {
+          setBenefitSubcategory(nextName);
+        }
+
+        if (editingItemBenefitSubcategory === oldName) {
+          setEditingItemBenefitSubcategory(nextName);
+        }
+      }
+
+      handleCancelEditBenefitSubcategory();
+
+      await Promise.all([loadBenefitSubcategories(), loadItems()]);
+
+      setMessage('특전 하위 분류가 수정되었습니다.');
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      setMessage('특전 하위 분류 수정 중 오류가 발생했습니다.');
+    } finally {
+      setIsUpdatingBenefitSubcategoryId('');
+    }
+  }
+
+  async function handleDeleteBenefitSubcategory(
+    subcategory: TradeBenefitSubcategoryRow,
+  ) {
+    const ok = window.confirm(
+      '이 특전 하위 분류를 삭제할까요? 이미 등록된 해당 특전 이미지는 일반 특전으로 이동합니다.',
+    );
+
+    if (!ok) {
+      return;
+    }
+
+    try {
+      setIsDeletingBenefitSubcategoryId(subcategory.id);
+      setMessage('');
+
+      const { error: updateItemsError } = await supabase
+        .from('trade_items')
+        .update({
+          benefit_subcategory: null,
+        })
+        .eq('collection_id', subcategory.collection_id)
+        .eq('category', 'benefit')
+        .eq('benefit_subcategory', subcategory.name);
+
+      if (updateItemsError) {
+        console.error(updateItemsError);
+        setMessage('기존 특전 이미지의 하위 분류 해제에 실패했습니다.');
+        return;
+      }
+
+      const { error: deleteError } = await supabase
+        .from('trade_benefit_subcategories')
+        .delete()
+        .eq('id', subcategory.id);
+
+      if (deleteError) {
+        console.error(deleteError);
+        setMessage('특전 하위 분류 삭제에 실패했습니다.');
+        return;
+      }
+
+      if (benefitSubcategory === subcategory.name) {
+        setBenefitSubcategory('');
+      }
+
+      if (editingItemBenefitSubcategory === subcategory.name) {
+        setEditingItemBenefitSubcategory('');
+      }
+
+      await Promise.all([loadBenefitSubcategories(), loadItems()]);
+
+      setMessage('특전 하위 분류가 삭제되었습니다.');
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      setMessage('특전 하위 분류 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingBenefitSubcategoryId('');
+    }
+  }
+
   async function handleAddItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -655,7 +973,14 @@ export default function AdminEventManagePage() {
 
       const fileExtension = getFileExtension(imageFile);
       const safeWorkTitle = normalizePathPart(selectedWorkTitle);
-      const fileName = `${category}-${safeWorkTitle}-${Date.now()}.${fileExtension}`;
+      const safeBenefitSubcategory = normalizePathPart(
+        benefitSubcategory || 'benefit',
+      );
+      const fileNamePrefix =
+        category === 'benefit'
+          ? `${category}-${safeBenefitSubcategory}-${safeWorkTitle}`
+          : `${category}-${safeWorkTitle}`;
+      const fileName = `${fileNamePrefix}-${Date.now()}.${fileExtension}`;
       const imagePath = `${eventData.slug}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -680,6 +1005,9 @@ export default function AdminEventManagePage() {
         work_title: selectedWorkTitle,
         item_name: null,
         image_path: imagePath,
+        image_ratio: imageRatio,
+        benefit_subcategory:
+          category === 'benefit' ? benefitSubcategory.trim() || null : null,
         is_visible: itemIsVisible,
         sort_order: 0,
       });
@@ -692,6 +1020,8 @@ export default function AdminEventManagePage() {
 
       setImageFile(null);
       setImagePreviewUrl('');
+      setBenefitSubcategory('');
+      setImageRatio('square');
       setItemIsVisible(true);
 
       await loadItems();
@@ -710,6 +1040,8 @@ export default function AdminEventManagePage() {
     setEditingItemId(item.id);
     setEditingItemWorkTitle(item.work_title);
     setEditingItemCategory(item.category);
+    setEditingItemBenefitSubcategory(item.benefit_subcategory ?? '');
+    setEditingItemImageRatio(getSafeImageRatio(item.image_ratio));
     setEditingItemIsVisible(item.is_visible);
   }
 
@@ -717,6 +1049,8 @@ export default function AdminEventManagePage() {
     setEditingItemId('');
     setEditingItemWorkTitle('');
     setEditingItemCategory('benefit');
+    setEditingItemBenefitSubcategory('');
+    setEditingItemImageRatio('square');
     setEditingItemIsVisible(true);
   }
 
@@ -736,6 +1070,11 @@ export default function AdminEventManagePage() {
           work_title: editingItemWorkTitle,
           category: editingItemCategory,
           item_name: null,
+          image_ratio: editingItemImageRatio,
+          benefit_subcategory:
+            editingItemCategory === 'benefit'
+              ? editingItemBenefitSubcategory.trim() || null
+              : null,
           is_visible: editingItemIsVisible,
         })
         .eq('id', item.id);
@@ -1219,6 +1558,191 @@ export default function AdminEventManagePage() {
         </form>
 
         <form
+          onSubmit={handleAddBenefitSubcategory}
+          className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-black text-neutral-950">
+                특전 하위 분류 관리
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-neutral-400">
+                행사별 특전 분류를 미리 만들어두면, 특전 등록 시 선택할 수 있습니다.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
+            <label className="block">
+              <span className="text-sm font-bold text-neutral-800">
+                하위 분류명
+              </span>
+
+              <input
+                value={newBenefitSubcategoryName}
+                onChange={(event) =>
+                  setNewBenefitSubcategoryName(event.target.value)
+                }
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                placeholder="예: 입장 특전, 구매 특전, 선착 특전"
+              />
+            </label>
+
+            <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3 md:mt-6">
+              <span>
+                <span className="block text-sm font-bold text-neutral-800">
+                  사용
+                </span>
+                <span className="mt-1 block text-xs text-neutral-500">
+                  등록 선택지 노출
+                </span>
+              </span>
+
+              <input
+                type="checkbox"
+                checked={newBenefitSubcategoryIsVisible}
+                onChange={(event) =>
+                  setNewBenefitSubcategoryIsVisible(event.target.checked)
+                }
+                className="h-5 w-5"
+              />
+            </label>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isSubmittingBenefitSubcategory}
+            className="mt-4 w-full rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+          >
+            {isSubmittingBenefitSubcategory ? '등록 중...' : '하위 분류 등록'}
+          </button>
+
+          {benefitSubcategories.length > 0 ? (
+            <div className="mt-5 space-y-2">
+              {benefitSubcategories.map((subcategory) => {
+                const isEditing =
+                  editingBenefitSubcategoryId === subcategory.id;
+                const isUpdating =
+                  isUpdatingBenefitSubcategoryId === subcategory.id;
+                const isDeleting =
+                  isDeletingBenefitSubcategoryId === subcategory.id;
+
+                return (
+                  <div
+                    key={subcategory.id}
+                    className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3"
+                  >
+                    {isEditing ? (
+                      <div className="space-y-3">
+                        <label className="block">
+                          <span className="text-[10px] font-bold text-neutral-500">
+                            하위 분류명
+                          </span>
+
+                          <input
+                            value={editingBenefitSubcategoryName}
+                            onChange={(event) =>
+                              setEditingBenefitSubcategoryName(
+                                event.target.value,
+                              )
+                            }
+                            className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs outline-none focus:border-neutral-950"
+                          />
+                        </label>
+
+                        <label className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2">
+                          <span>
+                            <span className="block text-[10px] font-bold text-neutral-600">
+                              사용
+                            </span>
+                            <span className="mt-0.5 block text-[10px] text-neutral-400">
+                              특전 등록 선택지 노출
+                            </span>
+                          </span>
+
+                          <input
+                            type="checkbox"
+                            checked={editingBenefitSubcategoryIsVisible}
+                            onChange={(event) =>
+                              setEditingBenefitSubcategoryIsVisible(
+                                event.target.checked,
+                              )
+                            }
+                            className="h-5 w-5"
+                          />
+                        </label>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={handleCancelEditBenefitSubcategory}
+                            disabled={isUpdating}
+                            className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-[11px] font-black text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            취소
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateBenefitSubcategory(subcategory)
+                            }
+                            disabled={isUpdating}
+                            className="rounded-xl bg-neutral-950 px-3 py-2 text-[11px] font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+                          >
+                            {isUpdating ? '수정 중...' : '저장'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="line-clamp-1 text-sm font-black text-neutral-950">
+                            {subcategory.name}
+                          </p>
+                          <p className="mt-1 text-[10px] font-bold text-neutral-400">
+                            {subcategory.is_visible
+                              ? '특전 등록 선택지에 표시'
+                              : '숨김'}
+                          </p>
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleStartEditBenefitSubcategory(subcategory)
+                            }
+                            className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-[11px] font-black text-neutral-600"
+                          >
+                            수정
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDeleteBenefitSubcategory(subcategory)
+                            }
+                            disabled={isDeleting}
+                            className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {isDeleting ? '삭제 중' : '삭제'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="mt-5 rounded-2xl bg-neutral-50 px-4 py-6 text-center text-xs text-neutral-400">
+              아직 등록된 특전 하위 분류가 없습니다. 필요할 때만 추가해 주세요.
+            </p>
+          )}
+        </form>
+
+        <form
           onSubmit={handleAddItem}
           className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
         >
@@ -1261,9 +1785,13 @@ export default function AdminEventManagePage() {
 
               <select
                 value={category}
-                onChange={(event) =>
-                  setCategory(event.target.value as TradeCategory)
-                }
+                onChange={(event) => {
+                  const nextCategory = event.target.value as TradeCategory;
+                  setCategory(nextCategory);
+                  if (nextCategory !== 'benefit') {
+                    setBenefitSubcategory('');
+                  }
+                }}
                 className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
               >
                 {TRADE_CATEGORIES.map((option) => (
@@ -1272,6 +1800,52 @@ export default function AdminEventManagePage() {
                   </option>
                 ))}
               </select>
+            </label>
+
+            {category === 'benefit' ? (
+              <label className="block">
+                <span className="text-sm font-bold text-neutral-800">
+                  특전 하위 분류
+                </span>
+
+                <select
+                  value={benefitSubcategory}
+                  onChange={(event) => setBenefitSubcategory(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                >
+                  <option value="">하위 분류 없음</option>
+
+                  {visibleBenefitSubcategories.map((subcategory) => (
+                    <option key={subcategory.id} value={subcategory.name}>
+                      {subcategory.name}
+                    </option>
+                  ))}
+                </select>
+
+                <p className="mt-2 text-xs leading-5 text-neutral-400">
+                  위의 특전 하위 분류 관리에서 행사별 분류를 먼저 추가할 수 있습니다.
+                </p>
+              </label>
+            ) : null}
+
+            <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
+              <span>
+                <span className="block text-sm font-bold text-neutral-800">
+                  포토카드 비율로 표시
+                </span>
+                <span className="mt-1 block text-xs text-neutral-500">
+                  정방형이 아닌 세로형 특전/굿즈에 사용합니다.
+                </span>
+              </span>
+
+              <input
+                type="checkbox"
+                checked={imageRatio === 'photocard'}
+                onChange={(event) =>
+                  setImageRatio(event.target.checked ? 'photocard' : 'square')
+                }
+                className="h-5 w-5"
+              />
             </label>
 
             <div className="space-y-3">
@@ -1286,7 +1860,7 @@ export default function AdminEventManagePage() {
                       <img
                         src={imagePreviewUrl}
                         alt="굿즈 이미지 미리보기"
-                        className="aspect-square w-12 rounded-xl bg-white object-contain p-1 shadow-sm"
+                        className={`${getImageRatioClass(imageRatio)} w-12 rounded-xl bg-white object-contain p-1 shadow-sm`}
                       />
                       <span className="text-xs font-bold text-neutral-500">
                         다른 이미지 선택
@@ -1404,7 +1978,7 @@ export default function AdminEventManagePage() {
             filteredItems.length > 0 ? (
               <div className="mt-5 grid grid-cols-2 gap-3">
                 {filteredItems.map((item) => {
-                  const categoryLabel = getCategoryLabel(item.category);
+                  const categoryLabel = getTradeItemMetaLabel(item);
                   const isEditing = editingItemId === item.id;
                   const isUpdating = isUpdatingItemId === item.id;
                   const isDeleting = isDeletingItemId === item.id;
@@ -1414,12 +1988,19 @@ export default function AdminEventManagePage() {
                       (work) => work.title === editingItemWorkTitle,
                     );
 
+                  const shouldShowCurrentBenefitSubcategory =
+                    editingItemBenefitSubcategory &&
+                    !benefitSubcategories.some(
+                      (subcategory) =>
+                        subcategory.name === editingItemBenefitSubcategory,
+                    );
+
                   return (
                     <article
                       key={item.id}
                       className="overflow-hidden rounded-2xl border border-neutral-200 bg-white"
                     >
-                      <div className="relative aspect-square bg-neutral-100">
+                      <div className={`relative ${getImageRatioClass(item.image_ratio)} bg-neutral-100`}>
                         <img
                           src={getTradeAssetUrl(item.image_path)}
                           alt={item.work_title}
@@ -1473,11 +2054,14 @@ export default function AdminEventManagePage() {
 
                               <select
                                 value={editingItemCategory}
-                                onChange={(event) =>
-                                  setEditingItemCategory(
-                                    event.target.value as TradeCategory,
-                                  )
-                                }
+                                onChange={(event) => {
+                                  const nextCategory =
+                                    event.target.value as TradeCategory;
+                                  setEditingItemCategory(nextCategory);
+                                  if (nextCategory !== 'benefit') {
+                                    setEditingItemBenefitSubcategory('');
+                                  }
+                                }}
                                 className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
                               >
                                 {TRADE_CATEGORIES.map((option) => (
@@ -1486,6 +2070,60 @@ export default function AdminEventManagePage() {
                                   </option>
                                 ))}
                               </select>
+                            </label>
+
+                            {editingItemCategory === 'benefit' ? (
+                              <label className="block">
+                                <span className="text-[10px] font-bold text-neutral-500">
+                                  특전 하위 분류
+                                </span>
+
+                                <select
+                                  value={editingItemBenefitSubcategory}
+                                  onChange={(event) =>
+                                    setEditingItemBenefitSubcategory(
+                                      event.target.value,
+                                    )
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
+                                >
+                                  <option value="">하위 분류 없음</option>
+
+                                  {shouldShowCurrentBenefitSubcategory ? (
+                                    <option value={editingItemBenefitSubcategory}>
+                                      {editingItemBenefitSubcategory} 현재값
+                                    </option>
+                                  ) : null}
+
+                                  {visibleBenefitSubcategories.map((subcategory) => (
+                                    <option key={subcategory.id} value={subcategory.name}>
+                                      {subcategory.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                            ) : null}
+
+                            <label className="flex items-center justify-between gap-2 rounded-xl bg-neutral-50 px-3 py-2">
+                              <span>
+                                <span className="block text-[10px] font-bold text-neutral-600">
+                                  포토카드 비율
+                                </span>
+                                <span className="mt-0.5 block text-[10px] text-neutral-400">
+                                  세로형 표시
+                                </span>
+                              </span>
+
+                              <input
+                                type="checkbox"
+                                checked={editingItemImageRatio === 'photocard'}
+                                onChange={(event) =>
+                                  setEditingItemImageRatio(
+                                    event.target.checked ? 'photocard' : 'square',
+                                  )
+                                }
+                                className="h-5 w-5"
+                              />
                             </label>
 
                             <label className="flex items-center justify-between gap-2 rounded-xl bg-neutral-50 px-3 py-2">
@@ -1536,6 +2174,12 @@ export default function AdminEventManagePage() {
 
                             <p className="mt-1 line-clamp-1 text-[10px] text-neutral-500">
                               {categoryLabel}
+                            </p>
+
+                            <p className="mt-0.5 text-[10px] font-bold text-neutral-400">
+                              {getSafeImageRatio(item.image_ratio) === 'photocard'
+                                ? '포토카드 비율'
+                                : '정방형'}
                             </p>
 
                             <div className="mt-3 grid grid-cols-2 gap-2">
