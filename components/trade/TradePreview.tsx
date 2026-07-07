@@ -101,25 +101,25 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
       .filter(Boolean);
 
     return (
-      <div ref={ref} className="w-[560px] bg-white p-5 text-neutral-950">
-        <div className="overflow-hidden rounded-[34px] bg-white">
-          <header className="bg-neutral-950 px-6 py-6 text-white">
+      <div ref={ref} className="w-[560px] bg-white p-4 text-neutral-950">
+        <div className="overflow-hidden rounded-[30px] bg-white">
+          <header className="bg-neutral-950 px-6 py-5 text-center text-white">
             <p className="text-[11px] font-black uppercase tracking-[0.28em] text-neutral-400">
               Goods Trade Board
             </p>
 
-            <h1 className="mt-2 break-keep text-[34px] font-black leading-[1.05] tracking-tight">
+            <h1 className="mt-2 break-keep text-[30px] font-black leading-[1.08] tracking-tight">
               {collectionTitle}
             </h1>
 
             {profileTexts.length > 0 ? (
-              <p className="mt-3 break-keep text-sm font-bold leading-6 text-neutral-200">
+              <p className="mt-2 break-keep text-sm font-bold leading-6 text-neutral-200">
                 {profileTexts.join(' · ')}
               </p>
             ) : null}
 
             {conditionChips.length > 0 ? (
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
                 {conditionChips.map((chip) => (
                   <span
                     key={chip}
@@ -132,7 +132,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
             ) : null}
           </header>
 
-          <section className="bg-white px-5 py-5">
+          <section className="bg-white px-4 py-4">
             {hasCards ? (
               visibleCategories.map((category, index) => (
                 <CategorySection
@@ -150,7 +150,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
             )}
           </section>
 
-          <footer className="border-t-2 border-dashed border-neutral-200 bg-neutral-50 px-6 py-4 text-center text-[10px] font-bold leading-5 text-neutral-400">
+          <footer className="border-t border-neutral-200 bg-neutral-50 px-5 py-3 text-center text-[9px] font-bold leading-4 text-neutral-400">
             <p>본 이미지는 비공식 교환판입니다.</p>
             <p>
               사이트에 기재된 모든 이미지의 저작권은 키다리스튜디오와 각
@@ -165,12 +165,12 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
 
 function CategorySection({ category, isFirst }: CategorySectionProps) {
   return (
-    <section className={isFirst ? 'pb-5' : 'border-t border-neutral-200 py-5'}>
-      <h2 className="mb-3 text-xl font-black tracking-tight text-neutral-950">
+    <section className={isFirst ? 'pb-4' : 'border-t border-neutral-200 py-4'}>
+      <h2 className="mb-2 text-lg font-black tracking-tight text-neutral-950">
         {category.label}
       </h2>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         <SideBlock
           label="있어요"
           cards={category.haveCards}
@@ -192,7 +192,7 @@ function SideBlock({ label, cards, columnCount }: SideBlockProps) {
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-center">
+      <div className="mb-1.5 flex items-center justify-center">
         <span
           className={
             hasCards
@@ -204,7 +204,7 @@ function SideBlock({ label, cards, columnCount }: SideBlockProps) {
         </span>
       </div>
 
-      <div className={`grid ${gridClassName} gap-1.5`}>
+      <div className={`grid ${gridClassName} gap-1`}>
         {cards.map((card) => (
           <PreviewCard key={card.id} card={card} />
         ))}
@@ -221,7 +221,7 @@ function PreviewCard({ card }: PreviewCardProps) {
       <img
         src={card.imageUrl}
         alt={card.memo || card.workTitle}
-        className="aspect-[3/4] w-full bg-white object-contain p-0.5"
+        className="aspect-square w-full bg-white object-contain p-0.5"
       />
 
       {quantity > 1 ? (
