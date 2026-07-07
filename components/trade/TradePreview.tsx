@@ -102,24 +102,24 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
 
     return (
       <div ref={ref} className="w-[560px] bg-white p-3 text-neutral-950">
-        <div className="overflow-hidden rounded-[26px] bg-white">
-          <header className="border-b border-neutral-200 bg-white px-5 py-3 text-center">
-            <h1 className="break-keep text-[24px] font-black leading-[1.12] tracking-tight text-neutral-950">
+        <div className="overflow-hidden rounded-[24px] border border-neutral-200 bg-white">
+          <header className="bg-neutral-950 px-4 py-2.5 text-center text-white">
+            <h1 className="break-keep text-[20px] font-black leading-[1.12] tracking-tight">
               {collectionTitle}
             </h1>
 
             {profileTexts.length > 0 ? (
-              <p className="mt-1 break-keep text-[12px] font-extrabold leading-5 text-neutral-500">
+              <p className="mt-0.5 break-keep text-[10px] font-extrabold leading-4 text-white/70">
                 {profileTexts.join(' · ')}
               </p>
             ) : null}
 
             {conditionChips.length > 0 ? (
-              <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+              <div className="mt-1.5 flex flex-wrap justify-center gap-1">
                 {conditionChips.map((chip) => (
                   <span
                     key={chip}
-                    className="rounded-full bg-neutral-100 px-2.5 py-1 text-[9px] font-black leading-none text-neutral-600"
+                    className="rounded-full bg-white/12 px-2 py-0.5 text-[8px] font-black leading-3 text-white/85"
                   >
                     {chip}
                   </span>
@@ -138,7 +138,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
                 />
               ))
             ) : (
-              <div className="rounded-[22px] border-2 border-dashed border-neutral-200 px-5 py-12 text-center">
+              <div className="rounded-[20px] border-2 border-dashed border-neutral-200 px-5 py-12 text-center">
                 <p className="text-base font-black text-neutral-300">
                   선택된 이미지가 없습니다
                 </p>
@@ -158,16 +158,20 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
 function CategorySection({ category, isFirst }: CategorySectionProps) {
   return (
     <section className={isFirst ? 'pb-3' : 'border-t border-neutral-200 py-3'}>
-      <h2 className="mb-2 text-center text-sm font-black tracking-tight text-neutral-950">
-        {category.label}
-      </h2>
+      <div className="mb-2 flex items-center gap-2">
+        <span className="h-3 w-1 rounded-full bg-neutral-950" />
+        <h2 className="text-left text-sm font-black tracking-tight text-neutral-950">
+          {category.label}
+        </h2>
+      </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-[1fr_1px_1fr] gap-2.5">
         <SideBlock
           label="있어요"
           cards={category.haveCards}
           columnCount={category.columnCount}
         />
+        <div className="bg-neutral-200" aria-hidden="true" />
         <SideBlock
           label="구해요"
           cards={category.wantCards}
@@ -184,12 +188,12 @@ function SideBlock({ label, cards, columnCount }: SideBlockProps) {
 
   return (
     <div>
-      <div className="mb-1.5 border-b border-neutral-200 pb-1 text-center">
+      <div className="mb-1.5 rounded-md bg-neutral-100 px-2 py-1 text-center">
         <span
           className={
             hasCards
-              ? 'text-[11px] font-black text-neutral-950'
-              : 'text-[11px] font-black text-neutral-300'
+              ? 'text-[10px] font-black text-neutral-950'
+              : 'text-[10px] font-black text-neutral-300'
           }
         >
           {label}
@@ -209,7 +213,7 @@ function PreviewCard({ card }: PreviewCardProps) {
   const quantity = getCardQuantity(card);
 
   return (
-    <article className="relative overflow-hidden rounded-lg bg-white">
+    <article className="relative overflow-hidden rounded-lg bg-white ring-1 ring-neutral-200">
       <img
         src={card.imageUrl}
         alt={card.memo || card.workTitle}
