@@ -104,6 +104,34 @@ function getCategoryLabel(category: TradeCategory) {
   );
 }
 
+function getCategorySortIndex(category: TradeCategory) {
+  const index = TRADE_CATEGORIES.findIndex((option) => option.id === category);
+
+  return index === -1 ? TRADE_CATEGORIES.length : index;
+}
+
+function sortRegisteredItems(items: RegisteredTradeItem[]) {
+  return [...items].sort((a, b) => {
+    const categoryDiff =
+      getCategorySortIndex(a.category) - getCategorySortIndex(b.category);
+
+    if (categoryDiff !== 0) {
+      return categoryDiff;
+    }
+
+    const titleDiff = a.workTitle.localeCompare(b.workTitle, "ko-KR", {
+      numeric: true,
+      sensitivity: "base",
+    });
+
+    if (titleDiff !== 0) {
+      return titleDiff;
+    }
+
+    return a.sortOrder - b.sortOrder;
+  });
+}
+
 export function TradeBuilder({
   collection,
   registeredItems,
@@ -132,7 +160,7 @@ export function TradeBuilder({
   }, [registeredItems]);
 
   const filteredItems = useMemo(() => {
-    return registeredItems.filter((item) => {
+    const nextItems = registeredItems.filter((item) => {
       const matchesWorkTitle =
         selectedWorkTitle === ALL_WORKS_VALUE ||
         item.workTitle === selectedWorkTitle;
@@ -143,6 +171,8 @@ export function TradeBuilder({
 
       return matchesWorkTitle && matchesCategory;
     });
+
+    return sortRegisteredItems(nextItems);
   }, [registeredItems, selectedWorkTitle, selectedCategory]);
 
   const haveCards = useMemo(() => {

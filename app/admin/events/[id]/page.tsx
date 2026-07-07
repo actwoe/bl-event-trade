@@ -90,6 +90,34 @@ function getCategoryLabel(category: TradeCategory) {
   );
 }
 
+function getCategorySortIndex(category: TradeCategory) {
+  const index = TRADE_CATEGORIES.findIndex((option) => option.id === category);
+
+  return index === -1 ? TRADE_CATEGORIES.length : index;
+}
+
+function sortTradeItems(rows: TradeItemRow[]) {
+  return [...rows].sort((a, b) => {
+    const categoryDiff =
+      getCategorySortIndex(a.category) - getCategorySortIndex(b.category);
+
+    if (categoryDiff !== 0) {
+      return categoryDiff;
+    }
+
+    const titleDiff = a.work_title.localeCompare(b.work_title, 'ko-KR', {
+      numeric: true,
+      sensitivity: 'base',
+    });
+
+    if (titleDiff !== 0) {
+      return titleDiff;
+    }
+
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+}
+
 export default function AdminEventManagePage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
@@ -120,7 +148,6 @@ export default function AdminEventManagePage() {
 
   const [selectedWorkTitle, setSelectedWorkTitle] = useState('');
   const [category, setCategory] = useState<TradeCategory>('benefit');
-  const [itemSortOrder, setItemSortOrder] = useState('0');
   const [itemIsVisible, setItemIsVisible] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
@@ -129,7 +156,6 @@ export default function AdminEventManagePage() {
   const [editingItemWorkTitle, setEditingItemWorkTitle] = useState('');
   const [editingItemCategory, setEditingItemCategory] =
     useState<TradeCategory>('benefit');
-  const [editingItemSortOrder, setEditingItemSortOrder] = useState('0');
   const [editingItemIsVisible, setEditingItemIsVisible] = useState(true);
 
   const [message, setMessage] = useState('');
@@ -249,7 +275,6 @@ export default function AdminEventManagePage() {
         'id, collection_id, category, work_title, item_name, image_path, is_visible, sort_order, created_at',
       )
       .eq('collection_id', eventId)
-      .order('sort_order', { ascending: true })
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -258,7 +283,7 @@ export default function AdminEventManagePage() {
       return;
     }
 
-    setItems((data ?? []) as TradeItemRow[]);
+    setItems(sortTradeItems((data ?? []) as TradeItemRow[]));
   }
 
   function handleThumbnailChange(event: ChangeEvent<HTMLInputElement>) {
@@ -621,8 +646,6 @@ export default function AdminEventManagePage() {
         return;
       }
 
-      const parsedSortOrder = Number.parseInt(itemSortOrder, 10);
-
       const { error: insertError } = await supabase.from('trade_items').insert({
         collection_id: eventData.id,
         category,
@@ -630,7 +653,7 @@ export default function AdminEventManagePage() {
         item_name: null,
         image_path: imagePath,
         is_visible: itemIsVisible,
-        sort_order: Number.isNaN(parsedSortOrder) ? 0 : parsedSortOrder,
+        sort_order: 0,
       });
 
       if (insertError) {
@@ -641,7 +664,6 @@ export default function AdminEventManagePage() {
 
       setImageFile(null);
       setImagePreviewUrl('');
-      setItemSortOrder('0');
       setItemIsVisible(true);
 
       await loadItems();
@@ -660,7 +682,6 @@ export default function AdminEventManagePage() {
     setEditingItemId(item.id);
     setEditingItemWorkTitle(item.work_title);
     setEditingItemCategory(item.category);
-    setEditingItemSortOrder(String(item.sort_order ?? 0));
     setEditingItemIsVisible(item.is_visible);
   }
 
@@ -668,7 +689,6 @@ export default function AdminEventManagePage() {
     setEditingItemId('');
     setEditingItemWorkTitle('');
     setEditingItemCategory('benefit');
-    setEditingItemSortOrder('0');
     setEditingItemIsVisible(true);
   }
 
@@ -682,8 +702,6 @@ export default function AdminEventManagePage() {
       setIsUpdatingItemId(item.id);
       setMessage('');
 
-      const parsedSortOrder = Number.parseInt(editingItemSortOrder, 10);
-
       const { error } = await supabase
         .from('trade_items')
         .update({
@@ -691,7 +709,6 @@ export default function AdminEventManagePage() {
           category: editingItemCategory,
           item_name: null,
           is_visible: editingItemIsVisible,
-          sort_order: Number.isNaN(parsedSortOrder) ? 0 : parsedSortOrder,
         })
         .eq('id', item.id);
 
@@ -1229,21 +1246,7 @@ export default function AdminEventManagePage() {
               </select>
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="text-sm font-bold text-neutral-800">
-                  정렬 순서
-                </span>
-
-                <input
-                  type="number"
-                  value={itemSortOrder}
-                  onChange={(event) => setItemSortOrder(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                  placeholder="0"
-                />
-              </label>
-
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
                 <span>
                   <span className="block text-sm font-bold text-neutral-800">
@@ -1261,38 +1264,38 @@ export default function AdminEventManagePage() {
                   className="h-5 w-5"
                 />
               </label>
-            </div>
 
-            <div>
-              <span className="text-sm font-bold text-neutral-800">
-                굿즈 이미지
-              </span>
+              <div>
+                <span className="text-sm font-bold text-neutral-800">
+                  굿즈 이미지
+                </span>
 
-              <label className="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center hover:border-neutral-950">
-                {imagePreviewUrl ? (
-                  <img
-                    src={imagePreviewUrl}
-                    alt="굿즈 이미지 미리보기"
-                    className="aspect-square w-32 rounded-2xl bg-white object-contain p-1 shadow-sm"
+                <label className="mt-1 flex min-h-[92px] cursor-pointer items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-3 text-center hover:border-neutral-950">
+                  {imagePreviewUrl ? (
+                    <img
+                      src={imagePreviewUrl}
+                      alt="굿즈 이미지 미리보기"
+                      className="aspect-square w-20 rounded-2xl bg-white object-contain p-1 shadow-sm"
+                    />
+                  ) : (
+                    <span>
+                      <span className="block text-sm font-black text-neutral-700">
+                        이미지 선택
+                      </span>
+                      <span className="mt-1 block text-xs leading-5 text-neutral-400">
+                        교환판에 표시될 굿즈 이미지를 업로드합니다.
+                      </span>
+                    </span>
+                  )}
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
                   />
-                ) : (
-                  <>
-                    <span className="text-sm font-black text-neutral-700">
-                      이미지 선택
-                    </span>
-                    <span className="mt-2 text-xs leading-5 text-neutral-400">
-                      교환판에 표시될 굿즈 이미지를 업로드합니다.
-                    </span>
-                  </>
-                )}
-
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="hidden"
-                />
-              </label>
+                </label>
+              </div>
             </div>
 
             <button
@@ -1315,7 +1318,7 @@ export default function AdminEventManagePage() {
 
           {items.length > 0 ? (
             <div className="mt-5 grid grid-cols-2 gap-3">
-              {items.map((item) => {
+              {sortTradeItems(items).map((item) => {
                 const categoryLabel = getCategoryLabel(item.category);
                 const isEditing = editingItemId === item.id;
                 const isUpdating = isUpdatingItemId === item.id;
@@ -1400,42 +1403,25 @@ export default function AdminEventManagePage() {
                             </select>
                           </label>
 
-                          <div className="grid grid-cols-2 gap-2">
-                            <label className="block">
-                              <span className="text-[10px] font-bold text-neutral-500">
-                                정렬
-                              </span>
-
-                              <input
-                                type="number"
-                                value={editingItemSortOrder}
-                                onChange={(event) =>
-                                  setEditingItemSortOrder(event.target.value)
-                                }
-                                onKeyDown={(event) => {
-                                  if (event.key === 'Enter') {
-                                    event.preventDefault();
-                                  }
-                                }}
-                                className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
-                              />
-                            </label>
-
-                            <label className="flex items-center justify-between gap-2 rounded-xl bg-neutral-50 px-3 py-2">
-                              <span className="text-[10px] font-bold text-neutral-600">
+                          <label className="flex items-center justify-between gap-2 rounded-xl bg-neutral-50 px-3 py-2">
+                            <span>
+                              <span className="block text-[10px] font-bold text-neutral-600">
                                 공개
                               </span>
+                              <span className="mt-0.5 block text-[10px] text-neutral-400">
+                                교환판 노출
+                              </span>
+                            </span>
 
-                              <input
-                                type="checkbox"
-                                checked={editingItemIsVisible}
-                                onChange={(event) =>
-                                  setEditingItemIsVisible(event.target.checked)
-                                }
-                                className="h-5 w-5"
-                              />
-                            </label>
-                          </div>
+                            <input
+                              type="checkbox"
+                              checked={editingItemIsVisible}
+                              onChange={(event) =>
+                                setEditingItemIsVisible(event.target.checked)
+                              }
+                              className="h-5 w-5"
+                            />
+                          </label>
 
                           <div className="grid grid-cols-2 gap-2 pt-1">
                             <button
@@ -1465,10 +1451,6 @@ export default function AdminEventManagePage() {
 
                           <p className="mt-1 line-clamp-1 text-[10px] text-neutral-500">
                             {categoryLabel}
-                          </p>
-
-                          <p className="mt-1 text-[10px] text-neutral-300">
-                            정렬 {item.sort_order}
                           </p>
 
                           <div className="mt-3 grid grid-cols-2 gap-2">
