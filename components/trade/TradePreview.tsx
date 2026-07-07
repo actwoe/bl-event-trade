@@ -54,10 +54,14 @@ function getColumnCount(haveCards: TradeCard[], wantCards: TradeCard[]): 1 | 2 |
   const totalCardCount = haveCardCount + wantCardCount;
   const maxSideCardCount = Math.max(haveCardCount, wantCardCount);
 
-  const columnsByTotal = totalCardCount <= 2 ? 1 : totalCardCount <= 4 ? 2 : 3;
-  const columnsBySide = maxSideCardCount <= 1 ? 1 : maxSideCardCount <= 2 ? 2 : 3;
+  if (totalCardCount === 0) return 2;
 
-  return Math.max(columnsByTotal, columnsBySide) as 1 | 2 | 3;
+  // 실제로 화면에 보이는 카드 개수를 기준으로 계산합니다.
+  // 수량(quantity)은 ×2, ×3 배지로만 표시하고 사이즈 계산에는 넣지 않습니다.
+  // 합쳐서 1~4개일 때도 한 줄 4개 기준 사이즈로 맞춥니다.
+  if (totalCardCount <= 4 && maxSideCardCount <= 2) return 2;
+
+  return 3;
 }
 
 function getGridColumnClass(columnCount: 1 | 2 | 3) {
@@ -92,40 +96,54 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
   function TradePreview({ board, collectionTitle }, ref) {
     const visibleCategories = getVisibleCategories(board.cards);
     const hasCards = visibleCategories.length > 0;
-    const profileTexts = [board.nickname, board.contact].filter(
-      (item) => item.trim().length > 0,
-    );
-    const conditionChips = board.memo
+    const nickname = board.nickname.trim();
+    const contact = board.contact.trim();
+    const hasProfile = nickname.length > 0 || contact.length > 0;
+    const conditionText = board.memo
       .split(' · ')
       .map((item) => item.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .join(' · ');
 
     return (
       <div ref={ref} className="w-[560px] bg-white p-3 text-neutral-950">
         <div className="overflow-hidden rounded-[24px] border border-neutral-200 bg-white">
-          <header className="bg-neutral-950 px-4 py-2.5 text-center text-white">
-            <h1 className="break-keep text-[20px] font-black leading-[1.12] tracking-tight">
-              {collectionTitle}
-            </h1>
+          <header className="bg-neutral-950 px-4 py-3 text-white">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1 text-left">
+                <h1 className="break-keep text-[21px] font-black leading-[1.08] tracking-tight">
+                  {collectionTitle}
+                </h1>
 
-            {profileTexts.length > 0 ? (
-              <p className="mt-0.5 break-keep text-[10px] font-extrabold leading-4 text-white/70">
-                {profileTexts.join(' · ')}
-              </p>
-            ) : null}
-
-            {conditionChips.length > 0 ? (
-              <div className="mt-1.5 flex flex-wrap justify-center gap-1">
-                {conditionChips.map((chip) => (
-                  <span
-                    key={chip}
-                    className="rounded-full bg-white/12 px-2 py-0.5 text-[8px] font-black leading-3 text-white/85"
-                  >
-                    {chip}
-                  </span>
-                ))}
+                {conditionText.length > 0 ? (
+                  <p className="mt-1 truncate text-[9px] font-extrabold leading-3 text-white/65">
+                    {conditionText}
+                  </p>
+                ) : (
+                  <p className="mt-1 text-[9px] font-extrabold leading-3 text-white/35">
+                    GOODS TRADE BOARD
+                  </p>
+                )}
               </div>
-            ) : null}
+
+              {hasProfile ? (
+                <div className="flex min-h-[52px] min-w-[52px] max-w-[128px] shrink-0 items-center justify-center rounded-full border border-white/30 bg-white px-3 py-2 text-center text-neutral-950">
+                  <div className="min-w-0">
+                    {nickname.length > 0 ? (
+                      <p className="truncate text-[11px] font-black leading-3">
+                        {nickname}
+                      </p>
+                    ) : null}
+
+                    {contact.length > 0 ? (
+                      <p className="mt-0.5 truncate text-[8px] font-extrabold leading-3 text-neutral-500">
+                        {contact}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </header>
 
           <section className="bg-white px-3 py-3">
