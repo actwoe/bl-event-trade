@@ -120,7 +120,6 @@ export default function AdminEventManagePage() {
 
   const [selectedWorkTitle, setSelectedWorkTitle] = useState('');
   const [category, setCategory] = useState<TradeCategory>('benefit');
-  const [itemName, setItemName] = useState('');
   const [itemSortOrder, setItemSortOrder] = useState('0');
   const [itemIsVisible, setItemIsVisible] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -130,7 +129,6 @@ export default function AdminEventManagePage() {
   const [editingItemWorkTitle, setEditingItemWorkTitle] = useState('');
   const [editingItemCategory, setEditingItemCategory] =
     useState<TradeCategory>('benefit');
-  const [editingItemName, setEditingItemName] = useState('');
   const [editingItemSortOrder, setEditingItemSortOrder] = useState('0');
   const [editingItemIsVisible, setEditingItemIsVisible] = useState(true);
 
@@ -146,10 +144,6 @@ export default function AdminEventManagePage() {
   const normalizedSlug = useMemo(() => {
     return normalizeSlug(slug);
   }, [slug]);
-
-  const selectedCategoryLabel = useMemo(() => {
-    return getCategoryLabel(category);
-  }, [category]);
 
   const visibleWorks = useMemo(() => {
     return sortKoreanTitles(works.filter((work) => work.is_visible));
@@ -608,8 +602,7 @@ export default function AdminEventManagePage() {
 
       const fileExtension = getFileExtension(imageFile);
       const safeWorkTitle = normalizePathPart(selectedWorkTitle);
-      const safeItemName = normalizePathPart(itemName || selectedCategoryLabel);
-      const fileName = `${category}-${safeWorkTitle}-${safeItemName}-${Date.now()}.${fileExtension}`;
+      const fileName = `${category}-${safeWorkTitle}-${Date.now()}.${fileExtension}`;
       const imagePath = `${eventData.slug}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
@@ -634,7 +627,7 @@ export default function AdminEventManagePage() {
         collection_id: eventData.id,
         category,
         work_title: selectedWorkTitle,
-        item_name: itemName.trim() || null,
+        item_name: null,
         image_path: imagePath,
         is_visible: itemIsVisible,
         sort_order: Number.isNaN(parsedSortOrder) ? 0 : parsedSortOrder,
@@ -646,7 +639,6 @@ export default function AdminEventManagePage() {
         return;
       }
 
-      setItemName('');
       setImageFile(null);
       setImagePreviewUrl('');
       setItemSortOrder('0');
@@ -668,7 +660,6 @@ export default function AdminEventManagePage() {
     setEditingItemId(item.id);
     setEditingItemWorkTitle(item.work_title);
     setEditingItemCategory(item.category);
-    setEditingItemName(item.item_name ?? '');
     setEditingItemSortOrder(String(item.sort_order ?? 0));
     setEditingItemIsVisible(item.is_visible);
   }
@@ -677,7 +668,6 @@ export default function AdminEventManagePage() {
     setEditingItemId('');
     setEditingItemWorkTitle('');
     setEditingItemCategory('benefit');
-    setEditingItemName('');
     setEditingItemSortOrder('0');
     setEditingItemIsVisible(true);
   }
@@ -699,7 +689,7 @@ export default function AdminEventManagePage() {
         .update({
           work_title: editingItemWorkTitle,
           category: editingItemCategory,
-          item_name: editingItemName.trim() || null,
+          item_name: null,
           is_visible: editingItemIsVisible,
           sort_order: Number.isNaN(parsedSortOrder) ? 0 : parsedSortOrder,
         })
@@ -1239,19 +1229,6 @@ export default function AdminEventManagePage() {
               </select>
             </label>
 
-            <label className="block">
-              <span className="text-sm font-bold text-neutral-800">
-                굿즈명 / 메모
-              </span>
-
-              <input
-                value={itemName}
-                onChange={(event) => setItemName(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="예: 특전 001, 포토카드 A"
-              />
-            </label>
-
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
                 <span className="text-sm font-bold text-neutral-800">
@@ -1357,7 +1334,7 @@ export default function AdminEventManagePage() {
                     <div className="relative aspect-[3/4] bg-neutral-100">
                       <img
                         src={getTradeAssetUrl(item.image_path)}
-                        alt={item.item_name ?? item.work_title}
+                        alt={item.work_title}
                         className="h-full w-full bg-white object-contain p-1"
                       />
 
@@ -1421,26 +1398,6 @@ export default function AdminEventManagePage() {
                                 </option>
                               ))}
                             </select>
-                          </label>
-
-                          <label className="block">
-                            <span className="text-[10px] font-bold text-neutral-500">
-                              굿즈명 / 메모
-                            </span>
-
-                            <input
-                              value={editingItemName}
-                              onChange={(event) =>
-                                setEditingItemName(event.target.value)
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                  event.preventDefault();
-                                }
-                              }}
-                              className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
-                              placeholder="굿즈명 / 메모"
-                            />
                           </label>
 
                           <div className="grid grid-cols-2 gap-2">
@@ -1508,10 +1465,6 @@ export default function AdminEventManagePage() {
 
                           <p className="mt-1 line-clamp-1 text-[10px] text-neutral-500">
                             {categoryLabel}
-                          </p>
-
-                          <p className="mt-1 line-clamp-1 text-[10px] text-neutral-400">
-                            {item.item_name || '굿즈명 없음'}
                           </p>
 
                           <p className="mt-1 text-[10px] text-neutral-300">

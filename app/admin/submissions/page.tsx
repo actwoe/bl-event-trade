@@ -88,7 +88,6 @@ export default function AdminSubmissionsPage() {
   const [signedUrlById, setSignedUrlById] = useState<Record<string, string>>(
     {},
   );
-  const [itemNameById, setItemNameById] = useState<Record<string, string>>({});
   const [adminNoteById, setAdminNoteById] = useState<Record<string, string>>(
     {},
   );
@@ -157,15 +156,12 @@ export default function AdminSubmissionsPage() {
 
     setSubmissions(nextSubmissions);
 
-    const nextItemNames: Record<string, string> = {};
     const nextAdminNotes: Record<string, string> = {};
 
     nextSubmissions.forEach((submission) => {
-      nextItemNames[submission.id] = submission.item_name ?? '';
       nextAdminNotes[submission.id] = submission.admin_note ?? '';
     });
 
-    setItemNameById(nextItemNames);
     setAdminNoteById(nextAdminNotes);
 
     await loadSignedUrls(nextSubmissions);
@@ -232,10 +228,7 @@ export default function AdminSubmissionsPage() {
 
       const fileExtension = getFileExtensionFromPath(submission.image_path);
       const safeWorkTitle = normalizePathPart(submission.work_title);
-      const safeItemName = normalizePathPart(
-        itemNameById[submission.id] || getCategoryLabel(submission.category),
-      );
-      const publicImagePath = `${submission.collection_slug}/approved-${submission.category}-${safeWorkTitle}-${safeItemName}-${Date.now()}.${fileExtension}`;
+      const publicImagePath = `${submission.collection_slug}/approved-${submission.category}-${safeWorkTitle}-${Date.now()}.${fileExtension}`;
 
       const { error: uploadError } = await supabase.storage
         .from('trade-assets')
@@ -251,15 +244,13 @@ export default function AdminSubmissionsPage() {
         return;
       }
 
-      const nextItemName = itemNameById[submission.id]?.trim() || null;
-
       const { data: insertedItem, error: insertError } = await supabase
         .from('trade_items')
         .insert({
           collection_id: submission.collection_id,
           category: submission.category,
           work_title: submission.work_title,
-          item_name: nextItemName,
+          item_name: null,
           image_path: publicImagePath,
           is_visible: true,
           sort_order: 0,
@@ -277,7 +268,7 @@ export default function AdminSubmissionsPage() {
         .from('card_submissions')
         .update({
           status: 'approved',
-          item_name: nextItemName,
+          item_name: null,
           approved_item_id: insertedItem.id,
           admin_note: adminNoteById[submission.id]?.trim() || null,
           reviewed_at: new Date().toISOString(),
@@ -585,29 +576,6 @@ export default function AdminSubmissionsPage() {
                         )}
                       </p>
                     </div>
-
-                    <label className="mt-4 block">
-                      <span className="text-sm font-bold text-neutral-800">
-                        굿즈명 / 메모
-                      </span>
-
-                      <input
-                        value={itemNameById[submission.id] ?? ''}
-                        onChange={(event) =>
-                          setItemNameById((prev) => ({
-                            ...prev,
-                            [submission.id]: event.target.value,
-                          }))
-                        }
-                        disabled={submission.status !== 'pending'}
-                        className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950 disabled:bg-neutral-50 disabled:text-neutral-400"
-                        placeholder="예: 특전 001, 포토카드 A"
-                      />
-
-                      <p className="mt-2 text-xs leading-5 text-neutral-400">
-                        승인 시 교환판에 표시될 굿즈명입니다.
-                      </p>
-                    </label>
 
                     <label className="mt-4 block">
                       <span className="text-sm font-bold text-neutral-800">

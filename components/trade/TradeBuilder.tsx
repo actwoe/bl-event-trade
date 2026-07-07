@@ -84,6 +84,26 @@ function isSameRegisteredCard(
   );
 }
 
+
+function getRegisteredItemQuantity(
+  cards: TradeCard[],
+  item: RegisteredTradeItem,
+  side: TradeSide,
+) {
+  const selectedCard = cards.find((card) =>
+    isSameRegisteredCard(card, item, side),
+  );
+
+  return selectedCard ? getCardQuantity(selectedCard) : 0;
+}
+
+
+function getCategoryLabel(category: TradeCategory) {
+  return (
+    TRADE_CATEGORIES.find((option) => option.id === category)?.label ?? category
+  );
+}
+
 export function TradeBuilder({
   collection,
   registeredItems,
@@ -219,11 +239,26 @@ export function TradeBuilder({
     });
   }
 
-  function addRegisteredItem(item: RegisteredTradeItem, side: TradeSide) {
+  function setRegisteredItemQuantity(
+    item: RegisteredTradeItem,
+    side: TradeSide,
+    nextQuantity: number,
+  ) {
+    const safeQuantity = Math.max(0, Math.floor(nextQuantity));
+
     setBoard((prev) => {
       const existingCard = prev.cards.find((card) =>
         isSameRegisteredCard(card, item, side),
       );
+
+      if (safeQuantity <= 0) {
+        return {
+          ...prev,
+          cards: existingCard
+            ? prev.cards.filter((card) => card.id !== existingCard.id)
+            : prev.cards,
+        };
+      }
 
       if (existingCard) {
         return {
@@ -232,7 +267,11 @@ export function TradeBuilder({
             card.id === existingCard.id
               ? {
                   ...card,
-                  quantity: getCardQuantity(card) + 1,
+                  category: item.category,
+                  imageUrl: item.imageUrl,
+                  workTitle: item.workTitle,
+                  memo: item.itemName,
+                  quantity: safeQuantity,
                   registeredItemId: item.id,
                 }
               : card,
@@ -247,7 +286,7 @@ export function TradeBuilder({
         imageUrl: item.imageUrl,
         workTitle: item.workTitle,
         memo: item.itemName,
-        quantity: 1,
+        quantity: safeQuantity,
         registeredItemId: item.id,
       };
 
@@ -256,6 +295,16 @@ export function TradeBuilder({
         cards: [...prev.cards, newCard],
       };
     });
+  }
+
+  function increaseRegisteredItemQuantity(item: RegisteredTradeItem, side: TradeSide) {
+    const currentQuantity = getRegisteredItemQuantity(board.cards, item, side);
+    setRegisteredItemQuantity(item, side, currentQuantity + 1);
+  }
+
+  function decreaseRegisteredItemQuantity(item: RegisteredTradeItem, side: TradeSide) {
+    const currentQuantity = getRegisteredItemQuantity(board.cards, item, side);
+    setRegisteredItemQuantity(item, side, currentQuantity - 1);
   }
 
   function addUploadedCards(side: TradeSide, files: FileList) {
@@ -581,11 +630,13 @@ export function TradeBuilder({
           selectedWorkTitle={selectedWorkTitle}
           selectedCategory={selectedCategory}
           workTitleOptions={workTitleOptions}
+          selectedCards={board.cards}
           filteredItems={filteredItems}
           onClose={closeAddModal}
           onChangeWorkTitle={setSelectedWorkTitle}
           onChangeCategory={setSelectedCategory}
-          onAddItem={(item) => addRegisteredItem(item, addModalSide)}
+          onIncreaseItem={(item) => increaseRegisteredItemQuantity(item, addModalSide)}
+          onDecreaseItem={(item) => decreaseRegisteredItemQuantity(item, addModalSide)}
           onUpload={(files) => addUploadedCards(addModalSide, files)}
         />
       ) : null}
@@ -626,11 +677,13 @@ type AddItemModalProps = {
   selectedWorkTitle: string;
   selectedCategory: CategoryFilterValue;
   workTitleOptions: string[];
+  selectedCards: TradeCard[];
   filteredItems: RegisteredTradeItem[];
   onClose: () => void;
   onChangeWorkTitle: (value: string) => void;
   onChangeCategory: (value: CategoryFilterValue) => void;
-  onAddItem: (item: RegisteredTradeItem) => void;
+  onIncreaseItem: (item: RegisteredTradeItem) => void;
+  onDecreaseItem: (item: RegisteredTradeItem) => void;
   onUpload: (files: FileList) => void;
 };
 
@@ -639,11 +692,13 @@ function AddItemModal({
   selectedWorkTitle,
   selectedCategory,
   workTitleOptions,
+  selectedCards,
   filteredItems,
   onClose,
   onChangeWorkTitle,
   onChangeCategory,
-  onAddItem,
+  onIncreaseItem,
+  onDecreaseItem,
   onUpload,
 }: AddItemModalProps) {
   const sideLabel = side === "have" ? "있어요" : "구해요";
@@ -721,13 +776,23 @@ function AddItemModal({
         <div className="flex-1 overflow-y-auto p-5">
           {filteredItems.length > 0 ? (
             <div className="grid grid-cols-3 gap-3">
-              {filteredItems.map((item) => (
-                <RegisteredItemCard
-                  key={item.id}
-                  item={item}
-                  onAdd={() => onAddItem(item)}
-                />
-              ))}
+              {filteredItems.map((item) => {
+                const quantity = getRegisteredItemQuantity(
+                  selectedCards,
+                  item,
+                  side,
+                );
+
+                return (
+                  <RegisteredItemCard
+                    key={item.id}
+                    item={item}
+                    quantity={quantity}
+                    onIncrease={() => onIncreaseItem(item)}
+                    onDecrease={() => onDecreaseItem(item)}
+                  />
+                );
+              })}
             </div>
           ) : (
             <p className="rounded-2xl bg-neutral-50 px-4 py-10 text-center text-xs text-neutral-400">
@@ -780,15 +845,27 @@ function AddItemModal({
 
 type RegisteredItemCardProps = {
   item: RegisteredTradeItem;
-  onAdd: () => void;
+  quantity: number;
+  onIncrease: () => void;
+  onDecrease: () => void;
 };
 
-function RegisteredItemCard({ item, onAdd }: RegisteredItemCardProps) {
+function RegisteredItemCard({
+  item,
+  quantity,
+  onIncrease,
+  onDecrease,
+}: RegisteredItemCardProps) {
+  const selected = quantity > 0;
+  const categoryLabel = getCategoryLabel(item.category);
+
   return (
-    <button
-      type="button"
-      onClick={onAdd}
-      className="overflow-hidden rounded-2xl border border-neutral-200 bg-white text-left transition hover:border-neutral-950"
+    <article
+      className={
+        selected
+          ? "overflow-hidden rounded-2xl border-2 border-neutral-950 bg-white text-left"
+          : "overflow-hidden rounded-2xl border border-neutral-200 bg-white text-left"
+      }
     >
       <div className="relative bg-neutral-100">
         <img
@@ -796,6 +873,12 @@ function RegisteredItemCard({ item, onAdd }: RegisteredItemCardProps) {
           alt={item.itemName}
           className="aspect-[3/4] w-full bg-white object-contain p-1"
         />
+
+        {selected ? (
+          <span className="absolute right-1.5 top-1.5 rounded-full bg-neutral-950 px-2 py-1 text-[10px] font-black leading-none text-white">
+            ×{quantity}
+          </span>
+        ) : null}
       </div>
 
       <div className="p-2">
@@ -803,14 +886,43 @@ function RegisteredItemCard({ item, onAdd }: RegisteredItemCardProps) {
           {item.workTitle}
         </p>
         <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">
-          {item.itemName || "굿즈명 없음"}
+          {categoryLabel}
         </p>
 
-        <p className="mt-2 rounded-lg bg-neutral-950 px-2 py-1.5 text-center text-[10px] font-black text-white">
-          추가
-        </p>
+        {selected ? (
+          <div className="mt-2 flex items-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
+            <button
+              type="button"
+              onClick={onDecrease}
+              className="flex h-8 flex-1 items-center justify-center text-sm font-black text-neutral-600"
+              aria-label="수량 줄이기"
+            >
+              −
+            </button>
+            <span className="min-w-8 px-1 text-center text-xs font-black text-neutral-950">
+              {quantity}
+            </span>
+            <button
+              type="button"
+              onClick={onIncrease}
+              className="flex h-8 flex-1 items-center justify-center text-sm font-black text-neutral-600"
+              aria-label="수량 늘리기"
+            >
+              +
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onIncrease}
+            className="mt-2 flex h-8 w-full items-center justify-center rounded-lg bg-neutral-950 text-sm font-black text-white"
+            aria-label="수량 늘리기"
+          >
+            +
+          </button>
+        )}
       </div>
-    </button>
+    </article>
   );
 }
 
@@ -821,13 +933,14 @@ type CardEditorProps = {
 };
 
 function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
-  const categoryLabel =
-    TRADE_CATEGORIES.find((category) => category.id === card.category)?.label ??
-    card.category;
+  const categoryLabel = getCategoryLabel(card.category);
   const quantity = getCardQuantity(card);
 
   function decreaseQuantity() {
-    if (quantity <= 1) return;
+    if (quantity <= 1) {
+      onRemove();
+      return;
+    }
 
     onUpdate({ quantity: quantity - 1 });
   }
@@ -909,8 +1022,7 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
             <button
               type="button"
               onClick={decreaseQuantity}
-              disabled={quantity <= 1}
-              className="flex h-8 w-8 items-center justify-center text-sm font-black text-neutral-500 disabled:text-neutral-200"
+              className="flex h-8 w-8 items-center justify-center text-sm font-black text-neutral-500"
               aria-label="수량 줄이기"
             >
               −
