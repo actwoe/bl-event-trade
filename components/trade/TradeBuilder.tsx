@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { toPng } from 'html-to-image';
-import { nanoid } from 'nanoid';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toPng } from "html-to-image";
+import { nanoid } from "nanoid";
 import {
   RegisteredTradeItem,
   TRADE_CATEGORIES,
@@ -11,8 +11,8 @@ import {
   TradeCategory,
   TradeCollectionSummary,
   TradeSide,
-} from '@/lib/trade-types';
-import { TradePreview } from './TradePreview';
+} from "@/lib/trade-types";
+import { TradePreview } from "./TradePreview";
 
 type TradeBuilderProps = {
   collection: TradeCollectionSummary;
@@ -20,30 +20,33 @@ type TradeBuilderProps = {
 };
 
 const PREVIEW_WIDTH = 560;
-const ALL_WORKS_VALUE = 'all';
+const ALL_WORKS_VALUE = "all";
+const ALL_CATEGORIES_VALUE = "all";
+
+type CategoryFilterValue = TradeCategory | typeof ALL_CATEGORIES_VALUE;
 
 const TRADE_CONDITIONS = [
-  '현장 직거래 가능',
-  'N:1 가능',
-  '반택 거래',
-  '일택 거래',
-  '미세 하자 있음',
+  "현장 직거래 가능",
+  "N:1 가능",
+  "반택 거래",
+  "일택 거래",
+  "미세 하자 있음",
 ];
 
 function createInitialBoard(): TradeBoard {
   return {
-    nickname: '',
-    contact: '',
-    memo: '',
+    nickname: "",
+    contact: "",
+    memo: "",
     cards: [],
   };
 }
 
 function sortKoreanTitles(titles: string[]) {
   return [...titles].sort((a, b) =>
-    a.localeCompare(b, 'ko-KR', {
+    a.localeCompare(b, "ko-KR", {
       numeric: true,
-      sensitivity: 'base',
+      sensitivity: "base",
     }),
   );
 }
@@ -58,7 +61,7 @@ export function TradeBuilder({
   const [isConditionsOpen, setIsConditionsOpen] = useState(false);
   const [selectedWorkTitle, setSelectedWorkTitle] = useState(ALL_WORKS_VALUE);
   const [selectedCategory, setSelectedCategory] =
-    useState<TradeCategory>('benefit');
+    useState<CategoryFilterValue>(ALL_CATEGORIES_VALUE);
   const [addModalSide, setAddModalSide] = useState<TradeSide | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [previewScale, setPreviewScale] = useState(0.6);
@@ -81,18 +84,20 @@ export function TradeBuilder({
         selectedWorkTitle === ALL_WORKS_VALUE ||
         item.workTitle === selectedWorkTitle;
 
-      const matchesCategory = item.category === selectedCategory;
+      const matchesCategory =
+        selectedCategory === ALL_CATEGORIES_VALUE ||
+        item.category === selectedCategory;
 
       return matchesWorkTitle && matchesCategory;
     });
   }, [registeredItems, selectedWorkTitle, selectedCategory]);
 
   const haveCards = useMemo(() => {
-    return board.cards.filter((card) => card.side === 'have');
+    return board.cards.filter((card) => card.side === "have");
   }, [board.cards]);
 
   const wantCards = useMemo(() => {
-    return board.cards.filter((card) => card.side === 'want');
+    return board.cards.filter((card) => card.side === "want");
   }, [board.cards]);
 
   const canDownload = useMemo(() => {
@@ -102,7 +107,7 @@ export function TradeBuilder({
   useEffect(() => {
     setBoard((prev) => ({
       ...prev,
-      memo: selectedConditions.join(' · '),
+      memo: selectedConditions.join(" · "),
     }));
   }, [selectedConditions]);
 
@@ -136,7 +141,7 @@ export function TradeBuilder({
       resizeObserver.observe(previewRef.current);
     }
 
-    window.addEventListener('resize', updatePreviewSize);
+    window.addEventListener("resize", updatePreviewSize);
 
     const timer = window.setTimeout(() => {
       updatePreviewSize();
@@ -144,7 +149,7 @@ export function TradeBuilder({
 
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener('resize', updatePreviewSize);
+      window.removeEventListener("resize", updatePreviewSize);
       window.clearTimeout(timer);
     };
   }, [board]);
@@ -187,14 +192,17 @@ export function TradeBuilder({
 
   function addUploadedCards(side: TradeSide, files: FileList) {
     const newCards: TradeCard[] = Array.from(files)
-      .filter((file) => file.type.startsWith('image/'))
+      .filter((file) => file.type.startsWith("image/"))
       .map((file) => ({
         id: nanoid(),
         side,
-        category: selectedCategory,
+        category:
+          selectedCategory === ALL_CATEGORIES_VALUE
+            ? "benefit"
+            : selectedCategory,
         imageUrl: URL.createObjectURL(file),
-        workTitle: file.name.replace(/\.[^/.]+$/, ''),
-        memo: '',
+        workTitle: file.name.replace(/\.[^/.]+$/, ""),
+        memo: "",
       }));
 
     if (newCards.length === 0) return;
@@ -237,11 +245,11 @@ export function TradeBuilder({
 
       const dataUrl = await toPng(previewRef.current, {
         pixelRatio: 2,
-        backgroundColor: '#ffffff',
+        backgroundColor: "#ffffff",
         cacheBust: true,
       });
 
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.download = `${collection.slug}-trade-board.png`;
       link.href = dataUrl;
       link.click();
@@ -303,7 +311,7 @@ export function TradeBuilder({
                 </p>
               </div>
               <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-500">
-                {isProfileOpen ? '접기' : '선택 입력'}
+                {isProfileOpen ? "접기" : "선택 입력"}
               </span>
             </button>
 
@@ -316,7 +324,7 @@ export function TradeBuilder({
                   <input
                     value={board.nickname}
                     onChange={(event) =>
-                      updateBoardField('nickname', event.target.value)
+                      updateBoardField("nickname", event.target.value)
                     }
                     className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-900"
                     placeholder="닉네임"
@@ -330,7 +338,7 @@ export function TradeBuilder({
                   <input
                     value={board.contact}
                     onChange={(event) =>
-                      updateBoardField('contact', event.target.value)
+                      updateBoardField("contact", event.target.value)
                     }
                     className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-900"
                     placeholder="@example"
@@ -357,7 +365,7 @@ export function TradeBuilder({
               </div>
               <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-500">
                 {isConditionsOpen
-                  ? '접기'
+                  ? "접기"
                   : `${selectedConditions.length}개 선택`}
               </span>
             </button>
@@ -372,8 +380,8 @@ export function TradeBuilder({
                       key={condition}
                       className={
                         checked
-                          ? 'flex cursor-pointer items-center gap-2 rounded-2xl bg-neutral-950 px-3 py-3 text-xs font-black text-white'
-                          : 'flex cursor-pointer items-center gap-2 rounded-2xl bg-white px-3 py-3 text-xs font-bold text-neutral-600 ring-1 ring-neutral-200'
+                          ? "flex cursor-pointer items-center gap-2 rounded-2xl bg-neutral-950 px-3 py-3 text-xs font-black text-white"
+                          : "flex cursor-pointer items-center gap-2 rounded-2xl bg-white px-3 py-3 text-xs font-bold text-neutral-600 ring-1 ring-neutral-200"
                       }
                     >
                       <input
@@ -401,14 +409,14 @@ export function TradeBuilder({
               title="있어요"
               emoji="🙋🏻‍♀️"
               count={haveCards.length}
-              onClick={() => openAddModal('have')}
+              onClick={() => openAddModal("have")}
             />
 
             <AddSideButton
               title="구해요"
               emoji="❤️"
               count={wantCards.length}
-              onClick={() => openAddModal('want')}
+              onClick={() => openAddModal("want")}
             />
           </div>
         </div>
@@ -457,7 +465,7 @@ export function TradeBuilder({
             disabled={!canDownload || isExporting}
             className="rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
           >
-            {isExporting ? '저장 중...' : 'PNG 저장'}
+            {isExporting ? "저장 중..." : "PNG 저장"}
           </button>
         </div>
       </div>
@@ -466,8 +474,8 @@ export function TradeBuilder({
         <div className="mb-3">
           <div className="text-sm font-black text-neutral-950">미리보기</div>
           <p className="mt-1 text-xs leading-5 text-neutral-400">
-            세로형 교환판으로 저장됩니다. 화면에서는 모바일 폭에 맞게
-            축소되어 보입니다.
+            세로형 교환판으로 저장됩니다. 화면에서는 모바일 폭에 맞게 축소되어
+            보입니다.
           </p>
         </div>
 
@@ -485,7 +493,7 @@ export function TradeBuilder({
               style={{
                 width: PREVIEW_WIDTH,
                 transform: `scale(${previewScale})`,
-                transformOrigin: 'top left',
+                transformOrigin: "top left",
               }}
             >
               <TradePreview
@@ -547,12 +555,12 @@ function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
 type AddItemModalProps = {
   side: TradeSide;
   selectedWorkTitle: string;
-  selectedCategory: TradeCategory;
+  selectedCategory: CategoryFilterValue;
   workTitleOptions: string[];
   filteredItems: RegisteredTradeItem[];
   onClose: () => void;
   onChangeWorkTitle: (value: string) => void;
-  onChangeCategory: (value: TradeCategory) => void;
+  onChangeCategory: (value: CategoryFilterValue) => void;
   onAddItem: (item: RegisteredTradeItem) => void;
   onUpload: (files: FileList) => void;
 };
@@ -569,7 +577,7 @@ function AddItemModal({
   onAddItem,
   onUpload,
 }: AddItemModalProps) {
-  const sideLabel = side === 'have' ? '있어요' : '구해요';
+  const sideLabel = side === "have" ? "있어요" : "구해요";
 
   return (
     <div className="fixed inset-0 z-50 bg-neutral-950/50 px-4 py-5">
@@ -599,6 +607,28 @@ function AddItemModal({
           <div className="mt-5 grid grid-cols-2 gap-3">
             <label className="block">
               <span className="text-xs font-black text-neutral-500">
+                굿즈 종류
+              </span>
+
+              <select
+                value={selectedCategory}
+                onChange={(event) =>
+                  onChangeCategory(event.target.value as CategoryFilterValue)
+                }
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-950"
+              >
+                <option value={ALL_CATEGORIES_VALUE}>전체</option>
+
+                {TRADE_CATEGORIES.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-black text-neutral-500">
                 작품 선택
               </span>
 
@@ -612,26 +642,6 @@ function AddItemModal({
                 {workTitleOptions.map((workTitle) => (
                   <option key={workTitle} value={workTitle}>
                     {workTitle}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="text-xs font-black text-neutral-500">
-                굿즈 종류
-              </span>
-
-              <select
-                value={selectedCategory}
-                onChange={(event) =>
-                  onChangeCategory(event.target.value as TradeCategory)
-                }
-                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-950"
-              >
-                {TRADE_CATEGORIES.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.label}
                   </option>
                 ))}
               </select>
@@ -678,7 +688,7 @@ function AddItemModal({
                   if (!files || files.length === 0) return;
 
                   onUpload(files);
-                  event.target.value = '';
+                  event.target.value = "";
                 }}
               />
             </label>
@@ -717,10 +727,6 @@ function RegisteredItemCard({ item, onAdd }: RegisteredItemCardProps) {
           alt={item.itemName}
           className="aspect-[3/4] w-full bg-white object-contain p-1"
         />
-
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-white/80 px-1 py-1 text-center text-[9px] font-black text-neutral-600">
-          SAMPLE
-        </div>
       </div>
 
       <div className="p-2">
@@ -728,7 +734,7 @@ function RegisteredItemCard({ item, onAdd }: RegisteredItemCardProps) {
           {item.workTitle}
         </p>
         <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">
-          {item.itemName || '굿즈명 없음'}
+          {item.itemName || "굿즈명 없음"}
         </p>
 
         <p className="mt-2 rounded-lg bg-neutral-950 px-2 py-1.5 text-center text-[10px] font-black text-white">
@@ -746,8 +752,12 @@ type CardEditorProps = {
 };
 
 function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
+  const categoryLabel =
+    TRADE_CATEGORIES.find((category) => category.id === card.category)?.label ??
+    card.category;
+
   return (
-    <div className="relative grid grid-cols-[56px_1fr] gap-3 rounded-xl bg-neutral-50 p-2 pr-10">
+    <div className="relative grid grid-cols-[64px_1fr] gap-3 rounded-xl bg-neutral-50 p-3 pr-10">
       <button
         type="button"
         onClick={onRemove}
@@ -760,11 +770,11 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
       <img
         src={card.imageUrl}
         alt=""
-        className="h-14 w-14 rounded-lg bg-white object-contain p-1"
+        className="h-16 w-16 rounded-lg bg-white object-contain p-1"
       />
 
-      <div className="space-y-2">
-        <div className="grid grid-cols-2 gap-2">
+      <div className="min-w-0 space-y-2">
+        <div className="grid grid-cols-2 gap-2 pr-7">
           <select
             value={card.side}
             onChange={(event) =>
@@ -772,7 +782,8 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
                 side: event.target.value as TradeSide,
               })
             }
-            className="rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs outline-none"
+            className="rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
+            aria-label="있어요 또는 구해요"
           >
             <option value="have">있어요</option>
             <option value="want">구해요</option>
@@ -785,7 +796,8 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
                 category: event.target.value as TradeCategory,
               })
             }
-            className="rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs outline-none"
+            className="rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
+            aria-label="굿즈 종류"
           >
             {TRADE_CATEGORIES.map((category) => (
               <option key={category.id} value={category.id}>
@@ -795,27 +807,14 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
           </select>
         </div>
 
-        <input
-          value={card.workTitle}
-          onChange={(event) =>
-            onUpdate({
-              workTitle: event.target.value,
-            })
-          }
-          className="w-full rounded-lg border border-neutral-200 px-2 py-1 text-xs outline-none focus:border-neutral-900"
-          placeholder="작품명"
-        />
-
-        <input
-          value={card.memo}
-          onChange={(event) =>
-            onUpdate({
-              memo: event.target.value,
-            })
-          }
-          className="w-full rounded-lg border border-neutral-200 px-2 py-1 text-xs outline-none focus:border-neutral-900"
-          placeholder="굿즈명 / 메모"
-        />
+        <div className="space-y-0.5 pr-7 text-xs leading-5">
+          <p className="truncate font-black text-neutral-950">
+            {card.workTitle || '작품명 없음'}
+          </p>
+          <p className="truncate text-neutral-500">
+            {card.memo || categoryLabel}
+          </p>
+        </div>
       </div>
     </div>
   );
