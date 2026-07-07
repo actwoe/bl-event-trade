@@ -17,14 +17,23 @@ type QuantityTradeCard = TradeCard & {
   quantity?: number;
 };
 
+type VisibleCategory = {
+  id: TradeCategory;
+  label: string;
+  haveCards: TradeCard[];
+  wantCards: TradeCard[];
+  columnCount: 1 | 2 | 3;
+};
+
 type CategorySectionProps = {
-  category: TradeCategory;
-  cards: TradeCard[];
+  category: VisibleCategory;
+  isFirst: boolean;
 };
 
 type SideBlockProps = {
   label: string;
   cards: TradeCard[];
+  columnCount: 1 | 2 | 3;
 };
 
 type PreviewCardProps = {
@@ -39,9 +48,54 @@ function getCardQuantity(card: TradeCard) {
   return Math.max(1, Math.floor(quantity));
 }
 
+function getQuantityTotal(cards: TradeCard[]) {
+  return cards.reduce((total, card) => total + getCardQuantity(card), 0);
+}
+
+function getColumnCount(haveCards: TradeCard[], wantCards: TradeCard[]): 1 | 2 | 3 {
+  const haveCount = getQuantityTotal(haveCards);
+  const wantCount = getQuantityTotal(wantCards);
+  const totalCount = haveCount + wantCount;
+  const maxSideCount = Math.max(haveCount, wantCount);
+
+  const columnsByTotal = totalCount <= 2 ? 1 : totalCount <= 4 ? 2 : 3;
+  const columnsBySide = maxSideCount <= 1 ? 1 : maxSideCount <= 2 ? 2 : 3;
+
+  return Math.max(columnsByTotal, columnsBySide) as 1 | 2 | 3;
+}
+
+function getGridColumnClass(columnCount: 1 | 2 | 3) {
+  if (columnCount === 1) return 'grid-cols-1';
+  if (columnCount === 2) return 'grid-cols-2';
+  return 'grid-cols-3';
+}
+
+function getVisibleCategories(cards: TradeCard[]): VisibleCategory[] {
+  return TRADE_CATEGORIES.map((category) => {
+    const haveCards = cards.filter(
+      (card) => card.category === category.id && card.side === 'have',
+    );
+
+    const wantCards = cards.filter(
+      (card) => card.category === category.id && card.side === 'want',
+    );
+
+    return {
+      id: category.id,
+      label: category.label,
+      haveCards,
+      wantCards,
+      columnCount: getColumnCount(haveCards, wantCards),
+    };
+  }).filter(
+    (category) => category.haveCards.length > 0 || category.wantCards.length > 0,
+  );
+}
+
 export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
   function TradePreview({ board, collectionTitle }, ref) {
-    const hasCards = board.cards.length > 0;
+    const visibleCategories = getVisibleCategories(board.cards);
+    const hasCards = visibleCategories.length > 0;
     const profileTexts = [board.nickname, board.contact].filter(
       (item) => item.trim().length > 0,
     );
@@ -82,13 +136,13 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
             ) : null}
           </header>
 
-          <section className="space-y-6 bg-white px-5 py-5">
+          <section className="bg-white px-5 py-5">
             {hasCards ? (
-              TRADE_CATEGORIES.map((category) => (
+              visibleCategories.map((category, index) => (
                 <CategorySection
                   key={category.id}
-                  category={category.id}
-                  cards={board.cards}
+                  category={category}
+                  isFirst={index === 0}
                 />
               ))
             ) : (
@@ -113,55 +167,48 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
   },
 );
 
-function CategorySection({ category, cards }: CategorySectionProps) {
-  const categoryOption = TRADE_CATEGORIES.find((option) => option.id === category);
-  const categoryLabel = categoryOption?.label ?? category;
-
-  const haveCards = cards.filter(
-    (card) => card.category === category && card.side === 'have',
-  );
-
-  const wantCards = cards.filter(
-    (card) => card.category === category && card.side === 'want',
-  );
-
-  const hasHaveCards = haveCards.length > 0;
-  const hasWantCards = wantCards.length > 0;
-
-  if (!hasHaveCards && !hasWantCards) {
-    return null;
-  }
-
+function CategorySection({ category, isFirst }: CategorySectionProps) {
   return (
-    <section>
+    <section className={isFirst ? 'pb-5' : 'border-t border-neutral-200 py-5'}>
       <h2 className="mb-3 text-xl font-black tracking-tight text-neutral-950">
-        {categoryLabel}
+        {category.label}
       </h2>
 
       <div className="grid grid-cols-2 gap-4">
-        <SideBlock label="있어요" cards={haveCards} />
-        <SideBlock label="구해요" cards={wantCards} />
+        <SideBlock
+          label="있어요"
+          cards={category.haveCards}
+          columnCount={category.columnCount}
+        />
+        <SideBlock
+          label="구해요"
+          cards={category.wantCards}
+          columnCount={category.columnCount}
+        />
       </div>
     </section>
   );
 }
 
-function SideBlock({ label, cards }: SideBlockProps) {
+function SideBlock({ label, cards, columnCount }: SideBlockProps) {
   const hasCards = cards.length > 0;
+  const gridClassName = getGridColumnClass(columnCount);
 
   return (
     <div>
-      {hasCards ? (
-        <div className="mb-2 flex items-center justify-center">
-          <span className="rounded-full bg-neutral-950 px-4 py-1.5 text-xs font-black text-white">
-            {label}
-          </span>
-        </div>
-      ) : (
-        <div className="mb-2 h-[30px]" aria-hidden="true" />
-      )}
+      <div className="mb-2 flex items-center justify-center">
+        <span
+          className={
+            hasCards
+              ? 'rounded-full bg-neutral-950 px-4 py-1.5 text-xs font-black text-white'
+              : 'rounded-full bg-neutral-100 px-4 py-1.5 text-xs font-black text-neutral-300'
+          }
+        >
+          {label}
+        </span>
+      </div>
 
-      <div className="grid grid-cols-3 gap-1.5">
+      <div className={`grid ${gridClassName} gap-1.5`}>
         {cards.map((card) => (
           <PreviewCard key={card.id} card={card} />
         ))}
