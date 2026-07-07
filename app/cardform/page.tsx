@@ -374,7 +374,7 @@ export default function CardFormPage() {
                     <img
                       src={imagePreviewUrl}
                       alt="제보 이미지 미리보기"
-                      className="aspect-[3/4] w-32 rounded-2xl object-cover shadow-sm"
+                      className="aspect-[3/4] w-32 rounded-2xl bg-white object-contain p-1 shadow-sm"
                     />
                   ) : (
                     <>

@@ -715,7 +715,7 @@ function RegisteredItemCard({ item, onAdd }: RegisteredItemCardProps) {
         <img
           src={item.imageUrl}
           alt={item.itemName}
-          className="aspect-[3/4] w-full object-cover"
+          className="aspect-[3/4] w-full bg-white object-contain p-1"
         />
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-white/80 px-1 py-1 text-center text-[9px] font-black text-neutral-600">
@@ -760,7 +760,7 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
       <img
         src={card.imageUrl}
         alt=""
-        className="h-14 w-14 rounded-lg object-cover"
+        className="h-14 w-14 rounded-lg bg-white object-contain p-1"
       />
 
       <div className="space-y-2">

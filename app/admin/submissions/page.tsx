@@ -542,7 +542,7 @@ export default function AdminSubmissionsPage() {
                       <img
                         src={signedUrl}
                         alt={submission.work_title}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full bg-white object-contain p-1"
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center px-4 text-center text-xs text-neutral-400">

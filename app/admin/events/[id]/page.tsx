@@ -1296,7 +1296,7 @@ export default function AdminEventManagePage() {
                   <img
                     src={imagePreviewUrl}
                     alt="굿즈 이미지 미리보기"
-                    className="aspect-[3/4] w-32 rounded-2xl object-cover shadow-sm"
+                    className="aspect-[3/4] w-32 rounded-2xl bg-white object-contain p-1 shadow-sm"
                   />
                 ) : (
                   <>
@@ -1358,7 +1358,7 @@ export default function AdminEventManagePage() {
                       <img
                         src={getTradeAssetUrl(item.image_path)}
                         alt={item.item_name ?? item.work_title}
-                        className="h-full w-full object-cover"
+                        className="h-full w-full bg-white object-contain p-1"
                       />
 
                       <span

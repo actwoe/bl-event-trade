@@ -199,7 +199,7 @@ function PreviewCard({ card }: PreviewCardProps) {
         <img
           src={card.imageUrl}
           alt={card.memo || card.workTitle}
-          className="aspect-[3/4] w-full object-cover"
+          className="aspect-[3/4] w-full bg-white object-contain p-1"
         />
 
         <div className="absolute inset-x-0 bottom-0 bg-neutral-950/80 px-1 py-1 text-center text-[9px] font-black text-white">
