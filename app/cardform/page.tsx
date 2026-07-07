@@ -34,7 +34,9 @@ function normalizePathPart(value: string) {
   const normalized = value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9가-힣-]/g, '-')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9-]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
 
@@ -108,7 +110,6 @@ export default function CardFormPage() {
         .select('title')
         .eq('collection_id', collectionId)
         .eq('is_visible', true)
-        .order('sort_order', { ascending: true })
         .order('title', { ascending: true });
 
       if (error) {
