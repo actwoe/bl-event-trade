@@ -158,6 +158,10 @@ export default function AdminEventManagePage() {
     useState<TradeCategory>('benefit');
   const [editingItemIsVisible, setEditingItemIsVisible] = useState(true);
 
+  const [itemFilterWorkTitle, setItemFilterWorkTitle] = useState('all');
+  const [itemFilterCategory, setItemFilterCategory] =
+    useState<'all' | TradeCategory>('all');
+
   const [message, setMessage] = useState('');
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
   const [isSubmittingWork, setIsSubmittingWork] = useState(false);
@@ -174,6 +178,30 @@ export default function AdminEventManagePage() {
   const visibleWorks = useMemo(() => {
     return sortKoreanTitles(works.filter((work) => work.is_visible));
   }, [works]);
+
+  const itemFilterWorks = useMemo(() => {
+    const titles = Array.from(
+      new Set(items.map((item) => item.work_title).filter(Boolean)),
+    );
+
+    return titles.sort((a, b) =>
+      a.localeCompare(b, 'ko-KR', {
+        numeric: true,
+        sensitivity: 'base',
+      }),
+    );
+  }, [items]);
+
+  const filteredItems = useMemo(() => {
+    return sortTradeItems(items).filter((item) => {
+      const matchesWork =
+        itemFilterWorkTitle === 'all' || item.work_title === itemFilterWorkTitle;
+      const matchesCategory =
+        itemFilterCategory === 'all' || item.category === itemFilterCategory;
+
+      return matchesWork && matchesCategory;
+    });
+  }, [items, itemFilterWorkTitle, itemFilterCategory]);
 
   useEffect(() => {
     async function loadPageData() {
@@ -1317,171 +1345,231 @@ export default function AdminEventManagePage() {
             <h2 className="text-lg font-black text-neutral-950">
               등록된 굿즈
             </h2>
-            <p className="mt-1 text-xs text-neutral-400">총 {items.length}개</p>
+            <p className="mt-1 text-xs text-neutral-400">
+              총 {items.length}개 · 현재 표시 {filteredItems.length}개
+            </p>
           </div>
 
           {items.length > 0 ? (
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              {sortTradeItems(items).map((item) => {
-                const categoryLabel = getCategoryLabel(item.category);
-                const isEditing = editingItemId === item.id;
-                const isUpdating = isUpdatingItemId === item.id;
-                const isDeleting = isDeletingItemId === item.id;
-                const shouldShowCurrentWork =
-                  editingItemWorkTitle &&
-                  !visibleWorks.some(
-                    (work) => work.title === editingItemWorkTitle,
-                  );
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-xs font-bold text-neutral-500">
+                  작품별 보기
+                </span>
 
-                return (
-                  <article
-                    key={item.id}
-                    className="overflow-hidden rounded-2xl border border-neutral-200 bg-white"
-                  >
-                    <div className="relative aspect-square bg-neutral-100">
-                      <img
-                        src={getTradeAssetUrl(item.image_path)}
-                        alt={item.work_title}
-                        className="h-full w-full bg-white object-contain p-1"
-                      />
+                <select
+                  value={itemFilterWorkTitle}
+                  onChange={(event) => setItemFilterWorkTitle(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2.5 text-xs font-bold text-neutral-700 outline-none focus:border-neutral-950"
+                >
+                  <option value="all">전체 작품</option>
 
-                      <span
-                        className={
-                          item.is_visible
-                            ? 'absolute right-2 top-2 rounded-full bg-white px-2 py-1 text-[10px] font-black text-neutral-950'
-                            : 'absolute right-2 top-2 rounded-full bg-red-50 px-2 py-1 text-[10px] font-black text-red-600'
-                        }
-                      >
-                        {item.is_visible ? '공개' : '숨김'}
-                      </span>
-                    </div>
+                  {itemFilterWorks.map((workTitle) => (
+                    <option key={workTitle} value={workTitle}>
+                      {workTitle}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-                    <div className="p-3">
-                      {isEditing ? (
-                        <div className="space-y-2">
-                          <label className="block">
-                            <span className="text-[10px] font-bold text-neutral-500">
-                              작품명
-                            </span>
+              <label className="block">
+                <span className="text-xs font-bold text-neutral-500">
+                  굿즈 종류별 보기
+                </span>
 
-                            <select
-                              value={editingItemWorkTitle}
-                              onChange={(event) =>
-                                setEditingItemWorkTitle(event.target.value)
-                              }
-                              className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
-                            >
-                              {shouldShowCurrentWork ? (
-                                <option value={editingItemWorkTitle}>
-                                  {editingItemWorkTitle} 현재값
-                                </option>
-                              ) : null}
+                <select
+                  value={itemFilterCategory}
+                  onChange={(event) =>
+                    setItemFilterCategory(
+                      event.target.value === 'all'
+                        ? 'all'
+                        : (event.target.value as TradeCategory),
+                    )
+                  }
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2.5 text-xs font-bold text-neutral-700 outline-none focus:border-neutral-950"
+                >
+                  <option value="all">전체 종류</option>
 
-                              {visibleWorks.map((work) => (
-                                <option key={work.id} value={work.title}>
-                                  {work.title}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-
-                          <label className="block">
-                            <span className="text-[10px] font-bold text-neutral-500">
-                              굿즈 종류
-                            </span>
-
-                            <select
-                              value={editingItemCategory}
-                              onChange={(event) =>
-                                setEditingItemCategory(
-                                  event.target.value as TradeCategory,
-                                )
-                              }
-                              className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
-                            >
-                              {TRADE_CATEGORIES.map((option) => (
-                                <option key={option.id} value={option.id}>
-                                  {option.label}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-
-                          <label className="flex items-center justify-between gap-2 rounded-xl bg-neutral-50 px-3 py-2">
-                            <span>
-                              <span className="block text-[10px] font-bold text-neutral-600">
-                                공개
-                              </span>
-                              <span className="mt-0.5 block text-[10px] text-neutral-400">
-                                교환판 노출
-                              </span>
-                            </span>
-
-                            <input
-                              type="checkbox"
-                              checked={editingItemIsVisible}
-                              onChange={(event) =>
-                                setEditingItemIsVisible(event.target.checked)
-                              }
-                              className="h-5 w-5"
-                            />
-                          </label>
-
-                          <div className="grid grid-cols-2 gap-2 pt-1">
-                            <button
-                              type="button"
-                              onClick={handleCancelEditItem}
-                              disabled={isUpdating}
-                              className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-[11px] font-black text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              취소
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateItem(item)}
-                              disabled={isUpdating}
-                              className="rounded-xl bg-neutral-950 px-3 py-2 text-[11px] font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-                            >
-                              {isUpdating ? '수정 중...' : '저장'}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <p className="line-clamp-1 text-[11px] font-black text-neutral-950">
-                            {item.work_title}
-                          </p>
-
-                          <p className="mt-1 line-clamp-1 text-[10px] text-neutral-500">
-                            {categoryLabel}
-                          </p>
-
-                          <div className="mt-3 grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleStartEditItem(item)}
-                              className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-[11px] font-black text-neutral-600"
-                            >
-                              수정
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteItem(item)}
-                              disabled={isDeleting}
-                              className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {isDeleting ? '삭제 중...' : '삭제'}
-                            </button>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
+                  {TRADE_CATEGORIES.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
+          ) : null}
+
+          {items.length > 0 ? (
+            filteredItems.length > 0 ? (
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                {filteredItems.map((item) => {
+                  const categoryLabel = getCategoryLabel(item.category);
+                  const isEditing = editingItemId === item.id;
+                  const isUpdating = isUpdatingItemId === item.id;
+                  const isDeleting = isDeletingItemId === item.id;
+                  const shouldShowCurrentWork =
+                    editingItemWorkTitle &&
+                    !visibleWorks.some(
+                      (work) => work.title === editingItemWorkTitle,
+                    );
+
+                  return (
+                    <article
+                      key={item.id}
+                      className="overflow-hidden rounded-2xl border border-neutral-200 bg-white"
+                    >
+                      <div className="relative aspect-square bg-neutral-100">
+                        <img
+                          src={getTradeAssetUrl(item.image_path)}
+                          alt={item.work_title}
+                          className="h-full w-full bg-white object-contain p-1"
+                        />
+
+                        <span
+                          className={
+                            item.is_visible
+                              ? 'absolute right-2 top-2 rounded-full bg-white px-2 py-1 text-[10px] font-black text-neutral-950'
+                              : 'absolute right-2 top-2 rounded-full bg-red-50 px-2 py-1 text-[10px] font-black text-red-600'
+                          }
+                        >
+                          {item.is_visible ? '공개' : '숨김'}
+                        </span>
+                      </div>
+
+                      <div className="p-3">
+                        {isEditing ? (
+                          <div className="space-y-2">
+                            <label className="block">
+                              <span className="text-[10px] font-bold text-neutral-500">
+                                작품명
+                              </span>
+
+                              <select
+                                value={editingItemWorkTitle}
+                                onChange={(event) =>
+                                  setEditingItemWorkTitle(event.target.value)
+                                }
+                                className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
+                              >
+                                {shouldShowCurrentWork ? (
+                                  <option value={editingItemWorkTitle}>
+                                    {editingItemWorkTitle} 현재값
+                                  </option>
+                                ) : null}
+
+                                {visibleWorks.map((work) => (
+                                  <option key={work.id} value={work.title}>
+                                    {work.title}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="block">
+                              <span className="text-[10px] font-bold text-neutral-500">
+                                굿즈 종류
+                              </span>
+
+                              <select
+                                value={editingItemCategory}
+                                onChange={(event) =>
+                                  setEditingItemCategory(
+                                    event.target.value as TradeCategory,
+                                  )
+                                }
+                                className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
+                              >
+                                {TRADE_CATEGORIES.map((option) => (
+                                  <option key={option.id} value={option.id}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="flex items-center justify-between gap-2 rounded-xl bg-neutral-50 px-3 py-2">
+                              <span>
+                                <span className="block text-[10px] font-bold text-neutral-600">
+                                  공개
+                                </span>
+                                <span className="mt-0.5 block text-[10px] text-neutral-400">
+                                  교환판 노출
+                                </span>
+                              </span>
+
+                              <input
+                                type="checkbox"
+                                checked={editingItemIsVisible}
+                                onChange={(event) =>
+                                  setEditingItemIsVisible(event.target.checked)
+                                }
+                                className="h-5 w-5"
+                              />
+                            </label>
+
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                              <button
+                                type="button"
+                                onClick={handleCancelEditItem}
+                                disabled={isUpdating}
+                                className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-[11px] font-black text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                취소
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateItem(item)}
+                                disabled={isUpdating}
+                                className="rounded-xl bg-neutral-950 px-3 py-2 text-[11px] font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+                              >
+                                {isUpdating ? '수정 중...' : '저장'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="line-clamp-1 text-[11px] font-black text-neutral-950">
+                              {item.work_title}
+                            </p>
+
+                            <p className="mt-1 line-clamp-1 text-[10px] text-neutral-500">
+                              {categoryLabel}
+                            </p>
+
+                            <div className="mt-3 grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEditItem(item)}
+                                className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-[11px] font-black text-neutral-600"
+                              >
+                                수정
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteItem(item)}
+                                disabled={isDeleting}
+                                className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {isDeleting ? '삭제 중...' : '삭제'}
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="mt-5 rounded-2xl bg-neutral-50 px-4 py-10 text-center">
+                <p className="text-sm font-bold text-neutral-400">
+                  선택한 조건에 맞는 굿즈 이미지가 없습니다.
+                </p>
+              </div>
+            )
           ) : (
             <div className="mt-5 rounded-2xl bg-neutral-50 px-4 py-10 text-center">
               <p className="text-sm font-bold text-neutral-400">
