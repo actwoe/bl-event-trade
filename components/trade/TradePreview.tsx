@@ -115,10 +115,20 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
                   {collectionTitle}
                 </h1>
 
-                {conditionText.length > 0 ? (
-                  <p className="mt-1 truncate text-[9px] font-extrabold leading-3 text-white/65">
-                    {conditionText}
-                  </p>
+                {hasProfile ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[9px] font-extrabold leading-3 text-white/70">
+                    {nickname.length > 0 ? (
+                      <span className="max-w-[180px] truncate">{nickname}</span>
+                    ) : null}
+
+                    {nickname.length > 0 && contact.length > 0 ? (
+                      <span className="text-white/35">/</span>
+                    ) : null}
+
+                    {contact.length > 0 ? (
+                      <span className="max-w-[180px] truncate">{contact}</span>
+                    ) : null}
+                  </div>
                 ) : (
                   <p className="mt-1 text-[9px] font-extrabold leading-3 text-white/35">
                     GOODS TRADE BOARD
@@ -126,20 +136,10 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
                 )}
               </div>
 
-              {hasProfile ? (
-                <div className="flex min-h-[52px] min-w-[52px] max-w-[128px] shrink-0 items-center justify-center rounded-full border border-white/30 bg-white px-3 py-2 text-center text-neutral-950">
-                  <div className="min-w-0">
-                    {nickname.length > 0 ? (
-                      <p className="truncate text-[11px] font-black leading-3">
-                        {nickname}
-                      </p>
-                    ) : null}
-
-                    {contact.length > 0 ? (
-                      <p className="mt-0.5 truncate text-[8px] font-extrabold leading-3 text-neutral-500">
-                        {contact}
-                      </p>
-                    ) : null}
+              {conditionText.length > 0 ? (
+                <div className="flex max-w-[190px] shrink-0 justify-end">
+                  <div className="rounded-2xl border border-white/25 bg-white px-3 py-2 text-right text-[9px] font-black leading-[1.25] text-neutral-950">
+                    {conditionText}
                   </div>
                 </div>
               ) : null}
