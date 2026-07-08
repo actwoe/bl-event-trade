@@ -554,7 +554,7 @@ export function TradeBuilder({
       <div className="w-full overflow-hidden rounded-3xl bg-white p-5 shadow-sm">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
-            Trade Board Maker
+            Popup & Callabo Cafe Trade Board
           </p>
 
           <h1 className="mt-1 text-2xl font-black text-neutral-950">
@@ -567,14 +567,14 @@ export function TradeBuilder({
             </p>
           ) : (
             <p className="mt-2 text-sm leading-6 text-neutral-500">
-              등록된 굿즈 이미지를 선택해 있어요 / 구해요 교환판을 만들 수
+              등록된 굿즈 이미지를 선택해 있어요 / 구해요 팝업 & 콜카 굿즈 교환판을 만들 수
               있습니다.
             </p>
           )}
         </div>
 
         <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
-          <p>선택한 이미지는 교환판 생성 목적으로만 사용됩니다.</p>
+          <p>선택한 이미지는 팝업 & 콜카 굿즈 교환판 생성 목적으로만 사용됩니다.</p>
           <p>완성된 이미지를 저장한 뒤 본인의 SNS에 직접 업로드해 주세요.</p>
         </div>
 
@@ -644,7 +644,7 @@ export function TradeBuilder({
                   거래 조건 선택
                 </p>
                 <p className="mt-1 text-xs text-neutral-400">
-                  체크한 조건만 교환판에 표시됩니다.
+                  체크한 조건만 팝업 & 콜카 굿즈 교환판에 표시됩니다.
                 </p>
               </div>
               <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-500">
@@ -758,14 +758,14 @@ export function TradeBuilder({
         <div className="mb-3">
           <div className="text-sm font-black text-neutral-950">미리보기</div>
           <p className="mt-1 text-xs leading-5 text-neutral-400">
-            세로형 교환판으로 저장됩니다. 화면에서는 모바일 폭에 맞게 축소되어
+            세로형 팝업 & 콜카 굿즈 교환판으로 저장됩니다. 화면에서는 모바일 폭에 맞게 축소되어
             보입니다.
           </p>
         </div>
 
         <div
           ref={previewAreaRef}
-          className="w-full min-w-0 overflow-hidden rounded-2xl bg-neutral-100"
+          className="w-full min-w-0 overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-200 p-2"
         >
           <div
             className="relative w-full"
@@ -789,6 +789,10 @@ export function TradeBuilder({
           </div>
         </div>
       </div>
+
+      <footer className="pb-2 text-center text-[11px] font-bold text-neutral-400">
+        제작 NP @ru1ned1over
+      </footer>
 
       {addModalSide ? (
         <AddItemModal
@@ -1074,15 +1078,15 @@ function RegisteredItemCard({
     <article
       className={
         selected
-          ? "overflow-hidden rounded-2xl border-2 border-neutral-950 bg-white text-left"
-          : "overflow-hidden rounded-2xl border border-neutral-200 bg-white text-left"
+          ? "overflow-hidden rounded-2xl border-2 border-neutral-950 bg-neutral-50 text-left shadow-sm"
+          : "overflow-hidden rounded-2xl border border-neutral-300 bg-neutral-50 text-left shadow-sm"
       }
     >
-      <div className="relative bg-neutral-100">
+      <div className="relative border-b border-neutral-200 bg-neutral-100">
         <img
           src={item.imageUrl}
           alt={item.itemName}
-          className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1`}
+          className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
         />
 
         {selected ? (

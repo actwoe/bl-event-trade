@@ -195,7 +195,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
                   </div>
                 ) : (
                   <p className="mt-1 text-[9px] font-extrabold leading-3 text-white/35">
-                    GOODS TRADE BOARD
+                    POPUP & CALLABO CAFE TRADE BOARD
                   </p>
                 )}
               </div>
@@ -215,7 +215,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
             </div>
           </header>
 
-          <section className="bg-white px-3 py-3">
+          <section className="bg-neutral-100 px-3 py-3">
             {hasCards ? (
               visibleCategories.map((category, index) => (
                 <CategorySection
@@ -225,7 +225,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
                 />
               ))
             ) : (
-              <div className="rounded-[20px] border-2 border-dashed border-neutral-200 px-5 py-12 text-center">
+              <div className="rounded-[20px] border-2 border-dashed border-neutral-300 bg-white px-5 py-12 text-center">
                 <p className="text-base font-black text-neutral-300">
                   선택된 이미지가 없습니다
                 </p>
@@ -233,9 +233,6 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
             )}
           </section>
 
-          <footer className="border-t border-neutral-200 bg-neutral-50 px-4 py-2 text-center text-[8px] font-bold leading-3 text-neutral-400">
-            비공식 교환판 · 이미지 저작권은 원저작권자에게 있습니다.
-          </footer>
         </div>
       </div>
     );
@@ -308,11 +305,11 @@ function PreviewCard({ card }: PreviewCardProps) {
   const quantity = getCardQuantity(card);
 
   return (
-    <article className="relative overflow-hidden rounded-lg bg-white">
+    <article className="relative overflow-hidden rounded-lg border border-neutral-300 bg-neutral-50 p-[2px] shadow-sm">
       <img
         src={card.imageUrl}
         alt={card.memo || card.workTitle}
-        className={`${getImageRatioClass(card)} w-full bg-white object-contain`}
+        className={`${getImageRatioClass(card)} w-full rounded-md bg-white object-contain`}
       />
 
       {quantity > 1 ? (

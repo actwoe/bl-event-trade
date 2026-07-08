@@ -31,15 +31,15 @@ export default async function HomePage() {
       <section className="mx-auto max-w-md px-4 py-8 sm:max-w-lg">
         <div className="text-center">
           <p className="mb-3 inline-flex rounded-full bg-neutral-950 px-4 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-white">
-            Trade Board Maker
+            Popup & Callabo Cafe Trade Board Maker
           </p>
 
           <h1 className="text-3xl font-black tracking-tight text-neutral-950">
-            굿즈 교환판 생성기
+            팝업 & 콜카 굿즈 교환판 생성기
           </h1>
 
           <p className="mx-auto mt-4 max-w-sm text-sm leading-7 text-neutral-600">
-            원하는 행사를 선택한 뒤, 랜덤 굿즈 교환판 이미지를 쉽게 만들 수 있어요.
+            원하는 행사를 선택한 뒤, 굿즈 교환판 이미지를 쉽게 만들 수 있어요.
           </p>
         </div>
 

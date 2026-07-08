@@ -358,7 +358,7 @@ export default function CardFormPage() {
             </h1>
 
             <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
-              <p>교환판에 없는 굿즈 이미지를 제보해 주세요.</p>
+              <p>실물 굿즈 이미지를 제보해 주세요.</p>
               <p>가급적 빛 반사가 없는 정방형 이미지를 권장합니다.</p>
               <p>제보 이미지는 관리자가 검수한 뒤 교환판에 반영됩니다.</p>
             </div>
