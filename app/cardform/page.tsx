@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
-import { nanoid } from 'nanoid';
-import { supabase } from '@/lib/supabase';
-import { TRADE_CATEGORIES, TradeCategory } from '@/lib/trade-types';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { nanoid } from "nanoid";
+import { supabase } from "@/lib/supabase";
+import { TRADE_CATEGORIES, TradeCategory } from "@/lib/trade-types";
 
 type TradeCollectionRow = {
   id: string;
@@ -16,15 +16,20 @@ type TradeWorkRow = {
   title: string;
 };
 
+type BenefitSubcategoryRow = {
+  name: string;
+  sort_order: number | null;
+};
+
 function getFileExtension(file: File) {
-  const extension = file.name.split('.').pop()?.toLowerCase();
+  const extension = file.name.split(".").pop()?.toLowerCase();
 
   if (!extension) {
-    return 'jpg';
+    return "jpg";
   }
 
-  if (extension === 'jpeg') {
-    return 'jpg';
+  if (extension === "jpeg") {
+    return "jpg";
   }
 
   return extension;
@@ -34,35 +39,55 @@ function normalizePathPart(value: string) {
   const normalized = value
     .trim()
     .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 
-  return normalized || 'submission';
+  return normalized || "submission";
 }
 
 function sortKoreanTitles(titles: string[]) {
   return [...titles].sort((a, b) =>
-    a.localeCompare(b, 'ko-KR', {
+    a.localeCompare(b, "ko-KR", {
       numeric: true,
-      sensitivity: 'base',
+      sensitivity: "base",
     }),
   );
 }
 
+function sortBenefitSubcategories(rows: BenefitSubcategoryRow[]) {
+  return [...rows].sort((a, b) => {
+    const orderA = a.sort_order ?? 0;
+    const orderB = b.sort_order ?? 0;
+
+    if (orderA !== orderB) {
+      return orderA - orderB;
+    }
+
+    return a.name.localeCompare(b.name, "ko-KR", {
+      numeric: true,
+      sensitivity: "base",
+    });
+  });
+}
+
 export default function CardFormPage() {
   const [collections, setCollections] = useState<TradeCollectionRow[]>([]);
-  const [collectionId, setCollectionId] = useState('');
+  const [collectionId, setCollectionId] = useState("");
   const [workTitles, setWorkTitles] = useState<string[]>([]);
-  const [workTitle, setWorkTitle] = useState('');
-  const [category, setCategory] = useState<TradeCategory>('benefit');
+  const [workTitle, setWorkTitle] = useState("");
+  const [category, setCategory] = useState<TradeCategory>("benefit");
+  const [benefitSubcategories, setBenefitSubcategories] = useState<string[]>(
+    [],
+  );
+  const [benefitSubcategory, setBenefitSubcategory] = useState("");
 
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [imagePreviewUrl, setImagePreviewUrl] = useState("");
 
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
 
@@ -70,18 +95,21 @@ export default function CardFormPage() {
     return collections.find((collection) => collection.id === collectionId);
   }, [collections, collectionId]);
 
+  const canSelectBenefitSubcategory =
+    category === "benefit" && benefitSubcategories.length > 0;
+
   useEffect(() => {
     async function loadCollections() {
       const { data, error } = await supabase
-        .from('trade_collections')
-        .select('id, slug, title, description')
-        .eq('is_public', true)
-        .order('published_at', { ascending: false })
-        .order('sort_order', { ascending: true });
+        .from("trade_collections")
+        .select("id, slug, title, description")
+        .eq("is_public", true)
+        .order("published_at", { ascending: false })
+        .order("sort_order", { ascending: true });
 
       if (error) {
         console.error(error);
-        setMessage('행사 목록을 불러오지 못했습니다.');
+        setMessage("행사 목록을 불러오지 못했습니다.");
         return;
       }
 
@@ -101,22 +129,22 @@ export default function CardFormPage() {
     async function loadWorkTitles() {
       if (!collectionId) {
         setWorkTitles([]);
-        setWorkTitle('');
+        setWorkTitle("");
         return;
       }
 
       const { data, error } = await supabase
-        .from('trade_collection_works')
-        .select('title')
-        .eq('collection_id', collectionId)
-        .eq('is_visible', true)
-        .order('title', { ascending: true });
+        .from("trade_collection_works")
+        .select("title")
+        .eq("collection_id", collectionId)
+        .eq("is_visible", true)
+        .order("title", { ascending: true });
 
       if (error) {
         console.error(error);
-        setMessage('작품 목록을 불러오지 못했습니다.');
+        setMessage("작품 목록을 불러오지 못했습니다.");
         setWorkTitles([]);
-        setWorkTitle('');
+        setWorkTitle("");
         return;
       }
 
@@ -133,11 +161,71 @@ export default function CardFormPage() {
       );
 
       setWorkTitles(uniqueWorkTitles);
-      setWorkTitle(uniqueWorkTitles[0] ?? '');
+      setWorkTitle(uniqueWorkTitles[0] ?? "");
     }
 
     loadWorkTitles();
   }, [collectionId]);
+
+  useEffect(() => {
+    async function loadBenefitSubcategories() {
+      if (!collectionId) {
+        setBenefitSubcategories([]);
+        setBenefitSubcategory("");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("trade_benefit_subcategories")
+        .select("name, sort_order")
+        .eq("collection_id", collectionId)
+        .eq("is_visible", true)
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.error(error);
+        setMessage(
+          "특전 하위 분류 목록을 불러오지 못했습니다. SQL 추가 여부를 확인해 주세요.",
+        );
+        setBenefitSubcategories([]);
+        setBenefitSubcategory("");
+        return;
+      }
+
+      const nextSubcategories = sortBenefitSubcategories(
+        (data ?? []) as BenefitSubcategoryRow[],
+      )
+        .map((row) => row.name.trim())
+        .filter(Boolean);
+
+      setBenefitSubcategories(nextSubcategories);
+      setBenefitSubcategory((prev) => {
+        if (prev && nextSubcategories.includes(prev)) {
+          return prev;
+        }
+
+        return "";
+      });
+    }
+
+    loadBenefitSubcategories();
+  }, [collectionId]);
+
+  useEffect(() => {
+    if (category !== "benefit") {
+      setBenefitSubcategory("");
+      return;
+    }
+
+    setBenefitSubcategory((prev) => {
+      if (!prev || benefitSubcategories.includes(prev)) {
+        return prev;
+      }
+
+      return "";
+    });
+  }, [category, benefitSubcategories]);
 
   useEffect(() => {
     return () => {
@@ -147,6 +235,14 @@ export default function CardFormPage() {
     };
   }, [imagePreviewUrl]);
 
+  function handleCategoryChange(nextCategory: TradeCategory) {
+    setCategory(nextCategory);
+
+    if (nextCategory !== "benefit") {
+      setBenefitSubcategory("");
+    }
+  }
+
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
@@ -154,8 +250,8 @@ export default function CardFormPage() {
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
-      setMessage('이미지 파일만 업로드할 수 있습니다.');
+    if (!file.type.startsWith("image/")) {
+      setMessage("이미지 파일만 업로드할 수 있습니다.");
       return;
     }
 
@@ -165,30 +261,30 @@ export default function CardFormPage() {
 
     setImageFile(file);
     setImagePreviewUrl(URL.createObjectURL(file));
-    setMessage('');
+    setMessage("");
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!selectedCollection) {
-      setMessage('행사를 선택해 주세요.');
+      setMessage("행사를 선택해 주세요.");
       return;
     }
 
     if (!workTitle) {
-      setMessage('작품을 선택해 주세요.');
+      setMessage("작품을 선택해 주세요.");
       return;
     }
 
     if (!imageFile) {
-      setMessage('제보할 이미지를 업로드해 주세요.');
+      setMessage("제보할 이미지를 업로드해 주세요.");
       return;
     }
 
     try {
       setIsSubmitting(true);
-      setMessage('');
+      setMessage("");
 
       const fileExtension = getFileExtension(imageFile);
       const safeWorkTitle = normalizePathPart(workTitle);
@@ -198,23 +294,21 @@ export default function CardFormPage() {
       const imagePath = `${selectedCollection.slug}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('trade-submissions')
+        .from("trade-submissions")
         .upload(imagePath, imageFile, {
-          cacheControl: '3600',
+          cacheControl: "3600",
           upsert: false,
           contentType: imageFile.type,
         });
 
       if (uploadError) {
         console.error(uploadError);
-        setMessage(
-          '이미지 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.',
-        );
+        setMessage("이미지 업로드에 실패했습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
 
       const { error: insertError } = await supabase
-        .from('card_submissions')
+        .from("card_submissions")
         .insert({
           collection_id: selectedCollection.id,
           collection_slug: selectedCollection.slug,
@@ -222,24 +316,29 @@ export default function CardFormPage() {
           category,
           work_title: workTitle,
           item_name: null,
+          benefit_subcategory:
+            category === "benefit" && benefitSubcategory.trim()
+              ? benefitSubcategory.trim()
+              : null,
           image_path: imagePath,
           submitter_contact: null,
           note: null,
-          status: 'pending',
+          status: "pending",
         });
 
       if (insertError) {
         console.error(insertError);
-        setMessage('제보 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+        setMessage("제보 등록에 실패했습니다. 잠시 후 다시 시도해 주세요.");
         return;
       }
 
       setIsSubmitted(true);
       setImageFile(null);
-      setImagePreviewUrl('');
+      setImagePreviewUrl("");
+      setBenefitSubcategory("");
     } catch (error) {
       console.error(error);
-      setMessage('제보 중 오류가 발생했습니다.');
+      setMessage("제보 중 오류가 발생했습니다.");
     } finally {
       setIsSubmitting(false);
     }
@@ -258,15 +357,11 @@ export default function CardFormPage() {
               이미지 제보
             </h1>
 
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              교환판에 없는 굿즈 이미지를 제보해 주세요. 제보된 이미지는
-              관리자가 확인한 뒤 반영됩니다.
-            </p>
-          </div>
-
-          <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
-            <p>제보 이미지는 즉시 공개되지 않습니다.</p>
-            <p>반영 시 워터마크가 추가될 수 있습니다.</p>
+            <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
+              <p>교환판에 없는 굿즈 이미지를 제보해 주세요.</p>
+              <p>가급적 빛 반사가 없는 정방형 이미지를 권장합니다.</p>
+              <p>제보 이미지는 관리자가 검수한 뒤 교환판에 반영됩니다.</p>
+            </div>
           </div>
         </header>
 
@@ -344,25 +439,57 @@ export default function CardFormPage() {
                 </p>
               </label>
 
-              <label className="block">
-                <span className="text-sm font-bold text-neutral-800">
-                  굿즈 종류
-                </span>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-sm font-bold text-neutral-800">
+                    굿즈 종류
+                  </span>
 
-                <select
-                  value={category}
-                  onChange={(event) =>
-                    setCategory(event.target.value as TradeCategory)
-                  }
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                >
-                  {TRADE_CATEGORIES.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  <select
+                    value={category}
+                    onChange={(event) =>
+                      handleCategoryChange(event.target.value as TradeCategory)
+                    }
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                  >
+                    {TRADE_CATEGORIES.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-bold text-neutral-800">
+                    특전 하위 분류
+                  </span>
+
+                  <select
+                    value={benefitSubcategory}
+                    onChange={(event) =>
+                      setBenefitSubcategory(event.target.value)
+                    }
+                    disabled={!canSelectBenefitSubcategory}
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950 disabled:bg-neutral-100 disabled:text-neutral-400"
+                  >
+                    {category !== "benefit" ? (
+                      <option value="">특전 선택 시 사용</option>
+                    ) : benefitSubcategories.length > 0 ? (
+                      <>
+                        <option value="">하위 분류 선택 안 함</option>
+                        {benefitSubcategories.map((subcategory) => (
+                          <option key={subcategory} value={subcategory}>
+                            {subcategory}
+                          </option>
+                        ))}
+                      </>
+                    ) : (
+                      <option value="">등록된 하위 분류 없음</option>
+                    )}
+                  </select>
+                </label>
+              </div>
 
               <div>
                 <span className="text-sm font-bold text-neutral-800">
@@ -374,7 +501,7 @@ export default function CardFormPage() {
                     <img
                       src={imagePreviewUrl}
                       alt="제보 이미지 미리보기"
-                      className="aspect-[3/4] w-32 rounded-2xl bg-white object-contain p-1 shadow-sm"
+                      className="aspect-square w-32 rounded-2xl bg-white object-contain p-1 shadow-sm"
                     />
                   ) : (
                     <>
@@ -382,7 +509,7 @@ export default function CardFormPage() {
                         이미지 선택
                       </span>
                       <span className="mt-2 text-xs leading-5 text-neutral-400">
-                        제보할 굿즈 이미지를 업로드해 주세요.
+                        빛 반사가 적은 정방형 이미지를 권장합니다.
                       </span>
                     </>
                   )}
@@ -411,7 +538,7 @@ export default function CardFormPage() {
                 }
                 className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
               >
-                {isSubmitting ? '제보 중...' : '이미지 제보하기'}
+                {isSubmitting ? "제보 중..." : "이미지 제보하기"}
               </button>
             </div>
           </form>

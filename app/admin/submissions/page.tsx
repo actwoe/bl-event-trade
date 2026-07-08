@@ -1,14 +1,14 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { TRADE_CATEGORIES, TradeCategory } from '@/lib/trade-types';
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { TRADE_CATEGORIES, TradeCategory } from "@/lib/trade-types";
 
-type AdminState = 'checking' | 'admin' | 'not-admin' | 'signed-out';
+type AdminState = "checking" | "admin" | "not-admin" | "signed-out";
 
-type SubmissionStatus = 'pending' | 'approved' | 'rejected';
+type SubmissionStatus = "pending" | "approved" | "rejected";
 
 type CardSubmissionRow = {
   id: string;
@@ -18,6 +18,7 @@ type CardSubmissionRow = {
   category: TradeCategory;
   work_title: string;
   item_name: string | null;
+  benefit_subcategory: string | null;
   image_path: string;
   submitter_contact: string | null;
   note: string | null;
@@ -29,49 +30,49 @@ type CardSubmissionRow = {
   reviewed_by: string | null;
 };
 
-type StatusFilter = 'pending' | 'approved' | 'rejected' | 'all';
+type StatusFilter = "pending" | "approved" | "rejected" | "all";
 
 function normalizePathPart(value: string) {
   const normalized = value
     .trim()
     .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 
-  return normalized || 'item';
+  return normalized || "item";
 }
 
 function getFileExtensionFromPath(path: string) {
-  const extension = path.split('.').pop()?.toLowerCase();
+  const extension = path.split(".").pop()?.toLowerCase();
 
   if (!extension) {
-    return 'jpg';
+    return "jpg";
   }
 
-  if (extension === 'jpeg') {
-    return 'jpg';
+  if (extension === "jpeg") {
+    return "jpg";
   }
 
   return extension;
 }
 
 function getContentTypeFromExtension(extension: string) {
-  if (extension === 'png') {
-    return 'image/png';
+  if (extension === "png") {
+    return "image/png";
   }
 
-  if (extension === 'webp') {
-    return 'image/webp';
+  if (extension === "webp") {
+    return "image/webp";
   }
 
-  if (extension === 'gif') {
-    return 'image/gif';
+  if (extension === "gif") {
+    return "image/gif";
   }
 
-  return 'image/jpeg';
+  return "image/jpeg";
 }
 
 function getCategoryLabel(category: TradeCategory) {
@@ -83,7 +84,7 @@ function getCategoryLabel(category: TradeCategory) {
 export default function AdminSubmissionsPage() {
   const router = useRouter();
 
-  const [adminState, setAdminState] = useState<AdminState>('checking');
+  const [adminState, setAdminState] = useState<AdminState>("checking");
   const [submissions, setSubmissions] = useState<CardSubmissionRow[]>([]);
   const [signedUrlById, setSignedUrlById] = useState<Record<string, string>>(
     {},
@@ -92,20 +93,22 @@ export default function AdminSubmissionsPage() {
     {},
   );
 
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('pending');
-  const [message, setMessage] = useState('');
-  const [processingId, setProcessingId] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("pending");
+  const [message, setMessage] = useState("");
+  const [processingId, setProcessingId] = useState("");
 
   const filteredSubmissions = useMemo(() => {
-    if (statusFilter === 'all') {
+    if (statusFilter === "all") {
       return submissions;
     }
 
-    return submissions.filter((submission) => submission.status === statusFilter);
+    return submissions.filter(
+      (submission) => submission.status === statusFilter,
+    );
   }, [submissions, statusFilter]);
 
   const pendingCount = useMemo(() => {
-    return submissions.filter((submission) => submission.status === 'pending')
+    return submissions.filter((submission) => submission.status === "pending")
       .length;
   }, [submissions]);
 
@@ -115,22 +118,22 @@ export default function AdminSubmissionsPage() {
       const user = sessionData.session?.user;
 
       if (!user) {
-        setAdminState('signed-out');
+        setAdminState("signed-out");
         return;
       }
 
       const { data: adminUser, error: adminError } = await supabase
-        .from('admin_users')
-        .select('user_id')
-        .eq('user_id', user.id)
+        .from("admin_users")
+        .select("user_id")
+        .eq("user_id", user.id)
         .maybeSingle();
 
       if (adminError || !adminUser) {
-        setAdminState('not-admin');
+        setAdminState("not-admin");
         return;
       }
 
-      setAdminState('admin');
+      setAdminState("admin");
 
       await loadSubmissions();
     }
@@ -140,15 +143,15 @@ export default function AdminSubmissionsPage() {
 
   async function loadSubmissions() {
     const { data, error } = await supabase
-      .from('card_submissions')
+      .from("card_submissions")
       .select(
-        'id, collection_id, collection_slug, collection_title, category, work_title, item_name, image_path, submitter_contact, note, status, admin_note, approved_item_id, created_at, reviewed_at, reviewed_by',
+        "id, collection_id, collection_slug, collection_title, category, work_title, item_name, benefit_subcategory, image_path, submitter_contact, note, status, admin_note, approved_item_id, created_at, reviewed_at, reviewed_by",
       )
-      .order('created_at', { ascending: false });
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.error(error);
-      setMessage('제보 목록을 불러오지 못했습니다.');
+      setMessage("제보 목록을 불러오지 못했습니다.");
       return;
     }
 
@@ -159,7 +162,7 @@ export default function AdminSubmissionsPage() {
     const nextAdminNotes: Record<string, string> = {};
 
     nextSubmissions.forEach((submission) => {
-      nextAdminNotes[submission.id] = submission.admin_note ?? '';
+      nextAdminNotes[submission.id] = submission.admin_note ?? "";
     });
 
     setAdminNoteById(nextAdminNotes);
@@ -171,12 +174,12 @@ export default function AdminSubmissionsPage() {
     const entries = await Promise.all(
       nextSubmissions.map(async (submission) => {
         const { data, error } = await supabase.storage
-          .from('trade-submissions')
+          .from("trade-submissions")
           .createSignedUrl(submission.image_path, 60 * 60);
 
         if (error || !data?.signedUrl) {
           console.error(error);
-          return [submission.id, ''] as const;
+          return [submission.id, ""] as const;
         }
 
         return [submission.id, data.signedUrl] as const;
@@ -187,17 +190,17 @@ export default function AdminSubmissionsPage() {
   }
 
   async function handleApprove(submission: CardSubmissionRow) {
-    if (submission.status !== 'pending') {
-      setMessage('이미 처리된 제보입니다.');
+    if (submission.status !== "pending") {
+      setMessage("이미 처리된 제보입니다.");
       return;
     }
 
     if (!submission.collection_id) {
-      setMessage('연결된 행사가 없어 승인할 수 없습니다.');
+      setMessage("연결된 행사가 없어 승인할 수 없습니다.");
       return;
     }
 
-    const ok = window.confirm('이 제보 이미지를 교환판에 반영할까요?');
+    const ok = window.confirm("이 제보 이미지를 교환판에 반영할까요?");
 
     if (!ok) {
       return;
@@ -205,24 +208,24 @@ export default function AdminSubmissionsPage() {
 
     try {
       setProcessingId(submission.id);
-      setMessage('');
+      setMessage("");
 
       const { data: sessionData } = await supabase.auth.getSession();
       const user = sessionData.session?.user;
 
       if (!user) {
-        setMessage('로그인이 필요합니다.');
+        setMessage("로그인이 필요합니다.");
         return;
       }
 
       const { data: downloadedFile, error: downloadError } =
         await supabase.storage
-          .from('trade-submissions')
+          .from("trade-submissions")
           .download(submission.image_path);
 
       if (downloadError || !downloadedFile) {
         console.error(downloadError);
-        setMessage('제보 이미지를 불러오지 못했습니다.');
+        setMessage("제보 이미지를 불러오지 못했습니다.");
         return;
       }
 
@@ -231,74 +234,78 @@ export default function AdminSubmissionsPage() {
       const publicImagePath = `${submission.collection_slug}/approved-${submission.category}-${safeWorkTitle}-${Date.now()}.${fileExtension}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('trade-assets')
+        .from("trade-assets")
         .upload(publicImagePath, downloadedFile, {
-          cacheControl: '3600',
+          cacheControl: "3600",
           upsert: false,
           contentType: getContentTypeFromExtension(fileExtension),
         });
 
       if (uploadError) {
         console.error(uploadError);
-        setMessage('공개 이미지 업로드에 실패했습니다.');
+        setMessage("공개 이미지 업로드에 실패했습니다.");
         return;
       }
 
       const { data: insertedItem, error: insertError } = await supabase
-        .from('trade_items')
+        .from("trade_items")
         .insert({
           collection_id: submission.collection_id,
           category: submission.category,
           work_title: submission.work_title,
           item_name: null,
+          benefit_subcategory:
+            submission.category === "benefit" && submission.benefit_subcategory
+              ? submission.benefit_subcategory
+              : null,
           image_path: publicImagePath,
           is_visible: true,
           sort_order: 0,
         })
-        .select('id')
+        .select("id")
         .single();
 
       if (insertError || !insertedItem) {
         console.error(insertError);
-        setMessage('교환판 굿즈 등록에 실패했습니다.');
+        setMessage("교환판 굿즈 등록에 실패했습니다.");
         return;
       }
 
       const { error: updateError } = await supabase
-        .from('card_submissions')
+        .from("card_submissions")
         .update({
-          status: 'approved',
+          status: "approved",
           item_name: null,
           approved_item_id: insertedItem.id,
           admin_note: adminNoteById[submission.id]?.trim() || null,
           reviewed_at: new Date().toISOString(),
           reviewed_by: user.id,
         })
-        .eq('id', submission.id);
+        .eq("id", submission.id);
 
       if (updateError) {
         console.error(updateError);
-        setMessage('제보 승인 상태 업데이트에 실패했습니다.');
+        setMessage("제보 승인 상태 업데이트에 실패했습니다.");
         return;
       }
 
       await loadSubmissions();
-      setMessage('제보 이미지를 승인하고 교환판에 반영했습니다.');
+      setMessage("제보 이미지를 승인하고 교환판에 반영했습니다.");
     } catch (error) {
       console.error(error);
-      setMessage('승인 처리 중 오류가 발생했습니다.');
+      setMessage("승인 처리 중 오류가 발생했습니다.");
     } finally {
-      setProcessingId('');
+      setProcessingId("");
     }
   }
 
   async function handleReject(submission: CardSubmissionRow) {
-    if (submission.status !== 'pending') {
-      setMessage('이미 처리된 제보입니다.');
+    if (submission.status !== "pending") {
+      setMessage("이미 처리된 제보입니다.");
       return;
     }
 
-    const ok = window.confirm('이 제보를 반려할까요?');
+    const ok = window.confirm("이 제보를 반려할까요?");
 
     if (!ok) {
       return;
@@ -306,45 +313,45 @@ export default function AdminSubmissionsPage() {
 
     try {
       setProcessingId(submission.id);
-      setMessage('');
+      setMessage("");
 
       const { data: sessionData } = await supabase.auth.getSession();
       const user = sessionData.session?.user;
 
       if (!user) {
-        setMessage('로그인이 필요합니다.');
+        setMessage("로그인이 필요합니다.");
         return;
       }
 
       const { error } = await supabase
-        .from('card_submissions')
+        .from("card_submissions")
         .update({
-          status: 'rejected',
+          status: "rejected",
           admin_note: adminNoteById[submission.id]?.trim() || null,
           reviewed_at: new Date().toISOString(),
           reviewed_by: user.id,
         })
-        .eq('id', submission.id);
+        .eq("id", submission.id);
 
       if (error) {
         console.error(error);
-        setMessage('제보 반려에 실패했습니다.');
+        setMessage("제보 반려에 실패했습니다.");
         return;
       }
 
       await loadSubmissions();
-      setMessage('제보를 반려했습니다.');
+      setMessage("제보를 반려했습니다.");
     } catch (error) {
       console.error(error);
-      setMessage('반려 처리 중 오류가 발생했습니다.');
+      setMessage("반려 처리 중 오류가 발생했습니다.");
     } finally {
-      setProcessingId('');
+      setProcessingId("");
     }
   }
 
   async function handleDeleteSubmission(submission: CardSubmissionRow) {
     const ok = window.confirm(
-      '이 제보 기록과 비공개 업로드 이미지를 삭제할까요?',
+      "이 제보 기록과 비공개 업로드 이미지를 삭제할까요?",
     );
 
     if (!ok) {
@@ -353,10 +360,10 @@ export default function AdminSubmissionsPage() {
 
     try {
       setProcessingId(submission.id);
-      setMessage('');
+      setMessage("");
 
       const { error: storageError } = await supabase.storage
-        .from('trade-submissions')
+        .from("trade-submissions")
         .remove([submission.image_path]);
 
       if (storageError) {
@@ -364,33 +371,33 @@ export default function AdminSubmissionsPage() {
       }
 
       const { error: deleteError } = await supabase
-        .from('card_submissions')
+        .from("card_submissions")
         .delete()
-        .eq('id', submission.id);
+        .eq("id", submission.id);
 
       if (deleteError) {
         console.error(deleteError);
-        setMessage('제보 삭제에 실패했습니다.');
+        setMessage("제보 삭제에 실패했습니다.");
         return;
       }
 
       await loadSubmissions();
-      setMessage('제보 기록을 삭제했습니다.');
+      setMessage("제보 기록을 삭제했습니다.");
     } catch (error) {
       console.error(error);
-      setMessage('삭제 처리 중 오류가 발생했습니다.');
+      setMessage("삭제 처리 중 오류가 발생했습니다.");
     } finally {
-      setProcessingId('');
+      setProcessingId("");
     }
   }
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push('/admin/login');
+    router.push("/admin/login");
     router.refresh();
   }
 
-  if (adminState === 'checking') {
+  if (adminState === "checking") {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
         <section className="mx-auto max-w-md rounded-3xl bg-white p-6 text-sm text-neutral-500 shadow-sm">
@@ -400,7 +407,7 @@ export default function AdminSubmissionsPage() {
     );
   }
 
-  if (adminState === 'signed-out') {
+  if (adminState === "signed-out") {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
         <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
@@ -423,7 +430,7 @@ export default function AdminSubmissionsPage() {
     );
   }
 
-  if (adminState === 'not-admin') {
+  if (adminState === "not-admin") {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
         <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
@@ -496,23 +503,23 @@ export default function AdminSubmissionsPage() {
         <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
           <StatusFilterButton
             label="대기"
-            active={statusFilter === 'pending'}
-            onClick={() => setStatusFilter('pending')}
+            active={statusFilter === "pending"}
+            onClick={() => setStatusFilter("pending")}
           />
           <StatusFilterButton
             label="승인"
-            active={statusFilter === 'approved'}
-            onClick={() => setStatusFilter('approved')}
+            active={statusFilter === "approved"}
+            onClick={() => setStatusFilter("approved")}
           />
           <StatusFilterButton
             label="반려"
-            active={statusFilter === 'rejected'}
-            onClick={() => setStatusFilter('rejected')}
+            active={statusFilter === "rejected"}
+            onClick={() => setStatusFilter("rejected")}
           />
           <StatusFilterButton
             label="전체"
-            active={statusFilter === 'all'}
-            onClick={() => setStatusFilter('all')}
+            active={statusFilter === "all"}
+            onClick={() => setStatusFilter("all")}
           />
         </div>
 
@@ -543,18 +550,18 @@ export default function AdminSubmissionsPage() {
 
                     <span
                       className={
-                        submission.status === 'approved'
-                          ? 'absolute right-3 top-3 rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-700'
-                          : submission.status === 'rejected'
-                            ? 'absolute right-3 top-3 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-600'
-                            : 'absolute right-3 top-3 rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-950'
+                        submission.status === "approved"
+                          ? "absolute right-3 top-3 rounded-full bg-green-50 px-3 py-1 text-xs font-black text-green-700"
+                          : submission.status === "rejected"
+                            ? "absolute right-3 top-3 rounded-full bg-red-50 px-3 py-1 text-xs font-black text-red-600"
+                            : "absolute right-3 top-3 rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-950"
                       }
                     >
-                      {submission.status === 'approved'
-                        ? '승인'
-                        : submission.status === 'rejected'
-                          ? '반려'
-                          : '대기'}
+                      {submission.status === "approved"
+                        ? "승인"
+                        : submission.status === "rejected"
+                          ? "반려"
+                          : "대기"}
                     </span>
                   </div>
 
@@ -569,10 +576,16 @@ export default function AdminSubmissionsPage() {
 
                     <div className="mt-3 space-y-1 text-sm leading-6 text-neutral-600">
                       <p>굿즈 종류: {categoryLabel}</p>
+                      {submission.category === "benefit" ? (
+                        <p>
+                          특전 하위 분류:{" "}
+                          {submission.benefit_subcategory || "선택 안 함"}
+                        </p>
+                      ) : null}
                       <p>
-                        제보일:{' '}
+                        제보일:{" "}
                         {new Date(submission.created_at).toLocaleString(
-                          'ko-KR',
+                          "ko-KR",
                         )}
                       </p>
                     </div>
@@ -583,20 +596,20 @@ export default function AdminSubmissionsPage() {
                       </span>
 
                       <textarea
-                        value={adminNoteById[submission.id] ?? ''}
+                        value={adminNoteById[submission.id] ?? ""}
                         onChange={(event) =>
                           setAdminNoteById((prev) => ({
                             ...prev,
                             [submission.id]: event.target.value,
                           }))
                         }
-                        disabled={submission.status !== 'pending'}
+                        disabled={submission.status !== "pending"}
                         className="mt-1 min-h-20 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950 disabled:bg-neutral-50 disabled:text-neutral-400"
                         placeholder="내부 메모 또는 반려 사유"
                       />
                     </label>
 
-                    {submission.status === 'pending' ? (
+                    {submission.status === "pending" ? (
                       <div className="mt-4 grid grid-cols-2 gap-2">
                         <button
                           type="button"
@@ -604,7 +617,7 @@ export default function AdminSubmissionsPage() {
                           disabled={isProcessing}
                           className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {isProcessing ? '처리 중...' : '반려'}
+                          {isProcessing ? "처리 중..." : "반려"}
                         </button>
 
                         <button
@@ -613,12 +626,12 @@ export default function AdminSubmissionsPage() {
                           disabled={isProcessing}
                           className="rounded-2xl bg-neutral-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
                         >
-                          {isProcessing ? '처리 중...' : '승인'}
+                          {isProcessing ? "처리 중..." : "승인"}
                         </button>
                       </div>
                     ) : (
                       <div className="mt-4 grid grid-cols-2 gap-2">
-                        {submission.status === 'approved' ? (
+                        {submission.status === "approved" ? (
                           <Link
                             href={`/trade/${submission.collection_slug}`}
                             className="rounded-2xl bg-neutral-950 px-4 py-3 text-center text-sm font-black text-white"
@@ -635,7 +648,7 @@ export default function AdminSubmissionsPage() {
                           disabled={isProcessing}
                           className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          {isProcessing ? '삭제 중...' : '기록 삭제'}
+                          {isProcessing ? "삭제 중..." : "기록 삭제"}
                         </button>
                       </div>
                     )}
@@ -673,8 +686,8 @@ function StatusFilterButton({
       onClick={onClick}
       className={
         active
-          ? 'shrink-0 rounded-full bg-neutral-950 px-4 py-2 text-xs font-black text-white'
-          : 'shrink-0 rounded-full border border-neutral-200 bg-white px-4 py-2 text-xs font-bold text-neutral-600'
+          ? "shrink-0 rounded-full bg-neutral-950 px-4 py-2 text-xs font-black text-white"
+          : "shrink-0 rounded-full border border-neutral-200 bg-white px-4 py-2 text-xs font-bold text-neutral-600"
       }
     >
       {label}

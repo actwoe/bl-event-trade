@@ -31,7 +31,7 @@ export default async function HomePage() {
       <section className="mx-auto max-w-md px-4 py-8 sm:max-w-lg">
         <div className="text-center">
           <p className="mb-3 inline-flex rounded-full bg-neutral-950 px-4 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-white">
-            Goods Trade Board Maker
+            Trade Board Maker
           </p>
 
           <h1 className="text-3xl font-black tracking-tight text-neutral-950">
@@ -39,8 +39,7 @@ export default async function HomePage() {
           </h1>
 
           <p className="mx-auto mt-4 max-w-sm text-sm leading-7 text-neutral-600">
-            원하는 행사를 선택한 뒤, 있어요 / 구해요 굿즈를 정리해서 SNS에
-            올릴 수 있는 교환판 이미지를 만들어보세요.
+            원하는 행사를 선택한 뒤, 랜덤 굿즈 교환판 이미지를 쉽게 만들 수 있어요.
           </p>
         </div>
 
@@ -48,7 +47,7 @@ export default async function HomePage() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-black text-neutral-950">
-                교환판 선택
+                행사 선택
               </h2>
               <p className="mt-1 text-xs leading-5 text-neutral-500">
                 최근 등록된 행사가 먼저 보여요.
@@ -120,7 +119,7 @@ export default async function HomePage() {
           ) : (
             <div className="mt-5 rounded-2xl border border-dashed border-neutral-300 bg-white px-4 py-10 text-center">
               <p className="text-sm font-bold text-neutral-500">
-                아직 공개된 교환판이 없습니다.
+                아직 공개된 행사가 없습니다.
               </p>
               <p className="mt-2 text-xs text-neutral-400">
                 관리자 페이지에서 행사를 등록해 주세요.
