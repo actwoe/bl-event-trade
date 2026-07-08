@@ -251,6 +251,10 @@ export default function AdminEventManagePage() {
   const [itemFilterCategory, setItemFilterCategory] =
     useState<'all' | TradeCategory>('all');
 
+  const [isWorkSectionOpen, setIsWorkSectionOpen] = useState(false);
+  const [isBenefitSubcategorySectionOpen, setIsBenefitSubcategorySectionOpen] =
+    useState(false);
+
   const [message, setMessage] = useState('');
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
   const [isSubmittingWork, setIsSubmittingWork] = useState(false);
@@ -1388,173 +1392,195 @@ export default function AdminEventManagePage() {
           onSubmit={handleAddWork}
           className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
         >
-          <h2 className="text-lg font-black text-neutral-950">작품명 등록</h2>
-
-          <p className="mt-2 text-sm leading-6 text-neutral-500">
-            굿즈 등록과 유저 이미지 제보에서 선택할 작품명을 미리 등록합니다.
-          </p>
-
-          <div className="mt-5 space-y-5">
-            <label className="block">
-              <span className="text-sm font-bold text-neutral-800">
-                작품명
-              </span>
-
-              <input
-                value={newWorkTitle}
-                onChange={(event) => setNewWorkTitle(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="예: 작품명 A"
-              />
-            </label>
-
-            <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
-              <span>
-                <span className="block text-sm font-bold text-neutral-800">
-                  공개
-                </span>
-                <span className="mt-1 block text-xs text-neutral-500">
-                  유저 이미지 제보와 교환판 선택 목록에 노출합니다.
-                </span>
-              </span>
-
-              <input
-                type="checkbox"
-                checked={newWorkIsVisible}
-                onChange={(event) => setNewWorkIsVisible(event.target.checked)}
-                className="h-5 w-5"
-              />
-            </label>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-black text-neutral-950">
+                작품명 등록
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                굿즈 등록과 유저 이미지 제보에서 선택할 작품명을 미리 등록합니다.
+              </p>
+              <p className="mt-1 text-xs font-bold text-neutral-400">
+                등록된 작품명 {works.length}개
+              </p>
+            </div>
 
             <button
-              type="submit"
-              disabled={isSubmittingWork}
-              className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+              type="button"
+              onClick={() => setIsWorkSectionOpen((prev) => !prev)}
+              className="shrink-0 rounded-full border border-neutral-200 bg-white px-4 py-2 text-xs font-black text-neutral-600"
             >
-              {isSubmittingWork ? '등록 중...' : '작품명 등록'}
+              {isWorkSectionOpen ? '접기' : '펼치기'}
             </button>
           </div>
 
-          <div className="mt-5 border-t border-neutral-100 pt-5">
-            <h3 className="text-sm font-black text-neutral-950">
-              등록된 작품명
-            </h3>
+          {isWorkSectionOpen ? (
+            <>
+              <div className="mt-5 space-y-5">
+                <label className="block">
+                  <span className="text-sm font-bold text-neutral-800">
+                    작품명
+                  </span>
 
-            {works.length > 0 ? (
-              <div className="mt-3 space-y-2">
-                {sortKoreanTitles(works).map((work) => {
-                  const isEditing = editingWorkId === work.id;
-                  const isUpdating = isUpdatingWorkId === work.id;
-                  const isDeleting = isDeletingWorkId === work.id;
+                  <input
+                    value={newWorkTitle}
+                    onChange={(event) => setNewWorkTitle(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                    placeholder="예: 작품명 A"
+                  />
+                </label>
 
-                  return (
-                    <div
-                      key={work.id}
-                      className="rounded-2xl bg-neutral-50 px-3 py-3"
-                    >
-                      {isEditing ? (
-                        <div className="space-y-3">
-                          <label className="block">
-                            <span className="text-xs font-bold text-neutral-500">
-                              작품명
-                            </span>
+                <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
+                  <span>
+                    <span className="block text-sm font-bold text-neutral-800">
+                      공개
+                    </span>
+                    <span className="mt-1 block text-xs text-neutral-500">
+                      유저 이미지 제보와 교환판 선택 목록에 노출합니다.
+                    </span>
+                  </span>
 
-                            <input
-                              value={editingWorkTitle}
-                              onChange={(event) =>
-                                setEditingWorkTitle(event.target.value)
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                  event.preventDefault();
-                                }
-                              }}
-                              className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-950"
-                              placeholder="작품명"
-                            />
-                          </label>
+                  <input
+                    type="checkbox"
+                    checked={newWorkIsVisible}
+                    onChange={(event) =>
+                      setNewWorkIsVisible(event.target.checked)
+                    }
+                    className="h-5 w-5"
+                  />
+                </label>
 
-                          <label className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-3">
-                            <span>
-                              <span className="block text-xs font-bold text-neutral-600">
-                                공개
-                              </span>
-                              <span className="mt-0.5 block text-[11px] text-neutral-400">
-                                유저 선택 목록 노출
-                              </span>
-                            </span>
-
-                            <input
-                              type="checkbox"
-                              checked={editingWorkIsVisible}
-                              onChange={(event) =>
-                                setEditingWorkIsVisible(event.target.checked)
-                              }
-                              className="h-5 w-5"
-                            />
-                          </label>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              type="button"
-                              onClick={handleCancelEditWork}
-                              disabled={isUpdating}
-                              className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-xs font-black text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              취소
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleUpdateWork(work)}
-                              disabled={isUpdating}
-                              className="rounded-xl bg-neutral-950 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-                            >
-                              {isUpdating ? '수정 중...' : '수정 저장'}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-black text-neutral-950">
-                              {work.title}
-                            </p>
-                            <p className="mt-0.5 text-[11px] text-neutral-400">
-                              {work.is_visible ? '공개' : '숨김'}
-                            </p>
-                          </div>
-
-                          <div className="flex shrink-0 items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => handleStartEditWork(work)}
-                              className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-[11px] font-black text-neutral-600"
-                            >
-                              수정
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteWork(work)}
-                              disabled={isDeleting}
-                              className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {isDeleting ? '삭제 중' : '삭제'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                <button
+                  type="submit"
+                  disabled={isSubmittingWork}
+                  className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+                >
+                  {isSubmittingWork ? '등록 중...' : '작품명 등록'}
+                </button>
               </div>
-            ) : (
-              <p className="mt-3 rounded-2xl bg-neutral-50 px-4 py-6 text-center text-xs text-neutral-400">
-                아직 등록된 작품명이 없습니다.
-              </p>
-            )}
-          </div>
+
+              <div className="mt-5 border-t border-neutral-100 pt-5">
+                <h3 className="text-sm font-black text-neutral-950">
+                  등록된 작품명
+                </h3>
+
+                {works.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {sortKoreanTitles(works).map((work) => {
+                      const isEditing = editingWorkId === work.id;
+                      const isUpdating = isUpdatingWorkId === work.id;
+                      const isDeleting = isDeletingWorkId === work.id;
+
+                      return (
+                        <div
+                          key={work.id}
+                          className="rounded-2xl bg-neutral-50 px-3 py-3"
+                        >
+                          {isEditing ? (
+                            <div className="space-y-3">
+                              <label className="block">
+                                <span className="text-xs font-bold text-neutral-500">
+                                  작품명
+                                </span>
+
+                                <input
+                                  value={editingWorkTitle}
+                                  onChange={(event) =>
+                                    setEditingWorkTitle(event.target.value)
+                                  }
+                                  onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                      event.preventDefault();
+                                    }
+                                  }}
+                                  className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-950"
+                                  placeholder="작품명"
+                                />
+                              </label>
+
+                              <label className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-3">
+                                <span>
+                                  <span className="block text-xs font-bold text-neutral-600">
+                                    공개
+                                  </span>
+                                  <span className="mt-0.5 block text-[11px] text-neutral-400">
+                                    유저 선택 목록 노출
+                                  </span>
+                                </span>
+
+                                <input
+                                  type="checkbox"
+                                  checked={editingWorkIsVisible}
+                                  onChange={(event) =>
+                                    setEditingWorkIsVisible(event.target.checked)
+                                  }
+                                  className="h-5 w-5"
+                                />
+                              </label>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEditWork}
+                                  disabled={isUpdating}
+                                  className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-xs font-black text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  취소
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateWork(work)}
+                                  disabled={isUpdating}
+                                  className="rounded-xl bg-neutral-950 px-3 py-2 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+                                >
+                                  {isUpdating ? '수정 중...' : '수정 저장'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-black text-neutral-950">
+                                  {work.title}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-neutral-400">
+                                  {work.is_visible ? '공개' : '숨김'}
+                                </p>
+                              </div>
+
+                              <div className="flex shrink-0 items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditWork(work)}
+                                  className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-[11px] font-black text-neutral-600"
+                                >
+                                  수정
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteWork(work)}
+                                  disabled={isDeleting}
+                                  className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {isDeleting ? '삭제 중' : '삭제'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-3 rounded-2xl bg-neutral-50 px-4 py-6 text-center text-xs text-neutral-400">
+                    아직 등록된 작품명이 없습니다.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : null}
         </form>
 
         <form
@@ -1562,184 +1588,203 @@ export default function AdminEventManagePage() {
           className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
         >
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <h2 className="text-lg font-black text-neutral-950">
                 특전 하위 분류 관리
               </h2>
-              <p className="mt-1 text-xs leading-5 text-neutral-400">
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
                 행사별 특전 분류를 미리 만들어두면, 특전 등록 시 선택할 수 있습니다.
               </p>
+              <p className="mt-1 text-xs font-bold text-neutral-400">
+                등록된 하위 분류 {benefitSubcategories.length}개
+              </p>
             </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setIsBenefitSubcategorySectionOpen((prev) => !prev)
+              }
+              className="shrink-0 rounded-full border border-neutral-200 bg-white px-4 py-2 text-xs font-black text-neutral-600"
+            >
+              {isBenefitSubcategorySectionOpen ? '접기' : '펼치기'}
+            </button>
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
-            <label className="block">
-              <span className="text-sm font-bold text-neutral-800">
-                하위 분류명
-              </span>
+          {isBenefitSubcategorySectionOpen ? (
+            <>
+              <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
+                <label className="block">
+                  <span className="text-sm font-bold text-neutral-800">
+                    하위 분류명
+                  </span>
 
-              <input
-                value={newBenefitSubcategoryName}
-                onChange={(event) =>
-                  setNewBenefitSubcategoryName(event.target.value)
-                }
-                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="예: 입장 특전, 구매 특전, 선착 특전"
-              />
-            </label>
+                  <input
+                    value={newBenefitSubcategoryName}
+                    onChange={(event) =>
+                      setNewBenefitSubcategoryName(event.target.value)
+                    }
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                    placeholder="예: 입장 특전, 구매 특전, 선착 특전"
+                  />
+                </label>
 
-            <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3 md:mt-6">
-              <span>
-                <span className="block text-sm font-bold text-neutral-800">
-                  사용
-                </span>
-                <span className="mt-1 block text-xs text-neutral-500">
-                  등록 선택지 노출
-                </span>
-              </span>
+                <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3 md:mt-6">
+                  <span>
+                    <span className="block text-sm font-bold text-neutral-800">
+                      사용
+                    </span>
+                    <span className="mt-1 block text-xs text-neutral-500">
+                      등록 선택지 노출
+                    </span>
+                  </span>
 
-              <input
-                type="checkbox"
-                checked={newBenefitSubcategoryIsVisible}
-                onChange={(event) =>
-                  setNewBenefitSubcategoryIsVisible(event.target.checked)
-                }
-                className="h-5 w-5"
-              />
-            </label>
-          </div>
+                  <input
+                    type="checkbox"
+                    checked={newBenefitSubcategoryIsVisible}
+                    onChange={(event) =>
+                      setNewBenefitSubcategoryIsVisible(event.target.checked)
+                    }
+                    className="h-5 w-5"
+                  />
+                </label>
+              </div>
 
-          <button
-            type="submit"
-            disabled={isSubmittingBenefitSubcategory}
-            className="mt-4 w-full rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-          >
-            {isSubmittingBenefitSubcategory ? '등록 중...' : '하위 분류 등록'}
-          </button>
+              <button
+                type="submit"
+                disabled={isSubmittingBenefitSubcategory}
+                className="mt-4 w-full rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+              >
+                {isSubmittingBenefitSubcategory
+                  ? '등록 중...'
+                  : '하위 분류 등록'}
+              </button>
 
-          {benefitSubcategories.length > 0 ? (
-            <div className="mt-5 space-y-2">
-              {benefitSubcategories.map((subcategory) => {
-                const isEditing =
-                  editingBenefitSubcategoryId === subcategory.id;
-                const isUpdating =
-                  isUpdatingBenefitSubcategoryId === subcategory.id;
-                const isDeleting =
-                  isDeletingBenefitSubcategoryId === subcategory.id;
+              {benefitSubcategories.length > 0 ? (
+                <div className="mt-5 space-y-2">
+                  {benefitSubcategories.map((subcategory) => {
+                    const isEditing =
+                      editingBenefitSubcategoryId === subcategory.id;
+                    const isUpdating =
+                      isUpdatingBenefitSubcategoryId === subcategory.id;
+                    const isDeleting =
+                      isDeletingBenefitSubcategoryId === subcategory.id;
 
-                return (
-                  <div
-                    key={subcategory.id}
-                    className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3"
-                  >
-                    {isEditing ? (
-                      <div className="space-y-3">
-                        <label className="block">
-                          <span className="text-[10px] font-bold text-neutral-500">
-                            하위 분류명
-                          </span>
+                    return (
+                      <div
+                        key={subcategory.id}
+                        className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3"
+                      >
+                        {isEditing ? (
+                          <div className="space-y-3">
+                            <label className="block">
+                              <span className="text-[10px] font-bold text-neutral-500">
+                                하위 분류명
+                              </span>
 
-                          <input
-                            value={editingBenefitSubcategoryName}
-                            onChange={(event) =>
-                              setEditingBenefitSubcategoryName(
-                                event.target.value,
-                              )
-                            }
-                            className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs outline-none focus:border-neutral-950"
-                          />
-                        </label>
+                              <input
+                                value={editingBenefitSubcategoryName}
+                                onChange={(event) =>
+                                  setEditingBenefitSubcategoryName(
+                                    event.target.value,
+                                  )
+                                }
+                                className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-xs outline-none focus:border-neutral-950"
+                              />
+                            </label>
 
-                        <label className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2">
-                          <span>
-                            <span className="block text-[10px] font-bold text-neutral-600">
-                              사용
-                            </span>
-                            <span className="mt-0.5 block text-[10px] text-neutral-400">
-                              특전 등록 선택지 노출
-                            </span>
-                          </span>
+                            <label className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2">
+                              <span>
+                                <span className="block text-[10px] font-bold text-neutral-600">
+                                  사용
+                                </span>
+                                <span className="mt-0.5 block text-[10px] text-neutral-400">
+                                  특전 등록 선택지 노출
+                                </span>
+                              </span>
 
-                          <input
-                            type="checkbox"
-                            checked={editingBenefitSubcategoryIsVisible}
-                            onChange={(event) =>
-                              setEditingBenefitSubcategoryIsVisible(
-                                event.target.checked,
-                              )
-                            }
-                            className="h-5 w-5"
-                          />
-                        </label>
+                              <input
+                                type="checkbox"
+                                checked={editingBenefitSubcategoryIsVisible}
+                                onChange={(event) =>
+                                  setEditingBenefitSubcategoryIsVisible(
+                                    event.target.checked,
+                                  )
+                                }
+                                className="h-5 w-5"
+                              />
+                            </label>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={handleCancelEditBenefitSubcategory}
-                            disabled={isUpdating}
-                            className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-[11px] font-black text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            취소
-                          </button>
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={handleCancelEditBenefitSubcategory}
+                                disabled={isUpdating}
+                                className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-[11px] font-black text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                취소
+                              </button>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleUpdateBenefitSubcategory(subcategory)
-                            }
-                            disabled={isUpdating}
-                            className="rounded-xl bg-neutral-950 px-3 py-2 text-[11px] font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-                          >
-                            {isUpdating ? '수정 중...' : '저장'}
-                          </button>
-                        </div>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateBenefitSubcategory(subcategory)
+                                }
+                                disabled={isUpdating}
+                                className="rounded-xl bg-neutral-950 px-3 py-2 text-[11px] font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+                              >
+                                {isUpdating ? '수정 중...' : '저장'}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="line-clamp-1 text-sm font-black text-neutral-950">
+                                {subcategory.name}
+                              </p>
+                              <p className="mt-1 text-[10px] font-bold text-neutral-400">
+                                {subcategory.is_visible
+                                  ? '특전 등록 선택지에 표시'
+                                  : '숨김'}
+                              </p>
+                            </div>
+
+                            <div className="flex shrink-0 items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleStartEditBenefitSubcategory(subcategory)
+                                }
+                                className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-[11px] font-black text-neutral-600"
+                              >
+                                수정
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteBenefitSubcategory(subcategory)
+                                }
+                                disabled={isDeleting}
+                                className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                {isDeleting ? '삭제 중' : '삭제'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="line-clamp-1 text-sm font-black text-neutral-950">
-                            {subcategory.name}
-                          </p>
-                          <p className="mt-1 text-[10px] font-bold text-neutral-400">
-                            {subcategory.is_visible
-                              ? '특전 등록 선택지에 표시'
-                              : '숨김'}
-                          </p>
-                        </div>
-
-                        <div className="flex shrink-0 items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleStartEditBenefitSubcategory(subcategory)
-                            }
-                            className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-[11px] font-black text-neutral-600"
-                          >
-                            수정
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleDeleteBenefitSubcategory(subcategory)
-                            }
-                            disabled={isDeleting}
-                            className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {isDeleting ? '삭제 중' : '삭제'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="mt-5 rounded-2xl bg-neutral-50 px-4 py-6 text-center text-xs text-neutral-400">
-              아직 등록된 특전 하위 분류가 없습니다. 필요할 때만 추가해 주세요.
-            </p>
-          )}
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-5 rounded-2xl bg-neutral-50 px-4 py-6 text-center text-xs text-neutral-400">
+                  아직 등록된 특전 하위 분류가 없습니다. 필요할 때만 추가해 주세요.
+                </p>
+              )}
+            </>
+          ) : null}
         </form>
 
         <form
@@ -1778,31 +1823,31 @@ export default function AdminEventManagePage() {
               </p>
             </label>
 
-            <label className="block">
-              <span className="text-sm font-bold text-neutral-800">
-                굿즈 종류
-              </span>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-sm font-bold text-neutral-800">
+                  굿즈 종류
+                </span>
 
-              <select
-                value={category}
-                onChange={(event) => {
-                  const nextCategory = event.target.value as TradeCategory;
-                  setCategory(nextCategory);
-                  if (nextCategory !== 'benefit') {
-                    setBenefitSubcategory('');
-                  }
-                }}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
-              >
-                {TRADE_CATEGORIES.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <select
+                  value={category}
+                  onChange={(event) => {
+                    const nextCategory = event.target.value as TradeCategory;
+                    setCategory(nextCategory);
+                    if (nextCategory !== 'benefit') {
+                      setBenefitSubcategory('');
+                    }
+                  }}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                >
+                  {TRADE_CATEGORIES.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-            {category === 'benefit' ? (
               <label className="block">
                 <span className="text-sm font-bold text-neutral-800">
                   특전 하위 분류
@@ -1811,22 +1856,33 @@ export default function AdminEventManagePage() {
                 <select
                   value={benefitSubcategory}
                   onChange={(event) => setBenefitSubcategory(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                  disabled={
+                    category !== 'benefit' || visibleBenefitSubcategories.length === 0
+                  }
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-950 disabled:bg-neutral-100 disabled:text-neutral-400"
                 >
-                  <option value="">하위 분류 없음</option>
+                  {category !== 'benefit' ? (
+                    <option value="">해당 없음</option>
+                  ) : visibleBenefitSubcategories.length === 0 ? (
+                    <option value="">등록된 하위 분류 없음</option>
+                  ) : (
+                    <>
+                      <option value="">하위 분류 없음</option>
 
-                  {visibleBenefitSubcategories.map((subcategory) => (
-                    <option key={subcategory.id} value={subcategory.name}>
-                      {subcategory.name}
-                    </option>
-                  ))}
+                      {visibleBenefitSubcategories.map((subcategory) => (
+                        <option key={subcategory.id} value={subcategory.name}>
+                          {subcategory.name}
+                        </option>
+                      ))}
+                    </>
+                  )}
                 </select>
-
-                <p className="mt-2 text-xs leading-5 text-neutral-400">
-                  위의 특전 하위 분류 관리에서 행사별 분류를 먼저 추가할 수 있습니다.
-                </p>
               </label>
-            ) : null}
+            </div>
+
+            <p className="-mt-3 text-xs leading-5 text-neutral-400">
+              특전 하위 분류는 굿즈 종류가 특전이고 등록된 하위 분류가 있을 때만 선택할 수 있습니다.
+            </p>
 
             <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
               <span>
