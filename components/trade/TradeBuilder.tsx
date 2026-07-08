@@ -5,6 +5,7 @@ import { toPng } from "html-to-image";
 import { nanoid } from "nanoid";
 import {
   RegisteredTradeItem,
+  TradeReferenceImage,
   TRADE_CATEGORIES,
   TradeBoard,
   TradeCard,
@@ -18,9 +19,11 @@ import { TradePreview } from "./TradePreview";
 type TradeBuilderProps = {
   collection: TradeCollectionSummary;
   registeredItems: RegisteredTradeItem[];
+  referenceImages: TradeReferenceImage[];
 };
 
 const PREVIEW_WIDTH = 560;
+const EXPORT_IMAGE_WIDTH = 1200;
 const ALL_WORKS_VALUE = "all";
 const ALL_CATEGORIES_VALUE = "all";
 const ALL_BENEFIT_SUBCATEGORIES_VALUE = "all";
@@ -89,7 +92,6 @@ function isSameRegisteredCard(
   );
 }
 
-
 function getRegisteredItemQuantity(
   cards: TradeCard[],
   item: RegisteredTradeItem,
@@ -102,7 +104,6 @@ function getRegisteredItemQuantity(
   return selectedCard ? getCardQuantity(selectedCard) : 0;
 }
 
-
 function getCategoryLabel(category: TradeCategory) {
   return (
     TRADE_CATEGORIES.find((option) => option.id === category)?.label ?? category
@@ -112,7 +113,6 @@ function getCategoryLabel(category: TradeCategory) {
 function getItemImageRatio(item: RegisteredTradeItem): TradeImageRatio {
   return item.imageRatio === "photocard" ? "photocard" : "square";
 }
-
 
 function getImageRatioClass(ratio: TradeImageRatio) {
   return ratio === "photocard" ? "aspect-[55/85]" : "aspect-square";
@@ -124,7 +124,9 @@ function getBenefitSubcategoryLabel(value?: string | null) {
 
 function getItemMetaLabel(item: RegisteredTradeItem) {
   const categoryLabel = getCategoryLabel(item.category);
-  const benefitSubcategory = getBenefitSubcategoryLabel(item.benefitSubcategory);
+  const benefitSubcategory = getBenefitSubcategoryLabel(
+    item.benefitSubcategory,
+  );
 
   if (item.category === "benefit" && benefitSubcategory) {
     return `${categoryLabel} · ${benefitSubcategory}`;
@@ -135,7 +137,9 @@ function getItemMetaLabel(item: RegisteredTradeItem) {
 
 function getCardMetaLabel(card: TradeCard) {
   const categoryLabel = getCategoryLabel(card.category);
-  const benefitSubcategory = getBenefitSubcategoryLabel(card.benefitSubcategory);
+  const benefitSubcategory = getBenefitSubcategoryLabel(
+    card.benefitSubcategory,
+  );
 
   if (card.category === "benefit" && benefitSubcategory) {
     return `${categoryLabel} · ${benefitSubcategory}`;
@@ -162,10 +166,14 @@ function sortRegisteredItems(items: RegisteredTradeItem[]) {
     if (a.category === "benefit" && b.category === "benefit") {
       const subcategoryDiff = getBenefitSubcategoryLabel(
         a.benefitSubcategory,
-      ).localeCompare(getBenefitSubcategoryLabel(b.benefitSubcategory), "ko-KR", {
-        numeric: true,
-        sensitivity: "base",
-      });
+      ).localeCompare(
+        getBenefitSubcategoryLabel(b.benefitSubcategory),
+        "ko-KR",
+        {
+          numeric: true,
+          sensitivity: "base",
+        },
+      );
 
       if (subcategoryDiff !== 0) {
         return subcategoryDiff;
@@ -188,6 +196,7 @@ function sortRegisteredItems(items: RegisteredTradeItem[]) {
 export function TradeBuilder({
   collection,
   registeredItems,
+  referenceImages,
 }: TradeBuilderProps) {
   const [board, setBoard] = useState<TradeBoard>(() => createInitialBoard());
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
@@ -197,9 +206,7 @@ export function TradeBuilder({
   const [selectedCategory, setSelectedCategory] =
     useState<CategoryFilterValue>(ALL_CATEGORIES_VALUE);
   const [selectedBenefitSubcategory, setSelectedBenefitSubcategory] =
-    useState<BenefitSubcategoryFilterValue>(
-      ALL_BENEFIT_SUBCATEGORIES_VALUE,
-    );
+    useState<BenefitSubcategoryFilterValue>(ALL_BENEFIT_SUBCATEGORIES_VALUE);
   const [addModalSide, setAddModalSide] = useState<TradeSide | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [previewScale, setPreviewScale] = useState(0.6);
@@ -233,6 +240,7 @@ export function TradeBuilder({
       );
     });
   }, [registeredItems]);
+
 
   const filteredItems = useMemo(() => {
     const nextItems = registeredItems.filter((item) => {
@@ -284,7 +292,10 @@ export function TradeBuilder({
   }, [wantCards]);
 
   const totalSelectedCount = useMemo(() => {
-    return board.cards.reduce((total, card) => total + getCardQuantity(card), 0);
+    return board.cards.reduce(
+      (total, card) => total + getCardQuantity(card),
+      0,
+    );
   }, [board.cards]);
 
   const canDownload = useMemo(() => {
@@ -389,7 +400,9 @@ export function TradeBuilder({
     }
   }
 
-  function changeBenefitSubcategoryFilter(value: BenefitSubcategoryFilterValue) {
+  function changeBenefitSubcategoryFilter(
+    value: BenefitSubcategoryFilterValue,
+  ) {
     setSelectedBenefitSubcategory(value);
   }
 
@@ -455,12 +468,18 @@ export function TradeBuilder({
     });
   }
 
-  function increaseRegisteredItemQuantity(item: RegisteredTradeItem, side: TradeSide) {
+  function increaseRegisteredItemQuantity(
+    item: RegisteredTradeItem,
+    side: TradeSide,
+  ) {
     const currentQuantity = getRegisteredItemQuantity(board.cards, item, side);
     setRegisteredItemQuantity(item, side, currentQuantity + 1);
   }
 
-  function decreaseRegisteredItemQuantity(item: RegisteredTradeItem, side: TradeSide) {
+  function decreaseRegisteredItemQuantity(
+    item: RegisteredTradeItem,
+    side: TradeSide,
+  ) {
     const currentQuantity = getRegisteredItemQuantity(board.cards, item, side);
     setRegisteredItemQuantity(item, side, currentQuantity - 1);
   }
@@ -528,7 +547,7 @@ export function TradeBuilder({
       setIsExporting(true);
 
       const dataUrl = await toPng(previewRef.current, {
-        pixelRatio: 2,
+        pixelRatio: EXPORT_IMAGE_WIDTH / PREVIEW_WIDTH,
         backgroundColor: "#ffffff",
         cacheBust: true,
       });
@@ -550,247 +569,249 @@ export function TradeBuilder({
   const scaledPreviewHeight = Math.ceil(previewHeight * previewScale);
 
   return (
-    <section className="w-full bg-neutral-100 px-4 py-5 sm:py-6">
+    <section className="w-full bg-neutral-100 px-4 pb-9 pt-5 sm:pb-10 sm:pt-6">
       <div className="mx-auto flex w-full max-w-md flex-col gap-5 sm:max-w-lg">
-      <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200 bg-white p-5 shadow-sm">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
-            Popup & Callabo Cafe Trade Board
-          </p>
-
-          <h1 className="mt-1 text-2xl font-black text-neutral-950">
-            {collection.title}
-          </h1>
-
-          {collection.description ? (
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              {collection.description}
+        <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200/80 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
+              Popup & Callabo Cafe Trade Board
             </p>
-          ) : (
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              등록된 굿즈 이미지를 선택해 있어요 / 구해요 팝업 & 콜카 굿즈 교환판을 만들 수
-              있습니다.
-            </p>
-          )}
-        </div>
 
-        <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
-          <p>선택한 이미지는 팝업 & 콜카 굿즈 교환판 생성 목적으로만 사용됩니다.</p>
-          <p>완성된 이미지를 저장한 뒤 본인의 SNS에 직접 업로드해 주세요.</p>
-        </div>
+            <h1 className="mt-1 text-2xl font-black text-neutral-950">
+              {collection.title}
+            </h1>
 
-        <div className="mt-6 space-y-3">
-          <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-            <button
-              type="button"
-              onClick={() => setIsProfileOpen((prev) => !prev)}
-              className="flex w-full items-center justify-between gap-3 text-left"
-              aria-expanded={isProfileOpen}
-            >
-              <div>
-                <p className="text-sm font-black text-neutral-950">
-                  닉네임 / SNS ID
-                </p>
-                <p className="mt-1 text-xs text-neutral-400">
-                  필요할 때만 입력해 주세요.
-                </p>
-              </div>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-500">
-                {isProfileOpen ? "접기" : "선택 입력"}
-              </span>
-            </button>
-
-            {isProfileOpen ? (
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-xs font-black text-neutral-500">
-                    닉네임
-                  </span>
-                  <input
-                    value={board.nickname}
-                    onChange={(event) =>
-                      updateBoardField("nickname", event.target.value)
-                    }
-                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-900"
-                    placeholder="닉네임"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-xs font-black text-neutral-500">
-                    SNS ID
-                  </span>
-                  <input
-                    value={board.contact}
-                    onChange={(event) =>
-                      updateBoardField("contact", event.target.value)
-                    }
-                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-900"
-                    placeholder="@example"
-                  />
-                </label>
-              </div>
-            ) : null}
-          </section>
-
-          <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-            <button
-              type="button"
-              onClick={() => setIsConditionsOpen((prev) => !prev)}
-              className="flex w-full items-center justify-between gap-3 text-left"
-              aria-expanded={isConditionsOpen}
-            >
-              <div>
-                <p className="text-sm font-black text-neutral-950">
-                  거래 조건 선택
-                </p>
-                <p className="mt-1 text-xs text-neutral-400">
-                  체크한 조건만 팝업 & 콜카 굿즈 교환판에 표시됩니다.
-                </p>
-              </div>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-500">
-                {isConditionsOpen
-                  ? "접기"
-                  : `${selectedConditions.length}개 선택`}
-              </span>
-            </button>
-
-            {isConditionsOpen ? (
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {TRADE_CONDITIONS.map((condition) => {
-                  const checked = selectedConditions.includes(condition);
-
-                  return (
-                    <label
-                      key={condition}
-                      className={
-                        checked
-                          ? "flex cursor-pointer items-center gap-2 rounded-2xl bg-neutral-950 px-3 py-3 text-xs font-black text-white"
-                          : "flex cursor-pointer items-center gap-2 rounded-2xl bg-white px-3 py-3 text-xs font-bold text-neutral-600 ring-1 ring-neutral-200"
-                      }
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleCondition(condition)}
-                        className="h-4 w-4"
-                      />
-                      <span>{condition}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            ) : null}
-          </section>
-        </div>
-
-        <div className="mt-8 border-t border-neutral-100 pt-6">
-          <h2 className="text-sm font-black text-neutral-950">
-            교환 이미지 추가
-          </h2>
-
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <AddSideButton
-              title="있어요"
-              emoji="🙋🏻‍♀️"
-              count={haveCardCount}
-              onClick={() => openAddModal("have")}
-            />
-
-            <AddSideButton
-              title="구해요"
-              emoji="❤️"
-              count={wantCardCount}
-              onClick={() => openAddModal("want")}
-            />
-          </div>
-        </div>
-
-        <div className="mt-8 border-t border-neutral-100 pt-6">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-black text-neutral-950">
-              선택된 이미지
-            </h2>
-
-            <p className="text-xs font-bold text-neutral-400">
-              총 {totalSelectedCount}개
-            </p>
-          </div>
-
-          <div className="mt-4 space-y-3">
-            {board.cards.length > 0 ? (
-              board.cards.map((card) => (
-                <CardEditor
-                  key={card.id}
-                  card={card}
-                  onUpdate={(patch) => updateCard(card.id, patch)}
-                  onRemove={() => removeCard(card.id)}
-                />
-              ))
+            {collection.description ? (
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                {collection.description}
+              </p>
             ) : (
-              <p className="rounded-xl bg-neutral-50 px-3 py-6 text-center text-xs text-neutral-400">
-                아직 선택된 이미지가 없습니다.
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                등록된 굿즈 이미지를 선택해 있어요 / 구해요 팝업 & 콜카 굿즈
+                교환판을 만들 수 있습니다.
               </p>
             )}
           </div>
-        </div>
 
-        <div className="mt-6 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={resetBoard}
-            className="rounded-2xl border border-neutral-300 bg-white px-5 py-4 text-sm font-bold text-neutral-700"
-          >
-            초기화
-          </button>
+          <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
+            <p>
+              선택한 이미지는 팝업 & 콜카 굿즈 교환판 생성 목적으로만
+              사용됩니다.
+            </p>
+            <p>완성된 이미지를 저장한 뒤 본인의 SNS에 직접 업로드해 주세요.</p>
+          </div>
 
-          <button
-            type="button"
-            onClick={downloadImage}
-            disabled={!canDownload || isExporting}
-            className="rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-          >
-            {isExporting ? "저장 중..." : "PNG 저장"}
-          </button>
-        </div>
-      </div>
+          <div className="mt-6 space-y-3">
+            <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+              <button
+                type="button"
+                onClick={() => setIsProfileOpen((prev) => !prev)}
+                className="flex w-full items-center justify-between gap-3 text-left"
+                aria-expanded={isProfileOpen}
+              >
+                <div>
+                  <p className="text-sm font-black text-neutral-950">
+                    닉네임 / SNS ID
+                  </p>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    필요할 때만 입력해 주세요.
+                  </p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-500">
+                  {isProfileOpen ? "접기" : "선택 입력"}
+                </span>
+              </button>
 
-      <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200 bg-white p-4 shadow-sm">
-        <div className="mb-3">
-          <div className="text-sm font-black text-neutral-950">미리보기</div>
-          <p className="mt-1 text-xs leading-5 text-neutral-400">
-            세로형 팝업 & 콜카 굿즈 교환판으로 저장됩니다. 화면에서는 모바일 폭에 맞게 축소되어
-            보입니다.
-          </p>
-        </div>
+              {isProfileOpen ? (
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="text-xs font-black text-neutral-500">
+                      닉네임
+                    </span>
+                    <input
+                      value={board.nickname}
+                      onChange={(event) =>
+                        updateBoardField("nickname", event.target.value)
+                      }
+                      className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-900"
+                      placeholder="닉네임"
+                    />
+                  </label>
 
-        <div
-          ref={previewAreaRef}
-          className="w-full min-w-0 overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-200 p-2"
-        >
-          <div
-            className="relative w-full"
-            style={{
-              height: scaledPreviewHeight,
-            }}
-          >
-            <div
-              style={{
-                width: PREVIEW_WIDTH,
-                transform: `scale(${previewScale})`,
-                transformOrigin: "top left",
-              }}
-            >
-              <TradePreview
-                ref={previewRef}
-                board={board}
-                collectionTitle={collection.title}
+                  <label className="block">
+                    <span className="text-xs font-black text-neutral-500">
+                      SNS ID
+                    </span>
+                    <input
+                      value={board.contact}
+                      onChange={(event) =>
+                        updateBoardField("contact", event.target.value)
+                      }
+                      className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-900"
+                      placeholder="@example"
+                    />
+                  </label>
+                </div>
+              ) : null}
+            </section>
+
+            <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+              <button
+                type="button"
+                onClick={() => setIsConditionsOpen((prev) => !prev)}
+                className="flex w-full items-center justify-between gap-3 text-left"
+                aria-expanded={isConditionsOpen}
+              >
+                <div>
+                  <p className="text-sm font-black text-neutral-950">
+                    거래 조건 선택
+                  </p>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    체크한 조건만 팝업 & 콜카 굿즈 교환판에 표시됩니다.
+                  </p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-500">
+                  {isConditionsOpen
+                    ? "접기"
+                    : `${selectedConditions.length}개 선택`}
+                </span>
+              </button>
+
+              {isConditionsOpen ? (
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {TRADE_CONDITIONS.map((condition) => {
+                    const checked = selectedConditions.includes(condition);
+
+                    return (
+                      <label
+                        key={condition}
+                        className={
+                          checked
+                            ? "flex cursor-pointer items-center gap-2 rounded-2xl bg-neutral-950 px-3 py-3 text-xs font-black text-white"
+                            : "flex cursor-pointer items-center gap-2 rounded-2xl bg-white px-3 py-3 text-xs font-bold text-neutral-600 ring-1 ring-neutral-200"
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleCondition(condition)}
+                          className="h-4 w-4"
+                        />
+                        <span>{condition}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : null}
+            </section>
+          </div>
+
+          <div className="mt-8 border-t border-neutral-100 pt-6">
+            <h2 className="text-sm font-black text-neutral-950">
+              교환 이미지 추가
+            </h2>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <AddSideButton
+                title="있어요"
+                emoji="🙋🏻‍♀️"
+                count={haveCardCount}
+                onClick={() => openAddModal("have")}
+              />
+
+              <AddSideButton
+                title="구해요"
+                emoji="❤️"
+                count={wantCardCount}
+                onClick={() => openAddModal("want")}
               />
             </div>
           </div>
-        </div>
-      </div>
 
+          <div className="mt-8 border-t border-neutral-100 pt-6">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-black text-neutral-950">
+                선택된 이미지
+              </h2>
+
+              <p className="text-xs font-bold text-neutral-400">
+                총 {totalSelectedCount}개
+              </p>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {board.cards.length > 0 ? (
+                board.cards.map((card) => (
+                  <CardEditor
+                    key={card.id}
+                    card={card}
+                    onUpdate={(patch) => updateCard(card.id, patch)}
+                    onRemove={() => removeCard(card.id)}
+                  />
+                ))
+              ) : (
+                <p className="rounded-xl bg-neutral-50 px-3 py-6 text-center text-xs text-neutral-400">
+                  아직 선택된 이미지가 없습니다.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={resetBoard}
+              className="rounded-2xl border border-neutral-300 bg-white px-5 py-4 text-sm font-bold text-neutral-700"
+            >
+              초기화
+            </button>
+
+            <button
+              type="button"
+              onClick={downloadImage}
+              disabled={!canDownload || isExporting}
+              className="rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+            >
+              {isExporting ? "저장 중..." : "PNG 저장"}
+            </button>
+          </div>
+        </div>
+
+        <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200/80 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
+          <div className="mb-3">
+            <div className="text-sm font-black text-neutral-950">미리보기</div>
+            <p className="mt-1 text-xs leading-5 text-neutral-400">
+              세로형 팝업 & 콜카 굿즈 교환판으로 저장됩니다. 화면에서는 모바일
+              폭에 맞게 축소되어 보입니다.
+            </p>
+          </div>
+
+          <div
+            ref={previewAreaRef}
+            className="w-full min-w-0 overflow-hidden rounded-2xl bg-white"
+          >
+            <div
+              className="relative w-full"
+              style={{
+                height: scaledPreviewHeight,
+              }}
+            >
+              <div
+                style={{
+                  width: PREVIEW_WIDTH,
+                  transform: `scale(${previewScale})`,
+                  transformOrigin: "top left",
+                }}
+              >
+                <TradePreview
+                  ref={previewRef}
+                  board={board}
+                  collectionTitle={collection.title}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {addModalSide ? (
@@ -802,14 +823,19 @@ export function TradeBuilder({
           workTitleOptions={workTitleOptions}
           benefitSubcategoryOptions={benefitSubcategoryOptions}
           hasBenefitItemsWithoutSubcategory={hasBenefitItemsWithoutSubcategory}
+          referenceImages={referenceImages}
           selectedCards={board.cards}
           filteredItems={filteredItems}
           onClose={closeAddModal}
           onChangeWorkTitle={setSelectedWorkTitle}
           onChangeCategory={changeCategoryFilter}
           onChangeBenefitSubcategory={changeBenefitSubcategoryFilter}
-          onIncreaseItem={(item) => increaseRegisteredItemQuantity(item, addModalSide)}
-          onDecreaseItem={(item) => decreaseRegisteredItemQuantity(item, addModalSide)}
+          onIncreaseItem={(item) =>
+            increaseRegisteredItemQuantity(item, addModalSide)
+          }
+          onDecreaseItem={(item) =>
+            decreaseRegisteredItemQuantity(item, addModalSide)
+          }
           onUpload={(files) => addUploadedCards(addModalSide, files)}
         />
       ) : null}
@@ -853,6 +879,7 @@ type AddItemModalProps = {
   workTitleOptions: string[];
   benefitSubcategoryOptions: string[];
   hasBenefitItemsWithoutSubcategory: boolean;
+  referenceImages: TradeReferenceImage[];
   selectedCards: TradeCard[];
   filteredItems: RegisteredTradeItem[];
   onClose: () => void;
@@ -872,6 +899,7 @@ function AddItemModal({
   workTitleOptions,
   benefitSubcategoryOptions,
   hasBenefitItemsWithoutSubcategory,
+  referenceImages,
   selectedCards,
   filteredItems,
   onClose,
@@ -884,13 +912,14 @@ function AddItemModal({
 }: AddItemModalProps) {
   const sideLabel = side === "have" ? "있어요" : "구해요";
   const canUseBenefitSubcategoryFilter =
-    (selectedCategory === ALL_CATEGORIES_VALUE || selectedCategory === "benefit") &&
+    (selectedCategory === ALL_CATEGORIES_VALUE ||
+      selectedCategory === "benefit") &&
     (benefitSubcategoryOptions.length > 0 || hasBenefitItemsWithoutSubcategory);
 
   return (
     <div className="fixed inset-0 z-50 bg-neutral-950/50 px-4 py-5">
       <div className="mx-auto flex h-full w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-xl sm:max-w-lg">
-        <header className="shrink-0 border-b border-neutral-100 p-5">
+        <header className="shrink-0 p-5 pb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-400">
@@ -986,7 +1015,9 @@ function AddItemModal({
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto px-5 pb-5 pt-1">
+          <GoodsWorkReference referenceImages={referenceImages} />
+
           {filteredItems.length > 0 ? (
             <div className="grid grid-cols-3 gap-3">
               {filteredItems.map((item) => {
@@ -1053,6 +1084,48 @@ function AddItemModal({
         </footer>
       </div>
     </div>
+  );
+}
+
+type GoodsWorkReferenceProps = {
+  referenceImages: TradeReferenceImage[];
+};
+
+function GoodsWorkReference({ referenceImages }: GoodsWorkReferenceProps) {
+  return (
+    <details className="mb-4 border-b border-neutral-100 pb-4 pt-1">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl bg-neutral-50 px-3 py-2.5 text-left ring-1 ring-neutral-200 [&::-webkit-details-marker]:hidden">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span aria-hidden="true" className="shrink-0 text-xs leading-none">
+            🔍
+          </span>
+          <span className="text-xs font-black leading-4 text-neutral-950">
+            내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?
+          </span>
+        </span>
+
+        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-neutral-500 ring-1 ring-neutral-200">
+          보기
+        </span>
+      </summary>
+
+      {referenceImages.length > 0 ? (
+        <div className="mt-3 max-h-80 space-y-3 overflow-y-auto pr-1">
+          {referenceImages.map((image) => (
+            <img
+              key={image.id}
+              src={image.imageUrl}
+              alt="굿즈 작품 확인용 공지 이미지"
+              className="w-full rounded-2xl bg-white object-contain ring-1 ring-neutral-200"
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="mt-3 rounded-xl bg-neutral-50 px-4 py-5 text-center text-xs leading-5 text-neutral-400 ring-1 ring-neutral-200">
+          아직 작품 확인용 공지 이미지가 등록되어 있지 않습니다.
+        </p>
+      )}
+    </details>
   );
 }
 
@@ -1227,9 +1300,7 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
             <p className="truncate font-black text-neutral-950">
               {card.workTitle || "작품명 없음"}
             </p>
-            <p className="truncate text-neutral-500">
-              {metaLabel}
-            </p>
+            <p className="truncate text-neutral-500">{metaLabel}</p>
           </div>
 
           <div className="flex shrink-0 items-center overflow-hidden rounded-full border border-neutral-200 bg-white">

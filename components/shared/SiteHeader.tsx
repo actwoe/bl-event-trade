@@ -1,21 +1,24 @@
+"use client";
+
 import Link from 'next/link';
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white/90 px-4 py-3 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3">
-        <Link href="/" className="min-w-0 truncate text-sm font-black text-neutral-950">
-          팝업 & 콜카 굿즈 교환판
+    <header className="bg-neutral-100 px-4 pt-4">
+      <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 sm:max-w-lg">
+        <Link
+          href="/"
+          className="inline-flex rounded-full border border-neutral-200/80 bg-white px-4 py-2 text-xs font-black text-neutral-600 shadow-[0_8px_22px_rgba(15,23,42,0.04)] transition hover:border-neutral-950 hover:text-neutral-950"
+        >
+          ← 메인으로
         </Link>
 
-        <nav className="flex shrink-0 items-center gap-2">
-          <Link
-            href="/cardform"
-            className="rounded-full border border-neutral-200 bg-white px-4 py-2 text-xs font-black text-neutral-700 shadow-sm transition hover:border-neutral-950 hover:text-neutral-950"
-          >
-            이미지 제보
-          </Link>
-        </nav>
+        <Link
+          href="/cardform"
+          className="inline-flex rounded-full border border-neutral-200/80 bg-white px-4 py-2 text-xs font-black text-neutral-600 shadow-[0_8px_22px_rgba(15,23,42,0.04)] transition hover:border-neutral-950 hover:text-neutral-950"
+        >
+          이미지 제보하기
+        </Link>
       </div>
     </header>
   );

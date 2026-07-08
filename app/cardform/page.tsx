@@ -205,7 +205,7 @@ export default function CardFormPage() {
           return prev;
         }
 
-        return "";
+        return nextSubcategories[0] ?? "";
       });
     }
 
@@ -219,11 +219,11 @@ export default function CardFormPage() {
     }
 
     setBenefitSubcategory((prev) => {
-      if (!prev || benefitSubcategories.includes(prev)) {
+      if (prev && benefitSubcategories.includes(prev)) {
         return prev;
       }
 
-      return "";
+      return benefitSubcategories[0] ?? "";
     });
   }, [category, benefitSubcategories]);
 
@@ -345,9 +345,9 @@ export default function CardFormPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-100 px-4 py-5">
+    <main className="w-full bg-neutral-100 px-4 pb-9 pt-5 sm:pb-10 sm:pt-6">
       <section className="mx-auto w-full max-w-md sm:max-w-lg">
-        <header className="rounded-3xl bg-white p-5 shadow-sm">
+        <header className="rounded-3xl border border-neutral-200/80 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
               Popup & Callabo Cafe Trade Board
@@ -366,7 +366,7 @@ export default function CardFormPage() {
         </header>
 
         {isSubmitted ? (
-          <section className="mt-5 rounded-3xl bg-white p-5 text-center shadow-sm">
+          <section className="mt-5 rounded-3xl border border-neutral-200/80 bg-white p-5 text-center shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
             <h2 className="text-xl font-black text-neutral-950">
               제보가 접수되었습니다
             </h2>
@@ -386,7 +386,7 @@ export default function CardFormPage() {
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
+            className="mt-5 rounded-3xl border border-neutral-200/80 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.045)]"
           >
             <div className="space-y-5">
               <label className="block">
@@ -477,7 +477,6 @@ export default function CardFormPage() {
                       <option value="">특전 선택 시 사용</option>
                     ) : benefitSubcategories.length > 0 ? (
                       <>
-                        <option value="">하위 분류 선택 안 함</option>
                         {benefitSubcategories.map((subcategory) => (
                           <option key={subcategory} value={subcategory}>
                             {subcategory}
@@ -501,7 +500,7 @@ export default function CardFormPage() {
                     <img
                       src={imagePreviewUrl}
                       alt="제보 이미지 미리보기"
-                      className="aspect-square w-32 rounded-2xl bg-white object-contain p-1 shadow-sm"
+                      className="aspect-square w-32 rounded-2xl bg-white object-contain p-1 shadow-[0_6px_18px_rgba(15,23,42,0.04)]"
                     />
                   ) : (
                     <>

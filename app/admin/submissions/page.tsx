@@ -400,7 +400,7 @@ export default function AdminSubmissionsPage() {
   if (adminState === "checking") {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 text-sm text-neutral-500 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 text-sm text-neutral-500 shadow-sm">
           관리자 권한을 확인하는 중입니다.
         </section>
       </main>
@@ -410,7 +410,7 @@ export default function AdminSubmissionsPage() {
   if (adminState === "signed-out") {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-black text-neutral-950">
             로그인이 필요합니다
           </h1>
@@ -433,7 +433,7 @@ export default function AdminSubmissionsPage() {
   if (adminState === "not-admin") {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-black text-neutral-950">
             관리자 권한이 없습니다
           </h1>
@@ -457,7 +457,7 @@ export default function AdminSubmissionsPage() {
   return (
     <main className="min-h-screen bg-neutral-100 px-4 py-5">
       <section className="mx-auto w-full max-w-md sm:max-w-lg">
-        <header className="rounded-3xl bg-white p-5 shadow-sm">
+        <header className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <Link
               href="/admin"
@@ -533,7 +533,7 @@ export default function AdminSubmissionsPage() {
               return (
                 <article
                   key={submission.id}
-                  className="overflow-hidden rounded-3xl bg-white shadow-sm"
+                  className="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm"
                 >
                   <div className="relative aspect-[3/4] bg-neutral-100">
                     {signedUrl ? (
@@ -657,7 +657,7 @@ export default function AdminSubmissionsPage() {
               );
             })
           ) : (
-            <div className="rounded-3xl bg-white px-5 py-10 text-center shadow-sm">
+            <div className="rounded-3xl border border-neutral-200 bg-white px-5 py-10 text-center shadow-sm">
               <p className="text-sm font-bold text-neutral-500">
                 표시할 제보가 없습니다.
               </p>

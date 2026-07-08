@@ -17,6 +17,8 @@ type TradeCollectionRow = {
   slug: string;
   title: string;
   description: string | null;
+  event_start_date: string | null;
+  event_end_date: string | null;
   thumbnail_path: string;
   status_label: string | null;
   is_public: boolean;
@@ -51,6 +53,14 @@ type TradeItemRow = {
   sort_order: number;
   image_ratio: TradeImageRatio | null;
   benefit_subcategory: string | null;
+  created_at: string;
+};
+
+type TradeReferenceImageRow = {
+  id: string;
+  collection_id: string;
+  image_path: string;
+  sort_order: number;
   created_at: string;
 };
 
@@ -199,11 +209,13 @@ export default function AdminEventManagePage() {
     TradeBenefitSubcategoryRow[]
   >([]);
   const [items, setItems] = useState<TradeItemRow[]>([]);
+  const [referenceImages, setReferenceImages] = useState<TradeReferenceImageRow[]>([]);
 
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
-  const [period, setPeriod] = useState('');
-  const [statusLabel, setStatusLabel] = useState('');
+  const [periodNote, setPeriodNote] = useState('');
+  const [eventStartDate, setEventStartDate] = useState('');
+  const [eventEndDate, setEventEndDate] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [sortOrder, setSortOrder] = useState('0');
 
@@ -237,6 +249,9 @@ export default function AdminEventManagePage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
 
+  const [referenceImageFiles, setReferenceImageFiles] = useState<File[]>([]);
+  const [referenceImagePreviewUrls, setReferenceImagePreviewUrls] = useState<string[]>([]);
+
   const [editingItemId, setEditingItemId] = useState('');
   const [editingItemWorkTitle, setEditingItemWorkTitle] = useState('');
   const [editingItemCategory, setEditingItemCategory] =
@@ -246,6 +261,10 @@ export default function AdminEventManagePage() {
   const [editingItemImageRatio, setEditingItemImageRatio] =
     useState<TradeImageRatio>('square');
   const [editingItemIsVisible, setEditingItemIsVisible] = useState(true);
+  const [editingItemImageFile, setEditingItemImageFile] =
+    useState<File | null>(null);
+  const [editingItemImagePreviewUrl, setEditingItemImagePreviewUrl] =
+    useState('');
 
   const [itemFilterWorkTitle, setItemFilterWorkTitle] = useState('all');
   const [itemFilterCategory, setItemFilterCategory] =
@@ -257,6 +276,8 @@ export default function AdminEventManagePage() {
   const [isBenefitSubcategorySectionOpen, setIsBenefitSubcategorySectionOpen] =
     useState(false);
   const [isItemCreateSectionOpen, setIsItemCreateSectionOpen] =
+    useState(false);
+  const [isReferenceImageSectionOpen, setIsReferenceImageSectionOpen] =
     useState(false);
 
   const [message, setMessage] = useState('');
@@ -270,9 +291,13 @@ export default function AdminEventManagePage() {
   const [isDeletingBenefitSubcategoryId, setIsDeletingBenefitSubcategoryId] =
     useState('');
   const [isSubmittingItem, setIsSubmittingItem] = useState(false);
+  const [isSubmittingReferenceImages, setIsSubmittingReferenceImages] =
+    useState(false);
   const [isUpdatingItemId, setIsUpdatingItemId] = useState('');
   const [isDeletingWorkId, setIsDeletingWorkId] = useState('');
   const [isDeletingItemId, setIsDeletingItemId] = useState('');
+  const [isDeletingReferenceImageId, setIsDeletingReferenceImageId] =
+    useState('');
 
   const normalizedSlug = useMemo(() => {
     return normalizeSlug(slug);
@@ -385,7 +410,7 @@ export default function AdminEventManagePage() {
       const { data, error } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, thumbnail_path, status_label, is_public, sort_order',
+          'id, slug, title, description, event_start_date, event_end_date, thumbnail_path, status_label, is_public, sort_order',
         )
         .eq('id', eventId)
         .single();
@@ -401,13 +426,19 @@ export default function AdminEventManagePage() {
       setEventData(typedEvent);
       setTitle(typedEvent.title);
       setSlug(typedEvent.slug);
-      setPeriod(typedEvent.description ?? '');
-      setStatusLabel(typedEvent.status_label ?? '');
+      setPeriodNote(typedEvent.description ?? '');
+      setEventStartDate(typedEvent.event_start_date ?? '');
+      setEventEndDate(typedEvent.event_end_date ?? '');
       setIsPublic(typedEvent.is_public);
       setSortOrder(String(typedEvent.sort_order ?? 0));
       setThumbnailPreviewUrl(getTradeAssetUrl(typedEvent.thumbnail_path));
 
-      await Promise.all([loadWorks(), loadBenefitSubcategories(), loadItems()]);
+      await Promise.all([
+        loadWorks(),
+        loadBenefitSubcategories(),
+        loadItems(),
+        loadReferenceImages(),
+      ]);
     }
 
     loadPageData();
@@ -422,8 +453,23 @@ export default function AdminEventManagePage() {
       if (imagePreviewUrl.startsWith('blob:')) {
         URL.revokeObjectURL(imagePreviewUrl);
       }
+
+      if (editingItemImagePreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(editingItemImagePreviewUrl);
+      }
+
+      referenceImagePreviewUrls.forEach((url) => {
+        if (url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
     };
-  }, [thumbnailPreviewUrl, imagePreviewUrl]);
+  }, [
+    thumbnailPreviewUrl,
+    imagePreviewUrl,
+    editingItemImagePreviewUrl,
+    referenceImagePreviewUrls,
+  ]);
 
   async function loadWorks() {
     const { data, error } = await supabase
@@ -489,6 +535,23 @@ export default function AdminEventManagePage() {
     setItems(sortTradeItems((data ?? []) as TradeItemRow[]));
   }
 
+  async function loadReferenceImages() {
+    const { data, error } = await supabase
+      .from('trade_reference_images')
+      .select('id, collection_id, image_path, sort_order, created_at')
+      .eq('collection_id', eventId)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error(error);
+      setMessage('공지용 이미지 목록을 불러오지 못했습니다. SQL 추가 여부를 확인해 주세요.');
+      return;
+    }
+
+    setReferenceImages((data ?? []) as TradeReferenceImageRow[]);
+  }
+
   function handleThumbnailChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
@@ -527,6 +590,52 @@ export default function AdminEventManagePage() {
 
     setImageFile(file);
     setImagePreviewUrl(URL.createObjectURL(file));
+  }
+
+  function clearReferenceImagePreviews() {
+    referenceImagePreviewUrls.forEach((url) => {
+      if (url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
+
+    setReferenceImageFiles([]);
+    setReferenceImagePreviewUrls([]);
+  }
+
+  function handleReferenceImagesChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []).filter((file) =>
+      file.type.startsWith('image/'),
+    );
+
+    if (files.length === 0) {
+      setMessage('이미지 파일만 업로드할 수 있습니다.');
+      return;
+    }
+
+    clearReferenceImagePreviews();
+    setReferenceImageFiles(files);
+    setReferenceImagePreviewUrls(files.map((file) => URL.createObjectURL(file)));
+  }
+
+  function handleEditingItemImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      setMessage('이미지 파일만 업로드할 수 있습니다.');
+      return;
+    }
+
+    if (editingItemImagePreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(editingItemImagePreviewUrl);
+    }
+
+    setEditingItemImageFile(file);
+    setEditingItemImagePreviewUrl(URL.createObjectURL(file));
   }
 
   async function handleUpdateEvent(event: FormEvent<HTMLFormElement>) {
@@ -581,9 +690,11 @@ export default function AdminEventManagePage() {
         .update({
           title: title.trim(),
           slug: normalizedSlug,
-          description: period.trim() || null,
+          description: periodNote.trim() || null,
+          event_start_date: eventStartDate || null,
+          event_end_date: eventEndDate || null,
           thumbnail_path: nextThumbnailPath,
-          status_label: statusLabel.trim() || null,
+          status_label: null,
           is_public: isPublic,
           sort_order: Number.isNaN(parsedSortOrder) ? 0 : parsedSortOrder,
         })
@@ -600,7 +711,7 @@ export default function AdminEventManagePage() {
       const { data } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, thumbnail_path, status_label, is_public, sort_order',
+          'id, slug, title, description, event_start_date, event_end_date, thumbnail_path, status_label, is_public, sort_order',
         )
         .eq('id', eventData.id)
         .single();
@@ -611,8 +722,9 @@ export default function AdminEventManagePage() {
         setEventData(refreshedEvent);
         setTitle(refreshedEvent.title);
         setSlug(refreshedEvent.slug);
-        setPeriod(refreshedEvent.description ?? '');
-        setStatusLabel(refreshedEvent.status_label ?? '');
+        setPeriodNote(refreshedEvent.description ?? '');
+        setEventStartDate(refreshedEvent.event_start_date ?? '');
+        setEventEndDate(refreshedEvent.event_end_date ?? '');
         setIsPublic(refreshedEvent.is_public);
         setSortOrder(String(refreshedEvent.sort_order ?? 0));
         setThumbnailPreviewUrl(getTradeAssetUrl(refreshedEvent.thumbnail_path));
@@ -1087,7 +1199,17 @@ export default function AdminEventManagePage() {
     }
   }
 
+  function clearEditingItemImagePreview() {
+    if (editingItemImagePreviewUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(editingItemImagePreviewUrl);
+    }
+
+    setEditingItemImageFile(null);
+    setEditingItemImagePreviewUrl('');
+  }
+
   function handleStartEditItem(item: TradeItemRow) {
+    clearEditingItemImagePreview();
     setEditingItemId(item.id);
     setEditingItemWorkTitle(item.work_title);
     setEditingItemCategory(item.category);
@@ -1097,6 +1219,7 @@ export default function AdminEventManagePage() {
   }
 
   function handleCancelEditItem() {
+    clearEditingItemImagePreview();
     setEditingItemId('');
     setEditingItemWorkTitle('');
     setEditingItemCategory('benefit');
@@ -1106,6 +1229,11 @@ export default function AdminEventManagePage() {
   }
 
   async function handleUpdateItem(item: TradeItemRow) {
+    if (!eventData) {
+      setMessage('행사 정보를 불러온 뒤 다시 시도해 주세요.');
+      return;
+    }
+
     if (!editingItemWorkTitle) {
       setMessage('작품명을 선택해 주세요.');
       return;
@@ -1115,12 +1243,45 @@ export default function AdminEventManagePage() {
       setIsUpdatingItemId(item.id);
       setMessage('');
 
+      let nextImagePath = item.image_path;
+
+      if (editingItemImageFile) {
+        const fileExtension = getFileExtension(editingItemImageFile);
+        const safeWorkTitle = normalizePathPart(editingItemWorkTitle);
+        const safeBenefitSubcategory = normalizePathPart(
+          editingItemBenefitSubcategory || 'benefit',
+        );
+        const fileNamePrefix =
+          editingItemCategory === 'benefit'
+            ? `${editingItemCategory}-${safeBenefitSubcategory}-${safeWorkTitle}`
+            : `${editingItemCategory}-${safeWorkTitle}`;
+        const fileName = `${fileNamePrefix}-replace-${Date.now()}.${fileExtension}`;
+        nextImagePath = `${eventData.slug}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('trade-assets')
+          .upload(nextImagePath, editingItemImageFile, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: editingItemImageFile.type,
+          });
+
+        if (uploadError) {
+          console.error(uploadError);
+          setMessage(
+            '교체 이미지 업로드에 실패했습니다. Storage 정책과 trade-assets 버킷을 확인해 주세요.',
+          );
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('trade_items')
         .update({
           work_title: editingItemWorkTitle,
           category: editingItemCategory,
           item_name: null,
+          image_path: nextImagePath,
           image_ratio: editingItemImageRatio,
           benefit_subcategory:
             editingItemCategory === 'benefit'
@@ -1140,7 +1301,11 @@ export default function AdminEventManagePage() {
 
       await loadItems();
 
-      setMessage('굿즈 정보가 수정되었습니다.');
+      setMessage(
+        editingItemImageFile
+          ? '굿즈 정보와 이미지가 수정되었습니다.'
+          : '굿즈 정보가 수정되었습니다.',
+      );
       router.refresh();
     } catch (error) {
       console.error(error);
@@ -1191,6 +1356,118 @@ export default function AdminEventManagePage() {
     }
   }
 
+  async function handleAddReferenceImages(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!eventData) {
+      setMessage('행사 정보를 불러온 뒤 다시 시도해 주세요.');
+      return;
+    }
+
+    if (referenceImageFiles.length === 0) {
+      setMessage('등록할 공지용 이미지를 선택해 주세요.');
+      return;
+    }
+
+    try {
+      setIsSubmittingReferenceImages(true);
+      setMessage('');
+
+      const now = Date.now();
+      const rows: {
+        collection_id: string;
+        image_path: string;
+        sort_order: number;
+      }[] = [];
+
+      for (const [index, file] of referenceImageFiles.entries()) {
+        const fileExtension = getFileExtension(file);
+        const imagePath = `${eventData.slug}/reference/reference-${now}-${index}.${fileExtension}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('trade-assets')
+          .upload(imagePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: file.type,
+          });
+
+        if (uploadError) {
+          console.error(uploadError);
+          setMessage('공지용 이미지 업로드에 실패했습니다. Storage 정책을 확인해 주세요.');
+          return;
+        }
+
+        rows.push({
+          collection_id: eventData.id,
+          image_path: imagePath,
+          sort_order: referenceImages.length + index,
+        });
+      }
+
+      const { error: insertError } = await supabase
+        .from('trade_reference_images')
+        .insert(rows);
+
+      if (insertError) {
+        console.error(insertError);
+        setMessage('공지용 이미지 등록에 실패했습니다. DB 정책을 확인해 주세요.');
+        return;
+      }
+
+      clearReferenceImagePreviews();
+      await loadReferenceImages();
+      setMessage('공지용 이미지가 등록되었습니다.');
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      setMessage('공지용 이미지 등록 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmittingReferenceImages(false);
+    }
+  }
+
+  async function handleDeleteReferenceImage(image: TradeReferenceImageRow) {
+    const ok = window.confirm('이 공지용 이미지를 삭제할까요?');
+
+    if (!ok) {
+      return;
+    }
+
+    try {
+      setIsDeletingReferenceImageId(image.id);
+      setMessage('');
+
+      const { error: storageError } = await supabase.storage
+        .from('trade-assets')
+        .remove([image.image_path]);
+
+      if (storageError) {
+        console.error(storageError);
+      }
+
+      const { error: deleteError } = await supabase
+        .from('trade_reference_images')
+        .delete()
+        .eq('id', image.id);
+
+      if (deleteError) {
+        console.error(deleteError);
+        setMessage('공지용 이미지 삭제에 실패했습니다.');
+        return;
+      }
+
+      await loadReferenceImages();
+      setMessage('공지용 이미지가 삭제되었습니다.');
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      setMessage('공지용 이미지 삭제 중 오류가 발생했습니다.');
+    } finally {
+      setIsDeletingReferenceImageId('');
+    }
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push('/admin/login');
@@ -1200,7 +1477,7 @@ export default function AdminEventManagePage() {
   if (adminState === 'checking') {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 text-sm text-neutral-500 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 text-sm text-neutral-500 shadow-sm">
           관리자 권한을 확인하는 중입니다.
         </section>
       </main>
@@ -1210,7 +1487,7 @@ export default function AdminEventManagePage() {
   if (adminState === 'signed-out') {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-black text-neutral-950">
             로그인이 필요합니다
           </h1>
@@ -1233,7 +1510,7 @@ export default function AdminEventManagePage() {
   if (adminState === 'not-admin') {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-black text-neutral-950">
             관리자 권한이 없습니다
           </h1>
@@ -1257,7 +1534,7 @@ export default function AdminEventManagePage() {
   return (
     <main className="min-h-screen bg-neutral-100 px-4 py-5">
       <section className="mx-auto w-full max-w-md sm:max-w-lg">
-        <header className="rounded-3xl bg-white p-5 shadow-sm">
+        <header className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <Link
               href="/admin/events"
@@ -1299,7 +1576,7 @@ export default function AdminEventManagePage() {
 
         <form
           onSubmit={handleUpdateEvent}
-          className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
+          className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm"
         >
           <h2 className="text-lg font-black text-neutral-950">행사 수정</h2>
 
@@ -1317,16 +1594,38 @@ export default function AdminEventManagePage() {
               />
             </label>
 
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-sm font-bold text-neutral-800">시작일</span>
+
+                <input
+                  type="date"
+                  value={eventStartDate}
+                  onChange={(event) => setEventStartDate(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-bold text-neutral-800">종료일</span>
+
+                <input
+                  type="date"
+                  value={eventEndDate}
+                  onChange={(event) => setEventEndDate(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                />
+              </label>
+            </div>
+
             <label className="block">
-              <span className="text-sm font-bold text-neutral-800">
-                행사 기간
-              </span>
+              <span className="text-sm font-bold text-neutral-800">행사 기간 메모</span>
 
               <input
-                value={period}
-                onChange={(event) => setPeriod(event.target.value)}
+                value={periodNote}
+                onChange={(event) => setPeriodNote(event.target.value)}
                 className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="예: 2026.07.01 - 2026.07.31"
+                placeholder="선택 입력"
               />
             </label>
 
@@ -1346,34 +1645,19 @@ export default function AdminEventManagePage() {
               </p>
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="text-sm font-bold text-neutral-800">
-                  상태 라벨
-                </span>
+            <label className="block">
+              <span className="text-sm font-bold text-neutral-800">
+                정렬 순서
+              </span>
 
-                <input
-                  value={statusLabel}
-                  onChange={(event) => setStatusLabel(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                  placeholder="OPEN"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-bold text-neutral-800">
-                  정렬 순서
-                </span>
-
-                <input
-                  type="number"
-                  value={sortOrder}
-                  onChange={(event) => setSortOrder(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                  placeholder="0"
-                />
-              </label>
-            </div>
+              <input
+                type="number"
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                placeholder="0"
+              />
+            </label>
 
             <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
               <span>
@@ -1437,7 +1721,7 @@ export default function AdminEventManagePage() {
 
         <form
           onSubmit={handleAddWork}
-          className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
+          className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -1632,7 +1916,7 @@ export default function AdminEventManagePage() {
 
         <form
           onSubmit={handleAddBenefitSubcategory}
-          className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
+          className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -1835,8 +2119,123 @@ export default function AdminEventManagePage() {
         </form>
 
         <form
+          onSubmit={handleAddReferenceImages}
+          className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-black text-neutral-950">
+                공지용 이미지 등록
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                행사 공지에 올라온 특전 안내 이미지를 그대로 등록합니다. 교환판 만들기에서 “내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?” 영역에 순서대로 표시됩니다.
+              </p>
+              <p className="mt-1 text-xs font-bold text-neutral-400">
+                등록된 공지 이미지 {referenceImages.length}개
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsReferenceImageSectionOpen((prev) => !prev)}
+              className="shrink-0 rounded-full border border-neutral-200 bg-white px-4 py-2 text-xs font-black text-neutral-600"
+            >
+              {isReferenceImageSectionOpen ? '접기' : '펼치기'}
+            </button>
+          </div>
+
+          {isReferenceImageSectionOpen ? (
+            <>
+              <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-7 text-center hover:border-neutral-950">
+                <span className="text-sm font-black text-neutral-700">
+                  공지용 이미지 선택
+                </span>
+                <span className="mt-2 text-xs leading-5 text-neutral-400">
+                  여러 장을 한 번에 선택할 수 있습니다.
+                </span>
+
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleReferenceImagesChange}
+                  className="hidden"
+                />
+              </label>
+
+              {referenceImagePreviewUrls.length > 0 ? (
+                <div className="mt-4 space-y-3">
+                  {referenceImagePreviewUrls.map((url, index) => (
+                    <img
+                      key={url}
+                      src={url}
+                      alt={`공지용 이미지 미리보기 ${index + 1}`}
+                      className="w-full rounded-2xl bg-white object-contain ring-1 ring-neutral-200"
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              <button
+                type="submit"
+                disabled={isSubmittingReferenceImages}
+                className="mt-4 w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+              >
+                {isSubmittingReferenceImages ? '등록 중...' : '공지용 이미지 등록'}
+              </button>
+
+              <div className="mt-5 border-t border-neutral-100 pt-5">
+                <h3 className="text-sm font-black text-neutral-950">
+                  등록된 공지용 이미지
+                </h3>
+
+                {referenceImages.length > 0 ? (
+                  <div className="mt-3 space-y-3">
+                    {referenceImages.map((image, index) => {
+                      const isDeleting = isDeletingReferenceImageId === image.id;
+
+                      return (
+                        <article
+                          key={image.id}
+                          className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3"
+                        >
+                          <img
+                            src={getTradeAssetUrl(image.image_path)}
+                            alt={`등록된 공지용 이미지 ${index + 1}`}
+                            className="w-full rounded-xl bg-white object-contain ring-1 ring-neutral-200"
+                          />
+
+                          <div className="mt-3 flex items-center justify-between gap-3">
+                            <p className="text-xs font-bold text-neutral-400">
+                              {index + 1}번째 이미지
+                            </p>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteReferenceImage(image)}
+                              disabled={isDeleting}
+                              className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {isDeleting ? '삭제 중' : '삭제'}
+                            </button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-3 rounded-2xl bg-neutral-50 px-4 py-6 text-center text-xs text-neutral-400">
+                    아직 등록된 공지용 이미지가 없습니다.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : null}
+        </form>
+
+        <form
           onSubmit={handleAddItem}
-          className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
+          className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
@@ -2040,7 +2439,7 @@ export default function AdminEventManagePage() {
           ) : null}
         </form>
 
-        <section className="mt-5 rounded-3xl bg-white p-5 shadow-sm">
+        <section className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
           <div>
             <h2 className="text-lg font-black text-neutral-950">
               등록된 굿즈
@@ -2265,6 +2664,44 @@ export default function AdminEventManagePage() {
                                 </select>
                               </label>
                             ) : null}
+
+                            <label className="block rounded-xl bg-neutral-50 p-3">
+                              <span className="text-[10px] font-bold text-neutral-600">
+                                이미지 교체
+                              </span>
+
+                              <div className="mt-2 flex items-center gap-3">
+                                <img
+                                  src={
+                                    editingItemImagePreviewUrl ||
+                                    getTradeAssetUrl(item.image_path)
+                                  }
+                                  alt={item.work_title}
+                                  className="h-16 w-16 rounded-xl bg-white object-contain p-1 ring-1 ring-neutral-200"
+                                />
+
+                                <span className="min-w-0 flex-1 text-[10px] leading-4 text-neutral-400">
+                                  새 이미지를 선택하면 저장 시 기존 굿즈 이미지가 교체됩니다.
+                                </span>
+                              </div>
+
+                              <span className="mt-2 inline-flex cursor-pointer rounded-xl border border-neutral-200 bg-white px-3 py-2 text-[11px] font-black text-neutral-600">
+                                새 이미지 선택
+                              </span>
+
+                              {editingItemImageFile ? (
+                                <span className="ml-2 text-[10px] font-bold text-neutral-500">
+                                  {editingItemImageFile.name}
+                                </span>
+                              ) : null}
+
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleEditingItemImageChange}
+                                className="hidden"
+                              />
+                            </label>
 
                             <label className="flex items-center justify-between gap-2 rounded-xl bg-neutral-50 px-3 py-2">
                               <span>

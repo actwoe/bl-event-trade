@@ -12,6 +12,8 @@ type TradeCollectionRow = {
   slug: string;
   title: string;
   description: string | null;
+  event_start_date: string | null;
+  event_end_date: string | null;
   thumbnail_path: string | null;
   status_label: string | null;
   is_public: boolean;
@@ -42,6 +44,59 @@ function getFileExtension(file: File) {
   return extension;
 }
 
+
+function getKoreaTodayDateString() {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
+  const parts = formatter.formatToParts(new Date());
+  const year = parts.find((part) => part.type === 'year')?.value ?? '';
+  const month = parts.find((part) => part.type === 'month')?.value ?? '';
+  const day = parts.find((part) => part.type === 'day')?.value ?? '';
+
+  return `${year}-${month}-${day}`;
+}
+
+function isEventEnded(row: TradeCollectionRow) {
+  if (!row.event_end_date) {
+    return false;
+  }
+
+  return row.event_end_date < getKoreaTodayDateString();
+}
+
+function formatDate(value: string | null) {
+  if (!value) return '';
+
+  const [year, month, day] = value.split('-');
+
+  if (!year || !month || !day) {
+    return value;
+  }
+
+  return `${year}.${month}.${day}`;
+}
+
+function getEventPeriodLabel(row: TradeCollectionRow) {
+  if (row.event_start_date && row.event_end_date) {
+    return `${formatDate(row.event_start_date)} - ${formatDate(row.event_end_date)}`;
+  }
+
+  if (row.event_start_date) {
+    return `${formatDate(row.event_start_date)} 시작`;
+  }
+
+  if (row.event_end_date) {
+    return `${formatDate(row.event_end_date)} 종료`;
+  }
+
+  return row.description ?? '';
+}
+
 function sortEvents(rows: TradeCollectionRow[]) {
   return [...rows].sort((a, b) => {
     const sortDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
@@ -66,8 +121,9 @@ export default function AdminEventsPage() {
 
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
-  const [period, setPeriod] = useState('');
-  const [statusLabel, setStatusLabel] = useState('OPEN');
+  const [periodNote, setPeriodNote] = useState('');
+  const [eventStartDate, setEventStartDate] = useState('');
+  const [eventEndDate, setEventEndDate] = useState('');
   const [sortOrder, setSortOrder] = useState('0');
   const [isPublic, setIsPublic] = useState(true);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -123,7 +179,7 @@ export default function AdminEventsPage() {
       const { data, error } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, thumbnail_path, status_label, is_public, sort_order, created_at',
+          'id, slug, title, description, event_start_date, event_end_date, thumbnail_path, status_label, is_public, sort_order, created_at',
         )
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
@@ -210,9 +266,11 @@ export default function AdminEventsPage() {
         .insert({
           title: title.trim(),
           slug: normalizedSlug,
-          description: period.trim() || null,
+          description: periodNote.trim() || null,
+          event_start_date: eventStartDate || null,
+          event_end_date: eventEndDate || null,
           thumbnail_path: thumbnailPath,
-          status_label: statusLabel.trim() || null,
+          status_label: null,
           is_public: isPublic,
           sort_order: Number.isNaN(parsedSortOrder) ? 0 : parsedSortOrder,
         });
@@ -225,8 +283,9 @@ export default function AdminEventsPage() {
 
       setTitle('');
       setSlug('');
-      setPeriod('');
-      setStatusLabel('OPEN');
+      setPeriodNote('');
+      setEventStartDate('');
+      setEventEndDate('');
       setSortOrder('0');
       setIsPublic(true);
       setThumbnailFile(null);
@@ -287,7 +346,7 @@ export default function AdminEventsPage() {
   if (adminState === 'checking') {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 text-sm text-neutral-500 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 text-sm text-neutral-500 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
           관리자 권한을 확인하는 중입니다.
         </section>
       </main>
@@ -297,7 +356,7 @@ export default function AdminEventsPage() {
   if (adminState === 'signed-out') {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
           <h1 className="text-2xl font-black text-neutral-950">
             로그인이 필요합니다
           </h1>
@@ -320,7 +379,7 @@ export default function AdminEventsPage() {
   if (adminState === 'not-admin') {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
           <h1 className="text-2xl font-black text-neutral-950">
             관리자 권한이 없습니다
           </h1>
@@ -344,7 +403,7 @@ export default function AdminEventsPage() {
   return (
     <main className="min-h-screen bg-neutral-100 px-4 py-5">
       <section className="mx-auto w-full max-w-md sm:max-w-lg">
-        <header className="rounded-3xl bg-white p-5 shadow-sm">
+        <header className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
           <div className="flex items-center justify-between gap-3">
             <Link
               href="/admin"
@@ -378,14 +437,14 @@ export default function AdminEventsPage() {
         </header>
 
         {message ? (
-          <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm leading-6 text-neutral-700 shadow-sm">
+          <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm leading-6 text-neutral-700 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
             {message}
           </p>
         ) : null}
 
         <form
           onSubmit={handleCreateEvent}
-          className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
+          className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)]"
         >
           <h2 className="text-lg font-black text-neutral-950">행사 등록</h2>
 
@@ -401,14 +460,38 @@ export default function AdminEventsPage() {
               />
             </label>
 
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block">
+                <span className="text-sm font-bold text-neutral-800">시작일</span>
+
+                <input
+                  type="date"
+                  value={eventStartDate}
+                  onChange={(event) => setEventStartDate(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-bold text-neutral-800">종료일</span>
+
+                <input
+                  type="date"
+                  value={eventEndDate}
+                  onChange={(event) => setEventEndDate(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                />
+              </label>
+            </div>
+
             <label className="block">
-              <span className="text-sm font-bold text-neutral-800">행사 기간</span>
+              <span className="text-sm font-bold text-neutral-800">행사 기간 메모</span>
 
               <input
-                value={period}
-                onChange={(event) => setPeriod(event.target.value)}
+                value={periodNote}
+                onChange={(event) => setPeriodNote(event.target.value)}
                 className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="예: 2026.07.01 - 2026.07.31"
+                placeholder="선택 입력"
               />
             </label>
 
@@ -427,34 +510,19 @@ export default function AdminEventsPage() {
               </p>
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="text-sm font-bold text-neutral-800">
-                  상태 라벨
-                </span>
+            <label className="block">
+              <span className="text-sm font-bold text-neutral-800">
+                정렬 순서
+              </span>
 
-                <input
-                  value={statusLabel}
-                  onChange={(event) => setStatusLabel(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                  placeholder="OPEN"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-bold text-neutral-800">
-                  정렬 순서
-                </span>
-
-                <input
-                  type="number"
-                  value={sortOrder}
-                  onChange={(event) => setSortOrder(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                  placeholder="0"
-                />
-              </label>
-            </div>
+              <input
+                type="number"
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                placeholder="0"
+              />
+            </label>
 
             <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
               <span>
@@ -484,7 +552,7 @@ export default function AdminEventsPage() {
                   <img
                     src={thumbnailPreviewUrl}
                     alt="썸네일 미리보기"
-                    className="aspect-[32/45] w-44 rounded-2xl object-cover shadow-sm"
+                    className="aspect-[32/45] w-44 rounded-2xl object-cover shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
                   />
                 ) : (
                   <>
@@ -516,7 +584,7 @@ export default function AdminEventsPage() {
           </div>
         </form>
 
-        <section className="mt-5 rounded-3xl bg-white p-5 shadow-sm">
+        <section className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-black text-neutral-950">행사 목록</h2>
@@ -540,6 +608,7 @@ export default function AdminEventsPage() {
               {events.map((row) => {
                 const thumbnailUrl = getTradeAssetUrl(row.thumbnail_path ?? '');
                 const isDeleting = isDeletingEventId === row.id;
+                const ended = isEventEnded(row);
 
                 return (
                   <article
@@ -547,18 +616,24 @@ export default function AdminEventsPage() {
                     className="overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50"
                   >
                     <Link href={`/admin/events/${row.id}`} className="block bg-white">
-                      <div className="aspect-[32/45] w-full overflow-hidden bg-white">
+                      <div className="relative aspect-[32/45] w-full overflow-hidden bg-white">
                         {thumbnailUrl ? (
                           <img
                             src={thumbnailUrl}
                             alt="행사 썸네일"
-                            className="h-full w-full object-cover"
+                            className={`h-full w-full object-cover ${ended ? 'grayscale opacity-60' : ''}`}
                           />
                         ) : (
                           <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-neutral-300">
                             NO IMG
                           </div>
                         )}
+
+                        {ended ? (
+                          <span className="absolute left-2 top-2 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black text-white">
+                            종료
+                          </span>
+                        ) : null}
                       </div>
                     </Link>
 
@@ -585,11 +660,11 @@ export default function AdminEventsPage() {
                       </div>
 
                       <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-neutral-500">
-                        {row.description || '행사 기간/설명이 없습니다.'}
+                        {getEventPeriodLabel(row) || '행사 기간이 없습니다.'}
                       </p>
 
                       <p className="mt-1 text-[10px] font-bold text-neutral-400">
-                        {row.status_label || '라벨 없음'} · 정렬 {row.sort_order ?? 0}
+                        {isEventEnded(row) ? '종료 · ' : ''}정렬 {row.sort_order ?? 0}
                       </p>
 
                       <div className="mt-3 grid grid-cols-3 gap-1.5">

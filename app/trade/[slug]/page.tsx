@@ -6,6 +6,7 @@ import {
   TradeCategory,
   TradeCollectionSummary,
   TradeImageRatio,
+  TradeReferenceImage,
 } from '@/lib/trade-types';
 
 type TradePageProps = {
@@ -32,6 +33,12 @@ type TradeItemRow = {
   benefit_subcategory: string | null;
 };
 
+type TradeReferenceImageRow = {
+  id: string;
+  image_path: string;
+  sort_order: number | null;
+};
+
 function getSafeImageRatio(value?: string | null): TradeImageRatio {
   return value === 'photocard' ? 'photocard' : 'square';
 }
@@ -52,17 +59,33 @@ export default async function TradePage({ params }: TradePageProps) {
 
   const collectionRow = collectionData as TradeCollectionRow;
 
-  const { data: itemData, error: itemError } = await supabase
-    .from('trade_items')
-    .select(
-      'id, category, work_title, item_name, image_path, sort_order, image_ratio, benefit_subcategory',
-    )
-    .eq('collection_id', collectionRow.id)
-    .eq('is_visible', true)
-    .order('created_at', { ascending: true });
+  const [{ data: itemData, error: itemError }, { data: referenceData, error: referenceError }] =
+    await Promise.all([
+      supabase
+        .from('trade_items')
+        .select(
+          'id, category, work_title, item_name, image_path, sort_order, image_ratio, benefit_subcategory',
+        )
+        .eq('collection_id', collectionRow.id)
+        .eq('is_visible', true)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('trade_reference_images')
+        .select('id, image_path, sort_order')
+        .eq('collection_id', collectionRow.id)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true }),
+    ]);
 
   if (itemError) {
     console.error(itemError);
+  }
+
+  if (referenceError && process.env.NODE_ENV !== 'production') {
+    console.warn(
+      '공지용 이미지 목록을 불러오지 못했습니다. trade_reference_images 권한 또는 SQL 적용 여부를 확인해 주세요.',
+      referenceError.message,
+    );
   }
 
   const collection: TradeCollectionSummary = {
@@ -85,5 +108,19 @@ export default async function TradePage({ params }: TradePageProps) {
       benefitSubcategory: item.benefit_subcategory ?? null,
     }));
 
-  return <TradeBuilder collection={collection} registeredItems={registeredItems} />;
+  const referenceImages: TradeReferenceImage[] = ((referenceData ?? []) as TradeReferenceImageRow[])
+    .filter((image) => image.image_path)
+    .map((image) => ({
+      id: image.id,
+      imageUrl: getTradeAssetUrl(image.image_path),
+      sortOrder: image.sort_order ?? 0,
+    }));
+
+  return (
+    <TradeBuilder
+      collection={collection}
+      registeredItems={registeredItems}
+      referenceImages={referenceImages}
+    />
+  );
 }

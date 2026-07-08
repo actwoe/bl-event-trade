@@ -215,7 +215,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
             </div>
           </header>
 
-          <section className="bg-neutral-100 px-3 py-3">
+          <section className="bg-white px-3 py-3">
             {hasCards ? (
               visibleCategories.map((category, index) => (
                 <CategorySection
@@ -225,7 +225,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
                 />
               ))
             ) : (
-              <div className="rounded-[20px] border-2 border-dashed border-neutral-300 bg-white px-5 py-12 text-center">
+              <div className="rounded-[20px] border-2 border-dashed border-neutral-200 px-5 py-12 text-center">
                 <p className="text-base font-black text-neutral-300">
                   선택된 이미지가 없습니다
                 </p>
@@ -305,11 +305,11 @@ function PreviewCard({ card }: PreviewCardProps) {
   const quantity = getCardQuantity(card);
 
   return (
-    <article className="relative overflow-hidden rounded-lg border border-neutral-300 bg-neutral-50 p-[2px] shadow-sm">
+    <article className="relative overflow-hidden rounded-lg bg-white">
       <img
         src={card.imageUrl}
         alt={card.memo || card.workTitle}
-        className={`${getImageRatioClass(card)} w-full rounded-md bg-white object-contain`}
+        className={`${getImageRatioClass(card)} w-full bg-white object-contain`}
       />
 
       {quantity > 1 ? (

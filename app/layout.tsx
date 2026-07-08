@@ -16,11 +16,9 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="min-h-screen bg-neutral-100 text-neutral-950 antialiased">
-        <div className="flex min-h-screen flex-col">
-          <SiteHeader />
-          <div className="flex-1">{children}</div>
-          <SiteFooter />
-        </div>
+        <SiteHeader />
+        {children}
+        <SiteFooter />
       </body>
     </html>
   );

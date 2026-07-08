@@ -47,6 +47,12 @@ export type RegisteredTradeItem = {
   benefitSubcategory?: string | null;
 };
 
+export type TradeReferenceImage = {
+  id: string;
+  imageUrl: string;
+  sortOrder: number;
+};
+
 export type TradeCollectionSummary = {
   id: string;
   slug: string;
