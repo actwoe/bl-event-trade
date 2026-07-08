@@ -250,9 +250,13 @@ export default function AdminEventManagePage() {
   const [itemFilterWorkTitle, setItemFilterWorkTitle] = useState('all');
   const [itemFilterCategory, setItemFilterCategory] =
     useState<'all' | TradeCategory>('all');
+  const [itemFilterBenefitSubcategory, setItemFilterBenefitSubcategory] =
+    useState('all');
 
   const [isWorkSectionOpen, setIsWorkSectionOpen] = useState(false);
   const [isBenefitSubcategorySectionOpen, setIsBenefitSubcategorySectionOpen] =
+    useState(false);
+  const [isItemCreateSectionOpen, setIsItemCreateSectionOpen] =
     useState(false);
 
   const [message, setMessage] = useState('');
@@ -301,16 +305,59 @@ export default function AdminEventManagePage() {
     );
   }, [items]);
 
+  const itemFilterBenefitSubcategories = useMemo(() => {
+    const labels = Array.from(
+      new Set(
+        items
+          .filter((item) => item.category === 'benefit')
+          .map((item) => getBenefitSubcategoryLabel(item.benefit_subcategory))
+          .filter(Boolean),
+      ),
+    );
+
+    return labels.sort((a, b) =>
+      a.localeCompare(b, 'ko-KR', {
+        numeric: true,
+        sensitivity: 'base',
+      }),
+    );
+  }, [items]);
+
+  const hasUncategorizedBenefitItems = useMemo(() => {
+    return items.some(
+      (item) =>
+        item.category === 'benefit' &&
+        !getBenefitSubcategoryLabel(item.benefit_subcategory),
+    );
+  }, [items]);
+
+  const hasBenefitSubcategoryFilterOptions =
+    itemFilterBenefitSubcategories.length > 0 || hasUncategorizedBenefitItems;
+
   const filteredItems = useMemo(() => {
     return sortTradeItems(items).filter((item) => {
       const matchesWork =
         itemFilterWorkTitle === 'all' || item.work_title === itemFilterWorkTitle;
       const matchesCategory =
         itemFilterCategory === 'all' || item.category === itemFilterCategory;
+      const itemBenefitSubcategory = getBenefitSubcategoryLabel(
+        item.benefit_subcategory,
+      );
+      const matchesBenefitSubcategory =
+        itemFilterBenefitSubcategory === 'all' ||
+        (item.category === 'benefit' &&
+          (itemFilterBenefitSubcategory === '__none__'
+            ? !itemBenefitSubcategory
+            : itemBenefitSubcategory === itemFilterBenefitSubcategory));
 
-      return matchesWork && matchesCategory;
+      return matchesWork && matchesCategory && matchesBenefitSubcategory;
     });
-  }, [items, itemFilterWorkTitle, itemFilterCategory]);
+  }, [
+    items,
+    itemFilterWorkTitle,
+    itemFilterCategory,
+    itemFilterBenefitSubcategory,
+  ]);
 
   useEffect(() => {
     async function loadPageData() {
@@ -1791,10 +1838,30 @@ export default function AdminEventManagePage() {
           onSubmit={handleAddItem}
           className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
         >
-          <h2 className="text-lg font-black text-neutral-950">
-            굿즈 이미지 등록
-          </h2>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-black text-neutral-950">
+                굿즈 이미지 등록
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                작품명, 굿즈 종류, 특전 하위 분류와 이미지 비율을 설정해 굿즈 이미지를 등록합니다.
+              </p>
+              <p className="mt-1 text-xs font-bold text-neutral-400">
+                등록된 굿즈 {items.length}개
+              </p>
+            </div>
 
+            <button
+              type="button"
+              onClick={() => setIsItemCreateSectionOpen((prev) => !prev)}
+              className="shrink-0 rounded-full border border-neutral-200 bg-white px-4 py-2 text-xs font-black text-neutral-600"
+            >
+              {isItemCreateSectionOpen ? '접기' : '펼치기'}
+            </button>
+          </div>
+
+          {isItemCreateSectionOpen ? (
+            <>
           <div className="mt-5 space-y-5">
             <label className="block">
               <span className="text-sm font-bold text-neutral-800">
@@ -1968,6 +2035,9 @@ export default function AdminEventManagePage() {
               {isSubmittingItem ? '등록 중...' : '굿즈 등록'}
             </button>
           </div>
+
+            </>
+          ) : null}
         </form>
 
         <section className="mt-5 rounded-3xl bg-white p-5 shadow-sm">
@@ -1981,7 +2051,7 @@ export default function AdminEventManagePage() {
           </div>
 
           {items.length > 0 ? (
-            <div className="mt-4 grid grid-cols-2 gap-3">
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <label className="block">
                 <span className="text-xs font-bold text-neutral-500">
                   작품별 보기
@@ -2009,13 +2079,18 @@ export default function AdminEventManagePage() {
 
                 <select
                   value={itemFilterCategory}
-                  onChange={(event) =>
-                    setItemFilterCategory(
+                  onChange={(event) => {
+                    const nextCategory =
                       event.target.value === 'all'
                         ? 'all'
-                        : (event.target.value as TradeCategory),
-                    )
-                  }
+                        : (event.target.value as TradeCategory);
+
+                    setItemFilterCategory(nextCategory);
+
+                    if (nextCategory !== 'all' && nextCategory !== 'benefit') {
+                      setItemFilterBenefitSubcategory('all');
+                    }
+                  }}
                   className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2.5 text-xs font-bold text-neutral-700 outline-none focus:border-neutral-950"
                 >
                   <option value="all">전체 종류</option>
@@ -2023,6 +2098,37 @@ export default function AdminEventManagePage() {
                   {TRADE_CATEGORIES.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-xs font-bold text-neutral-500">
+                  특전 하위 분류 보기
+                </span>
+
+                <select
+                  value={itemFilterBenefitSubcategory}
+                  onChange={(event) =>
+                    setItemFilterBenefitSubcategory(event.target.value)
+                  }
+                  disabled={
+                    (itemFilterCategory !== 'all' &&
+                      itemFilterCategory !== 'benefit') ||
+                    !hasBenefitSubcategoryFilterOptions
+                  }
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-2.5 text-xs font-bold text-neutral-700 outline-none focus:border-neutral-950 disabled:bg-neutral-100 disabled:text-neutral-400"
+                >
+                  <option value="all">전체 하위 분류</option>
+
+                  {hasUncategorizedBenefitItems ? (
+                    <option value="__none__">하위 분류 없음</option>
+                  ) : null}
+
+                  {itemFilterBenefitSubcategories.map((subcategory) => (
+                    <option key={subcategory} value={subcategory}>
+                      {subcategory}
                     </option>
                   ))}
                 </select>
