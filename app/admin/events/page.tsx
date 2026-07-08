@@ -16,7 +16,6 @@ type TradeCollectionRow = {
   status_label: string | null;
   is_public: boolean;
   sort_order: number | null;
-  created_at?: string | null;
 };
 
 function normalizeSlug(value: string) {
@@ -123,10 +122,10 @@ export default function AdminEventsPage() {
       const { data, error } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, thumbnail_path, status_label, is_public, sort_order, created_at',
+          'id, slug, title, description, thumbnail_path, status_label, is_public, sort_order',
         )
         .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: false });
+        .order('title', { ascending: true });
 
       if (error) {
         console.error(error);
@@ -536,7 +535,7 @@ export default function AdminEventsPage() {
           </div>
 
           {events.length > 0 ? (
-            <div className="mt-5 space-y-3">
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-4">
               {events.map((row) => {
                 const thumbnailUrl = getTradeAssetUrl(row.thumbnail_path ?? '');
                 const isDeleting = isDeletingEventId === row.id;
@@ -544,77 +543,85 @@ export default function AdminEventsPage() {
                 return (
                   <article
                     key={row.id}
-                    className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3"
+                    className="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-neutral-50 shadow-sm ring-1 ring-neutral-200"
                   >
-                    <div className="flex gap-3">
-                      <div className="h-24 w-16 shrink-0 overflow-hidden rounded-xl bg-white">
-                        {thumbnailUrl ? (
-                          <img
-                            src={thumbnailUrl}
-                            alt="행사 썸네일"
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-neutral-300">
-                            NO IMG
-                          </div>
-                        )}
+                    <Link
+                      href={`/admin/events/${row.id}`}
+                      className="block bg-white"
+                    >
+                      {thumbnailUrl ? (
+                        <img
+                          src={thumbnailUrl}
+                          alt="행사 썸네일"
+                          className="aspect-[32/45] w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex aspect-[32/45] w-full items-center justify-center bg-white text-[10px] font-black text-neutral-300">
+                          NO IMG
+                        </div>
+                      )}
+                    </Link>
+
+                    <div className="flex flex-1 flex-col p-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span
+                          className={`rounded-full px-2 py-1 text-[10px] font-black ${
+                            row.is_public
+                              ? 'bg-green-50 text-green-700'
+                              : 'bg-neutral-200 text-neutral-500'
+                          }`}
+                        >
+                          {row.is_public ? '공개' : '숨김'}
+                        </span>
+
+                        {row.status_label ? (
+                          <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-neutral-500">
+                            {row.status_label}
+                          </span>
+                        ) : null}
                       </div>
 
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-black text-neutral-950">
-                              {row.title}
-                            </p>
-                            <p className="mt-1 truncate text-xs text-neutral-500">
-                              /trade/{row.slug}
-                            </p>
-                          </div>
+                      <Link href={`/admin/events/${row.id}`}>
+                        <h3 className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-black leading-5 text-neutral-950">
+                          {row.title}
+                        </h3>
+                      </Link>
 
-                          <span
-                            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${
-                              row.is_public
-                                ? 'bg-green-50 text-green-700'
-                                : 'bg-neutral-200 text-neutral-500'
-                            }`}
-                          >
-                            {row.is_public ? '공개' : '숨김'}
-                          </span>
-                        </div>
+                      <p className="mt-1 line-clamp-1 text-[11px] font-bold text-neutral-400">
+                        /trade/{row.slug}
+                      </p>
 
-                        <p className="mt-2 line-clamp-2 text-xs leading-5 text-neutral-500">
-                          {row.description || '행사 기간/설명이 없습니다.'}
-                        </p>
+                      <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-[11px] leading-5 text-neutral-500">
+                        {row.description || '행사 기간/설명이 없습니다.'}
+                      </p>
 
-                        <p className="mt-1 text-[10px] font-bold text-neutral-400">
-                          {row.status_label || '라벨 없음'} · 정렬 {row.sort_order ?? 0}
-                        </p>
+                      <p className="mt-2 text-[10px] font-bold text-neutral-400">
+                        정렬 {row.sort_order ?? 0}
+                      </p>
 
-                        <div className="mt-3 grid grid-cols-3 gap-2">
-                          <Link
-                            href={`/admin/events/${row.id}`}
-                            className="rounded-xl bg-neutral-950 px-3 py-2 text-center text-[11px] font-black text-white"
-                          >
-                            관리
-                          </Link>
+                      <div className="mt-3 grid grid-cols-2 gap-1.5">
+                        <Link
+                          href={`/admin/events/${row.id}`}
+                          className="rounded-xl bg-neutral-950 px-2 py-2 text-center text-[11px] font-black text-white"
+                        >
+                          관리
+                        </Link>
 
-                          <Link
-                            href={`/trade/${row.slug}`}
-                            className="rounded-xl border border-neutral-200 bg-white px-3 py-2 text-center text-[11px] font-black text-neutral-600"
-                          >
-                            보기
-                          </Link>
+                        <Link
+                          href={`/trade/${row.slug}`}
+                          className="rounded-xl border border-neutral-200 bg-white px-2 py-2 text-center text-[11px] font-black text-neutral-600"
+                        >
+                          보기
+                        </Link>
 
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteEvent(row)}
-                            disabled={isDeleting}
-                            className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {isDeleting ? '삭제 중' : '삭제'}
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteEvent(row)}
+                          disabled={isDeleting}
+                          className="col-span-2 rounded-xl border border-red-200 bg-red-50 px-2 py-2 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {isDeleting ? '삭제 중' : '삭제'}
+                        </button>
                       </div>
                     </div>
                   </article>
