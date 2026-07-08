@@ -1042,7 +1042,8 @@ function AddItemModal({
             </summary>
 
             <p className="mt-2 text-xs leading-5 text-neutral-500">
-              등록되지 않은 이미지를 임시로 넣고 싶을 때만 사용해 주세요.
+              직접 찍은 이미지를 교환판에 넣고 싶을 때 사용해 주세요.
+              <br />
               업로드한 이미지는 서버에 저장되지 않습니다.
             </p>
 
