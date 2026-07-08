@@ -131,16 +131,13 @@ export default async function HomePage() {
           </h1>
 
           <p className="mt-2 text-sm leading-6 text-neutral-500">
-            진행 중인 팝업과 콜라보 카페 굿즈 교환판을 선택해 있어요 / 구해요 이미지를 만들 수 있습니다.
+            어떤 행사의 굿즈를 교환할까요?
           </p>
         </header>
 
         <div className="mt-6 border-t border-neutral-200 pt-5">
           <div>
-            <h2 className="text-lg font-black text-neutral-950">교환판 목록</h2>
-            <p className="mt-1 text-xs font-bold text-neutral-400">
-              공개된 교환판 {collections.length}개
-            </p>
+            <h2 className="text-lg font-black text-neutral-950">행사 목록</h2>
           </div>
 
           {error ? (
@@ -152,7 +149,7 @@ export default async function HomePage() {
           {!error && collections.length === 0 ? (
             <div className="mt-5 rounded-2xl bg-neutral-100 px-4 py-10 text-center">
               <p className="text-sm font-bold text-neutral-400">
-                아직 공개된 교환판이 없습니다.
+                아직 공개된 행사가 없습니다.
               </p>
             </div>
           ) : null}

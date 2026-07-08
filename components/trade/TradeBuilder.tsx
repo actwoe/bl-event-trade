@@ -593,14 +593,6 @@ export function TradeBuilder({
             )}
           </div>
 
-          <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
-            <p>
-              선택한 이미지는 팝업 & 콜카 굿즈 교환판 생성 목적으로만
-              사용됩니다.
-            </p>
-            <p>완성된 이미지를 저장한 뒤 본인의 SNS에 직접 업로드해 주세요.</p>
-          </div>
-
           <div className="mt-6 space-y-3">
             <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
               <button
@@ -781,7 +773,7 @@ export function TradeBuilder({
           <div className="mb-3">
             <div className="text-sm font-black text-neutral-950">미리보기</div>
             <p className="mt-1 text-xs leading-5 text-neutral-400">
-              세로형 팝업 & 콜카 굿즈 교환판으로 저장됩니다. 화면에서는 모바일
+              화면에서는 모바일
               폭에 맞게 축소되어 보입니다.
             </p>
           </div>
