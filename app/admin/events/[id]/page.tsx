@@ -2054,7 +2054,7 @@ export default function AdminEventManagePage() {
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <label className="block">
                 <span className="text-xs font-bold text-neutral-500">
-                  작품별 보기
+                  작품별
                 </span>
 
                 <select

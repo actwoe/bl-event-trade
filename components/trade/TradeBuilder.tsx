@@ -23,8 +23,11 @@ type TradeBuilderProps = {
 const PREVIEW_WIDTH = 560;
 const ALL_WORKS_VALUE = "all";
 const ALL_CATEGORIES_VALUE = "all";
+const ALL_BENEFIT_SUBCATEGORIES_VALUE = "all";
+const NO_BENEFIT_SUBCATEGORY_VALUE = "__none__";
 
 type CategoryFilterValue = TradeCategory | typeof ALL_CATEGORIES_VALUE;
+type BenefitSubcategoryFilterValue = string;
 
 type QuantityTradeCard = TradeCard & {
   quantity?: number;
@@ -193,6 +196,10 @@ export function TradeBuilder({
   const [selectedWorkTitle, setSelectedWorkTitle] = useState(ALL_WORKS_VALUE);
   const [selectedCategory, setSelectedCategory] =
     useState<CategoryFilterValue>(ALL_CATEGORIES_VALUE);
+  const [selectedBenefitSubcategory, setSelectedBenefitSubcategory] =
+    useState<BenefitSubcategoryFilterValue>(
+      ALL_BENEFIT_SUBCATEGORIES_VALUE,
+    );
   const [addModalSide, setAddModalSide] = useState<TradeSide | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [previewScale, setPreviewScale] = useState(0.6);
@@ -209,6 +216,24 @@ export function TradeBuilder({
     return sortKoreanTitles(Array.from(new Set(titles)));
   }, [registeredItems]);
 
+  const benefitSubcategoryOptions = useMemo(() => {
+    const subcategories = registeredItems
+      .filter((item) => item.category === "benefit")
+      .map((item) => getBenefitSubcategoryLabel(item.benefitSubcategory))
+      .filter((subcategory) => subcategory.length > 0);
+
+    return sortKoreanTitles(Array.from(new Set(subcategories)));
+  }, [registeredItems]);
+
+  const hasBenefitItemsWithoutSubcategory = useMemo(() => {
+    return registeredItems.some((item) => {
+      return (
+        item.category === "benefit" &&
+        !getBenefitSubcategoryLabel(item.benefitSubcategory)
+      );
+    });
+  }, [registeredItems]);
+
   const filteredItems = useMemo(() => {
     const nextItems = registeredItems.filter((item) => {
       const matchesWorkTitle =
@@ -219,11 +244,28 @@ export function TradeBuilder({
         selectedCategory === ALL_CATEGORIES_VALUE ||
         item.category === selectedCategory;
 
-      return matchesWorkTitle && matchesCategory;
+      const benefitSubcategory = getBenefitSubcategoryLabel(
+        item.benefitSubcategory,
+      );
+
+      const matchesBenefitSubcategory =
+        selectedBenefitSubcategory === ALL_BENEFIT_SUBCATEGORIES_VALUE ||
+        (item.category === "benefit" &&
+          selectedBenefitSubcategory === NO_BENEFIT_SUBCATEGORY_VALUE &&
+          benefitSubcategory.length === 0) ||
+        (item.category === "benefit" &&
+          selectedBenefitSubcategory === benefitSubcategory);
+
+      return matchesWorkTitle && matchesCategory && matchesBenefitSubcategory;
     });
 
     return sortRegisteredItems(nextItems);
-  }, [registeredItems, selectedWorkTitle, selectedCategory]);
+  }, [
+    registeredItems,
+    selectedWorkTitle,
+    selectedCategory,
+    selectedBenefitSubcategory,
+  ]);
 
   const haveCards = useMemo(() => {
     return board.cards.filter((card) => card.side === "have");
@@ -248,6 +290,26 @@ export function TradeBuilder({
   const canDownload = useMemo(() => {
     return board.cards.length > 0;
   }, [board.cards]);
+
+  useEffect(() => {
+    if (
+      selectedCategory !== ALL_CATEGORIES_VALUE &&
+      selectedCategory !== "benefit" &&
+      selectedBenefitSubcategory !== ALL_BENEFIT_SUBCATEGORIES_VALUE
+    ) {
+      setSelectedBenefitSubcategory(ALL_BENEFIT_SUBCATEGORIES_VALUE);
+    }
+  }, [selectedCategory, selectedBenefitSubcategory]);
+
+  useEffect(() => {
+    if (
+      selectedBenefitSubcategory !== ALL_BENEFIT_SUBCATEGORIES_VALUE &&
+      selectedBenefitSubcategory !== NO_BENEFIT_SUBCATEGORY_VALUE &&
+      !benefitSubcategoryOptions.includes(selectedBenefitSubcategory)
+    ) {
+      setSelectedBenefitSubcategory(ALL_BENEFIT_SUBCATEGORIES_VALUE);
+    }
+  }, [benefitSubcategoryOptions, selectedBenefitSubcategory]);
 
   useEffect(() => {
     setBoard((prev) => ({
@@ -317,6 +379,18 @@ export function TradeBuilder({
 
       return [...prev, condition];
     });
+  }
+
+  function changeCategoryFilter(value: CategoryFilterValue) {
+    setSelectedCategory(value);
+
+    if (value !== ALL_CATEGORIES_VALUE && value !== "benefit") {
+      setSelectedBenefitSubcategory(ALL_BENEFIT_SUBCATEGORIES_VALUE);
+    }
+  }
+
+  function changeBenefitSubcategoryFilter(value: BenefitSubcategoryFilterValue) {
+    setSelectedBenefitSubcategory(value);
   }
 
   function setRegisteredItemQuantity(
@@ -392,20 +466,26 @@ export function TradeBuilder({
   }
 
   function addUploadedCards(side: TradeSide, files: FileList) {
+    const uploadCategory =
+      selectedCategory === ALL_CATEGORIES_VALUE ? "benefit" : selectedCategory;
+    const uploadBenefitSubcategory =
+      uploadCategory === "benefit" &&
+      selectedBenefitSubcategory !== ALL_BENEFIT_SUBCATEGORIES_VALUE &&
+      selectedBenefitSubcategory !== NO_BENEFIT_SUBCATEGORY_VALUE
+        ? selectedBenefitSubcategory
+        : null;
+
     const newCards: QuantityTradeCard[] = Array.from(files)
       .filter((file) => file.type.startsWith("image/"))
       .map((file) => ({
         id: nanoid(),
         side,
-        category:
-          selectedCategory === ALL_CATEGORIES_VALUE
-            ? "benefit"
-            : selectedCategory,
+        category: uploadCategory,
         imageUrl: URL.createObjectURL(file),
         workTitle: file.name.replace(/\.[^/.]+$/, ""),
         memo: "",
         imageRatio: "square",
-        benefitSubcategory: null,
+        benefitSubcategory: uploadBenefitSubcategory,
         quantity: 1,
       }));
 
@@ -715,12 +795,16 @@ export function TradeBuilder({
           side={addModalSide}
           selectedWorkTitle={selectedWorkTitle}
           selectedCategory={selectedCategory}
+          selectedBenefitSubcategory={selectedBenefitSubcategory}
           workTitleOptions={workTitleOptions}
+          benefitSubcategoryOptions={benefitSubcategoryOptions}
+          hasBenefitItemsWithoutSubcategory={hasBenefitItemsWithoutSubcategory}
           selectedCards={board.cards}
           filteredItems={filteredItems}
           onClose={closeAddModal}
           onChangeWorkTitle={setSelectedWorkTitle}
-          onChangeCategory={setSelectedCategory}
+          onChangeCategory={changeCategoryFilter}
+          onChangeBenefitSubcategory={changeBenefitSubcategoryFilter}
           onIncreaseItem={(item) => increaseRegisteredItemQuantity(item, addModalSide)}
           onDecreaseItem={(item) => decreaseRegisteredItemQuantity(item, addModalSide)}
           onUpload={(files) => addUploadedCards(addModalSide, files)}
@@ -762,12 +846,16 @@ type AddItemModalProps = {
   side: TradeSide;
   selectedWorkTitle: string;
   selectedCategory: CategoryFilterValue;
+  selectedBenefitSubcategory: BenefitSubcategoryFilterValue;
   workTitleOptions: string[];
+  benefitSubcategoryOptions: string[];
+  hasBenefitItemsWithoutSubcategory: boolean;
   selectedCards: TradeCard[];
   filteredItems: RegisteredTradeItem[];
   onClose: () => void;
   onChangeWorkTitle: (value: string) => void;
   onChangeCategory: (value: CategoryFilterValue) => void;
+  onChangeBenefitSubcategory: (value: BenefitSubcategoryFilterValue) => void;
   onIncreaseItem: (item: RegisteredTradeItem) => void;
   onDecreaseItem: (item: RegisteredTradeItem) => void;
   onUpload: (files: FileList) => void;
@@ -777,17 +865,24 @@ function AddItemModal({
   side,
   selectedWorkTitle,
   selectedCategory,
+  selectedBenefitSubcategory,
   workTitleOptions,
+  benefitSubcategoryOptions,
+  hasBenefitItemsWithoutSubcategory,
   selectedCards,
   filteredItems,
   onClose,
   onChangeWorkTitle,
   onChangeCategory,
+  onChangeBenefitSubcategory,
   onIncreaseItem,
   onDecreaseItem,
   onUpload,
 }: AddItemModalProps) {
   const sideLabel = side === "have" ? "있어요" : "구해요";
+  const canUseBenefitSubcategoryFilter =
+    (selectedCategory === ALL_CATEGORIES_VALUE || selectedCategory === "benefit") &&
+    (benefitSubcategoryOptions.length > 0 || hasBenefitItemsWithoutSubcategory);
 
   return (
     <div className="fixed inset-0 z-50 bg-neutral-950/50 px-4 py-5">
@@ -814,8 +909,28 @@ function AddItemModal({
             </button>
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-3">
-            <label className="block">
+          <div className="mt-5 grid grid-cols-3 gap-2">
+            <label className="block min-w-0">
+              <span className="text-xs font-black text-neutral-500">
+                작품별
+              </span>
+
+              <select
+                value={selectedWorkTitle}
+                onChange={(event) => onChangeWorkTitle(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-2 py-3 text-xs outline-none focus:border-neutral-950"
+              >
+                <option value={ALL_WORKS_VALUE}>전체</option>
+
+                {workTitleOptions.map((workTitle) => (
+                  <option key={workTitle} value={workTitle}>
+                    {workTitle}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block min-w-0">
               <span className="text-xs font-black text-neutral-500">
                 굿즈 종류
               </span>
@@ -825,7 +940,7 @@ function AddItemModal({
                 onChange={(event) =>
                   onChangeCategory(event.target.value as CategoryFilterValue)
                 }
-                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-950"
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-2 py-3 text-xs outline-none focus:border-neutral-950"
               >
                 <option value={ALL_CATEGORIES_VALUE}>전체</option>
 
@@ -837,21 +952,30 @@ function AddItemModal({
               </select>
             </label>
 
-            <label className="block">
+            <label className="block min-w-0">
               <span className="text-xs font-black text-neutral-500">
-                작품 선택
+                특전 하위 분류
               </span>
 
               <select
-                value={selectedWorkTitle}
-                onChange={(event) => onChangeWorkTitle(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-950"
+                value={selectedBenefitSubcategory}
+                onChange={(event) =>
+                  onChangeBenefitSubcategory(event.target.value)
+                }
+                disabled={!canUseBenefitSubcategoryFilter}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-2 py-3 text-xs outline-none focus:border-neutral-950 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-300"
               >
-                <option value={ALL_WORKS_VALUE}>전체</option>
+                <option value={ALL_BENEFIT_SUBCATEGORIES_VALUE}>전체</option>
 
-                {workTitleOptions.map((workTitle) => (
-                  <option key={workTitle} value={workTitle}>
-                    {workTitle}
+                {hasBenefitItemsWithoutSubcategory ? (
+                  <option value={NO_BENEFIT_SUBCATEGORY_VALUE}>
+                    하위 분류 없음
+                  </option>
+                ) : null}
+
+                {benefitSubcategoryOptions.map((subcategory) => (
+                  <option key={subcategory} value={subcategory}>
+                    {subcategory}
                   </option>
                 ))}
               </select>
