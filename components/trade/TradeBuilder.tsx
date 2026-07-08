@@ -773,7 +773,7 @@ export function TradeBuilder({
           <div className="mb-3">
             <div className="text-sm font-black text-neutral-950">미리보기</div>
             <p className="mt-1 text-xs leading-5 text-neutral-400">
-              화면에서는 모바일 폭에 맞게 축소되어 보입니다. </br>
+              화면에서는 모바일 폭에 맞게 축소되어 보입니다. <br />
               상단의 PNG 저장 버튼을 누르시면 실제 사이즈로 다운로드 받으실 수 있습니다.
             </p>
           </div>
