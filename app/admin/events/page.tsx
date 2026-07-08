@@ -16,6 +16,7 @@ type TradeCollectionRow = {
   status_label: string | null;
   is_public: boolean;
   sort_order: number | null;
+  created_at?: string | null;
 };
 
 function normalizeSlug(value: string) {
@@ -122,10 +123,10 @@ export default function AdminEventsPage() {
       const { data, error } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, thumbnail_path, status_label, is_public, sort_order',
+          'id, slug, title, description, thumbnail_path, status_label, is_public, sort_order, created_at',
         )
         .order('sort_order', { ascending: true })
-        .order('title', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error(error);
@@ -363,7 +364,7 @@ export default function AdminEventsPage() {
 
           <div className="mt-6">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
-              Event Admin
+              Popup & Callabo Cafe Trade Board
             </p>
 
             <h1 className="mt-1 text-2xl font-black text-neutral-950">
@@ -371,7 +372,7 @@ export default function AdminEventsPage() {
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-neutral-500">
-              교환판 행사를 등록하고, 각 행사별 작품·특전·굿즈를 관리합니다.
+              팝업 & 콜카 굿즈 교환판 행사를 등록하고, 각 행사별 작품·특전·굿즈를 관리합니다.
             </p>
           </div>
         </header>
@@ -396,7 +397,7 @@ export default function AdminEventsPage() {
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="예: 2026 여름 특전 교환판"
+                placeholder="예: 2026 여름 팝업 & 콜카 굿즈 교환판"
               />
             </label>
 
@@ -461,7 +462,7 @@ export default function AdminEventsPage() {
                   공개 여부
                 </span>
                 <span className="mt-1 block text-xs text-neutral-500">
-                  공개 상태여야 메인 페이지와 교환판 목록에 노출됩니다.
+                  공개 상태여야 메인 페이지와 팝업 & 콜카 굿즈 교환판 목록에 노출됩니다.
                 </span>
               </span>
 
@@ -535,7 +536,7 @@ export default function AdminEventsPage() {
           </div>
 
           {events.length > 0 ? (
-            <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="mt-5 grid grid-cols-2 gap-3">
               {events.map((row) => {
                 const thumbnailUrl = getTradeAssetUrl(row.thumbnail_path ?? '');
                 const isDeleting = isDeletingEventId === row.id;
@@ -543,29 +544,37 @@ export default function AdminEventsPage() {
                 return (
                   <article
                     key={row.id}
-                    className="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-neutral-50 shadow-sm ring-1 ring-neutral-200"
+                    className="overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50"
                   >
-                    <Link
-                      href={`/admin/events/${row.id}`}
-                      className="block bg-white"
-                    >
-                      {thumbnailUrl ? (
-                        <img
-                          src={thumbnailUrl}
-                          alt="행사 썸네일"
-                          className="aspect-[32/45] w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex aspect-[32/45] w-full items-center justify-center bg-white text-[10px] font-black text-neutral-300">
-                          NO IMG
-                        </div>
-                      )}
+                    <Link href={`/admin/events/${row.id}`} className="block bg-white">
+                      <div className="aspect-[32/45] w-full overflow-hidden bg-white">
+                        {thumbnailUrl ? (
+                          <img
+                            src={thumbnailUrl}
+                            alt="행사 썸네일"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-[10px] font-bold text-neutral-300">
+                            NO IMG
+                          </div>
+                        )}
+                      </div>
                     </Link>
 
-                    <div className="flex flex-1 flex-col p-3">
-                      <div className="flex flex-wrap gap-1.5">
+                    <div className="p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="line-clamp-2 text-sm font-black leading-5 text-neutral-950">
+                            {row.title}
+                          </p>
+                          <p className="mt-1 truncate text-[10px] text-neutral-500">
+                            /trade/{row.slug}
+                          </p>
+                        </div>
+
                         <span
-                          className={`rounded-full px-2 py-1 text-[10px] font-black ${
+                          className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${
                             row.is_public
                               ? 'bg-green-50 text-green-700'
                               : 'bg-neutral-200 text-neutral-500'
@@ -573,33 +582,17 @@ export default function AdminEventsPage() {
                         >
                           {row.is_public ? '공개' : '숨김'}
                         </span>
-
-                        {row.status_label ? (
-                          <span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-neutral-500">
-                            {row.status_label}
-                          </span>
-                        ) : null}
                       </div>
 
-                      <Link href={`/admin/events/${row.id}`}>
-                        <h3 className="mt-2 line-clamp-2 min-h-[2.5rem] text-sm font-black leading-5 text-neutral-950">
-                          {row.title}
-                        </h3>
-                      </Link>
-
-                      <p className="mt-1 line-clamp-1 text-[11px] font-bold text-neutral-400">
-                        /trade/{row.slug}
-                      </p>
-
-                      <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-[11px] leading-5 text-neutral-500">
+                      <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-neutral-500">
                         {row.description || '행사 기간/설명이 없습니다.'}
                       </p>
 
-                      <p className="mt-2 text-[10px] font-bold text-neutral-400">
-                        정렬 {row.sort_order ?? 0}
+                      <p className="mt-1 text-[10px] font-bold text-neutral-400">
+                        {row.status_label || '라벨 없음'} · 정렬 {row.sort_order ?? 0}
                       </p>
 
-                      <div className="mt-3 grid grid-cols-2 gap-1.5">
+                      <div className="mt-3 grid grid-cols-3 gap-1.5">
                         <Link
                           href={`/admin/events/${row.id}`}
                           className="rounded-xl bg-neutral-950 px-2 py-2 text-center text-[11px] font-black text-white"
@@ -618,7 +611,7 @@ export default function AdminEventsPage() {
                           type="button"
                           onClick={() => handleDeleteEvent(row)}
                           disabled={isDeleting}
-                          className="col-span-2 rounded-xl border border-red-200 bg-red-50 px-2 py-2 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-xl border border-red-200 bg-red-50 px-2 py-2 text-[11px] font-black text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {isDeleting ? '삭제 중' : '삭제'}
                         </button>

@@ -4,8 +4,8 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-200 bg-white/90 px-4 py-3 backdrop-blur">
       <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-3">
-        <Link href="/" className="min-w-0 text-sm font-black text-neutral-950">
-          굿즈 교환판
+        <Link href="/" className="min-w-0 truncate text-sm font-black text-neutral-950">
+          팝업 & 콜카 굿즈 교환판
         </Link>
 
         <nav className="flex shrink-0 items-center gap-2">

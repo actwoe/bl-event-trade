@@ -1278,7 +1278,7 @@ export default function AdminEventManagePage() {
 
           <div className="mt-6">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
-              Event Manager
+              Popup & Callabo Cafe Trade Board
             </p>
 
             <h1 className="mt-1 text-2xl font-black text-neutral-950">
@@ -1286,7 +1286,7 @@ export default function AdminEventManagePage() {
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-neutral-500">
-              행사 정보, 작품 목록, 굿즈 이미지를 관리합니다.
+              팝업 & 콜카 굿즈 교환판의 행사 정보, 작품 목록, 굿즈 이미지를 관리합니다.
             </p>
           </div>
         </header>
@@ -1313,7 +1313,7 @@ export default function AdminEventManagePage() {
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
                 className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="예: 2026 여름 특전 교환판"
+                placeholder="예: 2026 여름 팝업 & 콜카 굿즈 교환판"
               />
             </label>
 
@@ -1483,7 +1483,7 @@ export default function AdminEventManagePage() {
                       공개
                     </span>
                     <span className="mt-1 block text-xs text-neutral-500">
-                      유저 이미지 제보와 교환판 선택 목록에 노출합니다.
+                      유저 이미지 제보와 팝업 & 콜카 굿즈 교환판 선택 목록에 노출합니다.
                     </span>
                   </span>
 
@@ -1996,7 +1996,7 @@ export default function AdminEventManagePage() {
                   )}
 
                   <span className="hidden text-xs text-neutral-400 sm:inline">
-                    교환판에 표시될 이미지를 업로드합니다.
+                    팝업 & 콜카 굿즈 교환판에 표시될 이미지를 업로드합니다.
                   </span>
 
                   <input
@@ -2054,7 +2054,7 @@ export default function AdminEventManagePage() {
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <label className="block">
                 <span className="text-xs font-bold text-neutral-500">
-                  작품별
+                  작품별 보기
                 </span>
 
                 <select

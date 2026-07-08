@@ -200,7 +200,7 @@ export default function AdminSubmissionsPage() {
       return;
     }
 
-    const ok = window.confirm("이 제보 이미지를 교환판에 반영할까요?");
+    const ok = window.confirm("이 제보 이미지를 팝업 & 콜카 굿즈 교환판에 반영할까요?");
 
     if (!ok) {
       return;
@@ -267,7 +267,7 @@ export default function AdminSubmissionsPage() {
 
       if (insertError || !insertedItem) {
         console.error(insertError);
-        setMessage("교환판 굿즈 등록에 실패했습니다.");
+        setMessage("팝업 & 콜카 굿즈 교환판 굿즈 등록에 실패했습니다.");
         return;
       }
 
@@ -290,7 +290,7 @@ export default function AdminSubmissionsPage() {
       }
 
       await loadSubmissions();
-      setMessage("제보 이미지를 승인하고 교환판에 반영했습니다.");
+      setMessage("제보 이미지를 승인하고 팝업 & 콜카 굿즈 교환판에 반영했습니다.");
     } catch (error) {
       console.error(error);
       setMessage("승인 처리 중 오류가 발생했습니다.");
@@ -476,7 +476,7 @@ export default function AdminSubmissionsPage() {
 
           <div className="mt-6">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
-              Submissions
+              Popup & Callabo Cafe Trade Board
             </p>
 
             <h1 className="mt-1 text-2xl font-black text-neutral-950">
@@ -484,13 +484,13 @@ export default function AdminSubmissionsPage() {
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-neutral-500">
-              유저가 제보한 이미지를 확인하고 교환판 반영 여부를 결정합니다.
+              유저가 제보한 이미지를 확인하고 팝업 & 콜카 굿즈 교환판 반영 여부를 결정합니다.
             </p>
           </div>
 
           <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
             <p>대기 중인 제보: {pendingCount}개</p>
-            <p>승인하면 공개 교환판에 즉시 반영됩니다.</p>
+            <p>승인하면 공개 팝업 & 콜카 굿즈 교환판에 즉시 반영됩니다.</p>
           </div>
         </header>
 

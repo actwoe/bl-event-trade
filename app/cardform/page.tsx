@@ -350,7 +350,7 @@ export default function CardFormPage() {
         <header className="rounded-3xl bg-white p-5 shadow-sm">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
-              Image Submission
+              Popup & Callabo Cafe Trade Board
             </p>
 
             <h1 className="mt-1 text-2xl font-black text-neutral-950">
@@ -358,9 +358,9 @@ export default function CardFormPage() {
             </h1>
 
             <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
-              <p>실물 굿즈 이미지를 제보해 주세요.</p>
+              <p>팝업 & 콜카 굿즈 교환판에 없는 굿즈 이미지를 제보해 주세요.</p>
               <p>가급적 빛 반사가 없는 정방형 이미지를 권장합니다.</p>
-              <p>제보 이미지는 관리자가 검수한 뒤 교환판에 반영됩니다.</p>
+              <p>제보 이미지는 관리자가 검수한 뒤 팝업 & 콜카 굿즈 교환판에 반영됩니다.</p>
             </div>
           </div>
         </header>
@@ -372,7 +372,7 @@ export default function CardFormPage() {
             </h2>
 
             <p className="mt-2 text-sm leading-6 text-neutral-500">
-              관리자가 확인한 뒤 교환판에 반영됩니다.
+              관리자가 확인한 뒤 팝업 & 콜카 굿즈 교환판에 반영됩니다.
             </p>
 
             <button

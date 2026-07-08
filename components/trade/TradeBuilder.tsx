@@ -550,8 +550,9 @@ export function TradeBuilder({
   const scaledPreviewHeight = Math.ceil(previewHeight * previewScale);
 
   return (
-    <section className="mx-auto flex w-full max-w-md flex-col gap-5 px-4 py-5 sm:max-w-lg">
-      <div className="w-full overflow-hidden rounded-3xl bg-white p-5 shadow-sm">
+    <section className="w-full bg-neutral-100 px-4 py-5 sm:py-6">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-5 sm:max-w-lg">
+      <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200 bg-white p-5 shadow-sm">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
             Popup & Callabo Cafe Trade Board
@@ -754,7 +755,7 @@ export function TradeBuilder({
         </div>
       </div>
 
-      <div className="w-full overflow-hidden rounded-3xl bg-white p-4 shadow-sm">
+      <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200 bg-white p-4 shadow-sm">
         <div className="mb-3">
           <div className="text-sm font-black text-neutral-950">미리보기</div>
           <p className="mt-1 text-xs leading-5 text-neutral-400">
@@ -790,9 +791,7 @@ export function TradeBuilder({
         </div>
       </div>
 
-      <footer className="pb-2 text-center text-[11px] font-bold text-neutral-400">
-        제작 NP @ru1ned1over
-      </footer>
+      </div>
 
       {addModalSide ? (
         <AddItemModal
