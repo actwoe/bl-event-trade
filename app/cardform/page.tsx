@@ -345,7 +345,7 @@ export default function CardFormPage() {
   }
 
   return (
-    <main className="w-full bg-neutral-100 px-4 pb-9 pt-5 sm:pb-10 sm:pt-6">
+    <main className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
       <section className="mx-auto w-full max-w-md sm:max-w-lg">
         <header className="rounded-3xl border border-neutral-200/80 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
           <div>
@@ -358,8 +358,7 @@ export default function CardFormPage() {
             </h1>
 
             <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
-              <p>팝업 & 콜카 굿즈 교환판에 없는 굿즈 이미지를 제보해 주세요.</p>
-              <p>가급적 빛 반사가 없는 정방형 이미지를 권장합니다.</p>
+              <p>실제 굿즈 이미지를 제보해주시면 운영에 많은 도움이 됩니다!</p>
               <p>제보 이미지는 관리자가 검수한 뒤 팝업 & 콜카 굿즈 교환판에 반영됩니다.</p>
             </div>
           </div>

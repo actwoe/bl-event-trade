@@ -1,6 +1,6 @@
 export function SiteFooter() {
   return (
-    <footer className="bg-neutral-100 px-4 pb-6 pt-2 text-center">
+    <footer className="bg-neutral-100 px-4 pb-6 pt-0 text-center">
       <p className="text-[11px] font-black text-neutral-500">
         제작 NP @ru1ned1over
       </p>

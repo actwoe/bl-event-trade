@@ -569,7 +569,7 @@ export function TradeBuilder({
   const scaledPreviewHeight = Math.ceil(previewHeight * previewScale);
 
   return (
-    <section className="w-full bg-neutral-100 px-4 pb-9 pt-5 sm:pb-10 sm:pt-6">
+    <section className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
       <div className="mx-auto flex w-full max-w-md flex-col gap-5 sm:max-w-lg">
         <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200/80 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
           <div>

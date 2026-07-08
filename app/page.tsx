@@ -119,7 +119,7 @@ export default async function HomePage() {
   const sortedCollections = sortCollectionsByStatus(collections, today);
 
   return (
-    <main className="w-full bg-neutral-100 px-4 pb-9 pt-5 sm:pb-10 sm:pt-6">
+    <main className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
       <section className="mx-auto w-full max-w-md rounded-3xl border border-neutral-200/80 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.045)] sm:max-w-lg">
         <header>
           <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
