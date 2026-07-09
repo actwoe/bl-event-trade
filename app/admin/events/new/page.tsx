@@ -241,7 +241,7 @@ export default function AdminEventNewPage() {
     <main className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
       <section className="mx-auto w-full max-w-md sm:max-w-lg">
         <div className="overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-          <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_52%,#fdf2f8_100%)] p-5">
+          <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] p-5">
             <div className="mb-6 flex items-center justify-between gap-3">
               <Link
                 href="/admin/events"

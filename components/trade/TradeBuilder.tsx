@@ -573,7 +573,7 @@ export function TradeBuilder({
     <section className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
       <div className="mx-auto flex w-full max-w-md flex-col gap-5 sm:max-w-lg">
         <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200/70 bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-          <div className="-mx-5 -mt-5 border-b border-neutral-200/70 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_52%,#fdf2f8_100%)] px-5 pb-5 pt-5">
+          <div className="-mx-5 -mt-5 border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] px-5 pb-5 pt-5">
             <div className="mb-6 flex items-center justify-between gap-3">
               <Link
                 href="/"
@@ -1028,7 +1028,7 @@ function AddItemModal({
           <GoodsWorkReference referenceImages={referenceImages} />
 
           {filteredItems.length > 0 ? (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {filteredItems.map((item) => {
                 const quantity = getRegisteredItemQuantity(
                   selectedCards,
