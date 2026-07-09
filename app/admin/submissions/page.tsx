@@ -200,7 +200,7 @@ export default function AdminSubmissionsPage() {
       return;
     }
 
-    const ok = window.confirm("이 제보 이미지를 팝업 & 콜카 굿즈 교환판에 반영할까요?");
+    const ok = window.confirm("이 제보 이미지를 교환판에 반영할까요?");
 
     if (!ok) {
       return;
@@ -267,7 +267,7 @@ export default function AdminSubmissionsPage() {
 
       if (insertError || !insertedItem) {
         console.error(insertError);
-        setMessage("팝업 & 콜카 굿즈 교환판 굿즈 등록에 실패했습니다.");
+        setMessage("교환판 굿즈 등록에 실패했습니다.");
         return;
       }
 
@@ -290,7 +290,7 @@ export default function AdminSubmissionsPage() {
       }
 
       await loadSubmissions();
-      setMessage("제보 이미지를 승인하고 팝업 & 콜카 굿즈 교환판에 반영했습니다.");
+      setMessage("제보 이미지를 승인하고 교환판에 반영했습니다.");
     } catch (error) {
       console.error(error);
       setMessage("승인 처리 중 오류가 발생했습니다.");
@@ -400,7 +400,7 @@ export default function AdminSubmissionsPage() {
   if (adminState === "checking") {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 text-sm text-neutral-500 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 text-sm text-neutral-500 shadow-sm">
           관리자 권한을 확인하는 중입니다.
         </section>
       </main>
@@ -410,7 +410,7 @@ export default function AdminSubmissionsPage() {
   if (adminState === "signed-out") {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-black text-neutral-950">
             로그인이 필요합니다
           </h1>
@@ -433,7 +433,7 @@ export default function AdminSubmissionsPage() {
   if (adminState === "not-admin") {
     return (
       <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 shadow-sm">
+        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-black text-neutral-950">
             관리자 권한이 없습니다
           </h1>
@@ -457,26 +457,28 @@ export default function AdminSubmissionsPage() {
   return (
     <main className="min-h-screen bg-neutral-100 px-4 py-5">
       <section className="mx-auto w-full max-w-md sm:max-w-lg">
-        <header className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <Link
-              href="/admin"
-              className="rounded-full border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-600"
-            >
-              ← 관리자 홈
-            </Link>
+        <div className="overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
+          <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_52%,#fdf2f8_100%)] p-5">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <Link
+                href="/admin/events"
+                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
+              >
+                ← 행사 목록
+              </Link>
 
-            <Link
-              href="/"
-              className="rounded-full border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-600"
-            >
-              사이트 보기
-            </Link>
-          </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
+              >
+                로그아웃
+              </button>
+            </div>
 
           <div className="mt-6">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
-              Popup & Callabo Cafe Trade Board
+              Submissions
             </p>
 
             <h1 className="mt-1 text-2xl font-black text-neutral-950">
@@ -484,23 +486,24 @@ export default function AdminSubmissionsPage() {
             </h1>
 
             <p className="mt-2 text-sm leading-6 text-neutral-500">
-              유저가 제보한 이미지를 확인하고 팝업 & 콜카 굿즈 교환판 반영 여부를 결정합니다.
+              유저가 제보한 이미지를 확인하고 교환판 반영 여부를 결정합니다.
             </p>
           </div>
 
-          <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
+          <div className="mt-5 rounded-2xl border border-white/60 bg-white/65 p-4 text-xs leading-6 text-neutral-600 shadow-[0_8px_20px_rgba(15,23,42,0.025)]">
             <p>대기 중인 제보: {pendingCount}개</p>
-            <p>승인하면 공개 팝업 & 콜카 굿즈 교환판에 즉시 반영됩니다.</p>
+            <p>승인하면 공개 교환판에 즉시 반영됩니다.</p>
           </div>
-        </header>
+          </header>
 
-        {message ? (
-          <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm leading-6 text-neutral-700 shadow-sm">
+          {message ? (
+            <p className="mx-5 mt-5 rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-700">
             {message}
           </p>
         ) : null}
 
-        <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+          <div className="p-5">
+            <div className="flex gap-2 overflow-x-auto pb-1">
           <StatusFilterButton
             label="대기"
             active={statusFilter === "pending"}
@@ -523,7 +526,7 @@ export default function AdminSubmissionsPage() {
           />
         </div>
 
-        <div className="mt-5 space-y-4">
+            <div className="mt-5 space-y-4">
           {filteredSubmissions.length > 0 ? (
             filteredSubmissions.map((submission) => {
               const signedUrl = signedUrlById[submission.id];
@@ -533,7 +536,7 @@ export default function AdminSubmissionsPage() {
               return (
                 <article
                   key={submission.id}
-                  className="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-sm"
+                  className="overflow-hidden rounded-3xl bg-white shadow-sm"
                 >
                   <div className="relative aspect-[3/4] bg-neutral-100">
                     {signedUrl ? (
@@ -657,12 +660,14 @@ export default function AdminSubmissionsPage() {
               );
             })
           ) : (
-            <div className="rounded-3xl border border-neutral-200 bg-white px-5 py-10 text-center shadow-sm">
+            <div className="rounded-3xl bg-white px-5 py-10 text-center shadow-sm">
               <p className="text-sm font-bold text-neutral-500">
                 표시할 제보가 없습니다.
               </p>
             </div>
           )}
+            </div>
+          </div>
         </div>
       </section>
     </main>

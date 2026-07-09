@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import { nanoid } from "nanoid";
@@ -571,8 +572,24 @@ export function TradeBuilder({
   return (
     <section className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
       <div className="mx-auto flex w-full max-w-md flex-col gap-5 sm:max-w-lg">
-        <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200/80 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
-          <div>
+        <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200/70 bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
+          <div className="-mx-5 -mt-5 border-b border-neutral-200/70 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_52%,#fdf2f8_100%)] px-5 pb-5 pt-5">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <Link
+                href="/"
+                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
+              >
+                ← 메인으로
+              </Link>
+
+              <Link
+                href="/cardform"
+                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
+              >
+                이미지 제보하기
+              </Link>
+            </div>
+
             <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
               Popup & Callabo Cafe Trade Board
             </p>
@@ -606,7 +623,7 @@ export function TradeBuilder({
                     닉네임 / SNS ID
                   </p>
                   <p className="mt-1 text-xs text-neutral-400">
-                    필요할 때만 입력해 주세요.
+                    필요할 때만 입력해주세요.
                   </p>
                 </div>
                 <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-500">
@@ -773,8 +790,8 @@ export function TradeBuilder({
           <div className="mb-3">
             <div className="text-sm font-black text-neutral-950">미리보기</div>
             <p className="mt-1 text-xs leading-5 text-neutral-400">
-              화면에서는 모바일 폭에 맞게 축소되어 보입니다. <br />
-              상단의 PNG 저장 버튼을 누르시면 실제 사이즈로 다운로드 받으실 수 있습니다.
+              화면에서는 모바일
+              폭에 맞게 축소되어 보입니다.
             </p>
           </div>
 
@@ -1043,7 +1060,6 @@ function AddItemModal({
 
             <p className="mt-2 text-xs leading-5 text-neutral-500">
               직접 찍은 이미지를 교환판에 넣고 싶을 때 사용해 주세요.
-              <br />
               업로드한 이미지는 서버에 저장되지 않습니다.
             </p>
 

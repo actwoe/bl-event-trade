@@ -1,55 +1,53 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
+import Link from "next/link";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
-type AdminState = 'checking' | 'admin' | 'not-admin' | 'signed-out';
+type AdminState = "checking" | "admin" | "not-admin" | "signed-out";
 
 function normalizeSlug(value: string) {
   return value
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
 function getFileExtension(file: File) {
-  const extension = file.name.split('.').pop()?.toLowerCase();
+  const extension = file.name.split(".").pop()?.toLowerCase();
 
   if (!extension) {
-    return 'jpg';
+    return "jpg";
   }
 
-  if (extension === 'jpeg') {
-    return 'jpg';
+  if (extension === "jpeg") {
+    return "jpg";
   }
 
   return extension;
 }
 
-export default function AdminNewEventPage() {
+export default function AdminEventNewPage() {
   const router = useRouter();
 
-  const [adminState, setAdminState] = useState<AdminState>('checking');
+  const [adminState, setAdminState] = useState<AdminState>("checking");
+  const [message, setMessage] = useState("");
 
-  const [title, setTitle] = useState('');
-  const [slug, setSlug] = useState('');
-  const [period, setPeriod] = useState('');
-  const [statusLabel, setStatusLabel] = useState('OPEN');
+  const [title, setTitle] = useState("");
+  const [slug, setSlug] = useState("");
+  const [periodNote, setPeriodNote] = useState("");
+  const [eventStartDate, setEventStartDate] = useState("");
+  const [eventEndDate, setEventEndDate] = useState("");
+  const [sortOrder, setSortOrder] = useState("0");
   const [isPublic, setIsPublic] = useState(true);
-  const [sortOrder, setSortOrder] = useState('0');
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
-  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState('');
+  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState("");
+  const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
 
-  const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const normalizedSlug = useMemo(() => {
-    return normalizeSlug(slug);
-  }, [slug]);
+  const normalizedSlug = useMemo(() => normalizeSlug(slug), [slug]);
 
   useEffect(() => {
     async function checkAdmin() {
@@ -57,22 +55,22 @@ export default function AdminNewEventPage() {
       const user = sessionData.session?.user;
 
       if (!user) {
-        setAdminState('signed-out');
+        setAdminState("signed-out");
         return;
       }
 
-      const { data: adminUser, error } = await supabase
-        .from('admin_users')
-        .select('user_id')
-        .eq('user_id', user.id)
+      const { data: adminUser, error: adminError } = await supabase
+        .from("admin_users")
+        .select("user_id")
+        .eq("user_id", user.id)
         .maybeSingle();
 
-      if (error || !adminUser) {
-        setAdminState('not-admin');
+      if (adminError || !adminUser) {
+        setAdminState("not-admin");
         return;
       }
 
-      setAdminState('admin');
+      setAdminState("admin");
     }
 
     checkAdmin();
@@ -80,19 +78,11 @@ export default function AdminNewEventPage() {
 
   useEffect(() => {
     return () => {
-      if (thumbnailPreviewUrl) {
+      if (thumbnailPreviewUrl.startsWith("blob:")) {
         URL.revokeObjectURL(thumbnailPreviewUrl);
       }
     };
   }, [thumbnailPreviewUrl]);
-
-  function handleTitleChange(value: string) {
-    setTitle(value);
-
-    if (!slug) {
-      setSlug(normalizeSlug(value));
-    }
-  }
 
   function handleThumbnailChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -101,12 +91,12 @@ export default function AdminNewEventPage() {
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
-      setMessage('이미지 파일만 업로드할 수 있습니다.');
+    if (!file.type.startsWith("image/")) {
+      setMessage("이미지 파일만 업로드할 수 있습니다.");
       return;
     }
 
-    if (thumbnailPreviewUrl) {
+    if (thumbnailPreviewUrl.startsWith("blob:")) {
       URL.revokeObjectURL(thumbnailPreviewUrl);
     }
 
@@ -114,115 +104,111 @@ export default function AdminNewEventPage() {
     setThumbnailPreviewUrl(URL.createObjectURL(file));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleCreateEvent(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!title.trim()) {
-      setMessage('행사 제목을 입력해 주세요.');
+      setMessage("행사 제목을 입력해 주세요.");
       return;
     }
 
     if (!normalizedSlug) {
-      setMessage(
-        'slug를 입력해 주세요. 영문 소문자, 숫자, 하이픈만 사용할 수 있습니다.',
-      );
+      setMessage("slug를 입력해 주세요. 영문, 숫자, 하이픈만 사용할 수 있습니다.");
       return;
     }
 
-    if (!thumbnailFile) {
-      setMessage('행사 썸네일 이미지를 업로드해 주세요.');
+    if (eventStartDate && eventEndDate && eventStartDate > eventEndDate) {
+      setMessage("행사 종료일은 시작일보다 빠를 수 없습니다.");
       return;
     }
 
     try {
-      setIsSubmitting(true);
-      setMessage('');
+      setIsSubmittingEvent(true);
+      setMessage("");
 
-      const fileExtension = getFileExtension(thumbnailFile);
-      const thumbnailPath = `${normalizedSlug}/thumbnail.${fileExtension}`;
+      let thumbnailPath: string | null = null;
 
-      const { error: uploadError } = await supabase.storage
-        .from('trade-assets')
-        .upload(thumbnailPath, thumbnailFile, {
-          cacheControl: '3600',
-          upsert: true,
-          contentType: thumbnailFile.type,
-        });
+      if (thumbnailFile) {
+        const fileExtension = getFileExtension(thumbnailFile);
+        thumbnailPath = `${normalizedSlug}/thumbnail.${fileExtension}`;
 
-      if (uploadError) {
-        console.error(uploadError);
-        setMessage(
-          '썸네일 업로드에 실패했습니다. Storage 정책과 trade-assets 버킷을 확인해 주세요.',
-        );
-        return;
+        const { error: uploadError } = await supabase.storage
+          .from("trade-assets")
+          .upload(thumbnailPath, thumbnailFile, {
+            cacheControl: "3600",
+            upsert: true,
+            contentType: thumbnailFile.type,
+          });
+
+        if (uploadError) {
+          console.error(uploadError);
+          setMessage("썸네일 업로드에 실패했습니다. Storage 정책을 확인해 주세요.");
+          return;
+        }
       }
 
       const parsedSortOrder = Number.parseInt(sortOrder, 10);
 
-      const { data: insertedEvent, error: insertError } = await supabase
-        .from('trade_collections')
+      const { data, error: insertError } = await supabase
+        .from("trade_collections")
         .insert({
-          slug: normalizedSlug,
           title: title.trim(),
-          description: period.trim() || null,
+          slug: normalizedSlug,
+          description: periodNote.trim() || null,
+          event_start_date: eventStartDate || null,
+          event_end_date: eventEndDate || null,
           thumbnail_path: thumbnailPath,
-          status_label: statusLabel.trim() || null,
+          status_label: null,
           is_public: isPublic,
           sort_order: Number.isNaN(parsedSortOrder) ? 0 : parsedSortOrder,
-          published_at: new Date().toISOString(),
         })
-        .select('id')
+        .select("id")
         .single();
 
-      if (insertError || !insertedEvent) {
+      if (insertError) {
         console.error(insertError);
-        setMessage(
-          '행사 등록에 실패했습니다. slug가 중복되었거나 DB 정책이 막혔을 수 있습니다.',
-        );
+        setMessage("행사 등록에 실패했습니다. slug 중복 또는 DB 정책을 확인해 주세요.");
         return;
       }
 
-      router.push('/admin/events');
+      setMessage("행사가 등록되었습니다.");
+      router.push(data?.id ? `/admin/events/${data.id}` : "/admin/events");
       router.refresh();
     } catch (error) {
       console.error(error);
-      setMessage('행사 등록 중 오류가 발생했습니다.');
+      setMessage("행사 등록 중 오류가 발생했습니다.");
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingEvent(false);
     }
   }
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push('/admin/login');
+    router.push("/admin/login");
     router.refresh();
   }
 
-  if (adminState === 'checking') {
+  if (adminState === "checking") {
     return (
-      <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 text-sm text-neutral-500 shadow-sm">
+      <main className="w-full bg-neutral-100 px-4 py-10">
+        <section className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-6 text-sm text-neutral-500 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
           관리자 권한을 확인하는 중입니다.
         </section>
       </main>
     );
   }
 
-  if (adminState === 'signed-out') {
+  if (adminState === "signed-out") {
     return (
-      <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-black text-neutral-950">
-            로그인이 필요합니다
-          </h1>
-
+      <main className="w-full bg-neutral-100 px-4 py-10">
+        <section className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-6 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
+          <h1 className="text-2xl font-bold text-neutral-950">로그인이 필요합니다</h1>
           <p className="mt-2 text-sm leading-6 text-neutral-500">
-            새 행사는 관리자 로그인 후 등록할 수 있습니다.
+            행사 등록은 관리자 로그인 후 이용할 수 있습니다.
           </p>
-
           <Link
             href="/admin/login"
-            className="mt-6 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white"
+            className="mt-6 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-bold text-white"
           >
             관리자 로그인
           </Link>
@@ -231,22 +217,18 @@ export default function AdminNewEventPage() {
     );
   }
 
-  if (adminState === 'not-admin') {
+  if (adminState === "not-admin") {
     return (
-      <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
-          <h1 className="text-2xl font-black text-neutral-950">
-            관리자 권한이 없습니다
-          </h1>
-
+      <main className="w-full bg-neutral-100 px-4 py-10">
+        <section className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-6 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
+          <h1 className="text-2xl font-bold text-neutral-950">관리자 권한이 없습니다</h1>
           <p className="mt-2 text-sm leading-6 text-neutral-500">
             현재 로그인한 계정은 관리자 목록에 등록되어 있지 않습니다.
           </p>
-
           <button
             type="button"
             onClick={handleLogout}
-            className="mt-6 rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white"
+            className="mt-6 rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-bold text-white"
           >
             로그아웃
           </button>
@@ -256,185 +238,163 @@ export default function AdminNewEventPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-100 px-4 py-5">
+    <main className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
       <section className="mx-auto w-full max-w-md sm:max-w-lg">
-        <header className="rounded-3xl bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <Link
-              href="/admin/events"
-              className="rounded-full border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-600"
-            >
-              ← 행사 목록
-            </Link>
+        <div className="overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
+          <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_52%,#fdf2f8_100%)] p-5">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <Link
+                href="/admin/events"
+                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
+              >
+                ← 행사 목록
+              </Link>
 
-            <Link
-              href="/"
-              className="rounded-full border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-600"
-            >
-              사이트 보기
-            </Link>
-          </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
+              >
+                로그아웃
+              </button>
+            </div>
 
-          <div className="mt-6">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
-              New Event
-            </p>
-
-            <h1 className="mt-1 text-2xl font-black text-neutral-950">
-              새 행사 등록
-            </h1>
-
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              메인 페이지에 표시될 교환판 행사를 만들고 썸네일을 업로드합니다.
-            </p>
-          </div>
-        </header>
-
-        <form
-          onSubmit={handleSubmit}
-          className="mt-5 rounded-3xl bg-white p-5 shadow-sm"
-        >
-          <div className="space-y-5">
-            <label className="block">
-              <span className="text-sm font-bold text-neutral-800">
-                행사 제목
-              </span>
-
-              <input
-                value={title}
-                onChange={(event) => handleTitleChange(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="예: 2026 여름 특전 교환판"
-              />
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-bold text-neutral-800">Slug</span>
-
-              <input
-                value={slug}
-                onChange={(event) => setSlug(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="예: summer-event-2026"
-              />
-
-              <p className="mt-2 text-xs leading-5 text-neutral-400">
-                실제 주소는 /trade/{normalizedSlug || 'slug'} 형태로 생성됩니다.
-                영문 소문자, 숫자, 하이픈만 사용하는 걸 추천합니다.
+            <div className="mt-6">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">
+                Popup & Callabo Cafe Trade Board
               </p>
-            </label>
-
-            <label className="block">
-              <span className="text-sm font-bold text-neutral-800">
-                행사 기간
-              </span>
-
-              <input
-                value={period}
-                onChange={(event) => setPeriod(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="예: 2026.07.01 - 2026.07.31"
-              />
-
-              <p className="mt-2 text-xs leading-5 text-neutral-400">
-                메인 카드와 교환판 설명 영역에 표시됩니다.
+              <h1 className="mt-1 text-2xl font-bold text-neutral-950">행사 등록</h1>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                팝업 & 콜라보 카페 굿즈 교환판에 노출할 새 행사를 등록합니다.
               </p>
-            </label>
+            </div>
+          </header>
 
-            <div className="grid grid-cols-2 gap-3">
+          {message ? (
+            <p className="mx-5 mt-5 rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-700">
+              {message}
+            </p>
+          ) : null}
+
+          <form onSubmit={handleCreateEvent} className="p-5">
+            <div className="space-y-5">
               <label className="block">
-                <span className="text-sm font-bold text-neutral-800">
-                  상태 라벨
-                </span>
-
+                <span className="text-sm font-semibold text-neutral-800">행사 제목</span>
                 <input
-                  value={statusLabel}
-                  onChange={(event) => setStatusLabel(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                  placeholder="OPEN"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-950"
+                  placeholder="예: 2026 여름 팝업 & 콜카 굿즈 교환판"
                 />
               </label>
 
               <label className="block">
-                <span className="text-sm font-bold text-neutral-800">
-                  정렬 순서
-                </span>
+                <span className="text-sm font-semibold text-neutral-800">Slug</span>
+                <input
+                  value={slug}
+                  onChange={(event) => setSlug(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-950"
+                  placeholder="예: summer-event-2026"
+                />
+                <p className="mt-2 text-xs leading-5 text-neutral-400">
+                  실제 주소는 /trade/{normalizedSlug || "slug"} 형태입니다.
+                </p>
+              </label>
 
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-sm font-semibold text-neutral-800">시작일</span>
+                  <input
+                    type="date"
+                    value={eventStartDate}
+                    onChange={(event) => setEventStartDate(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none transition focus:border-neutral-950"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-semibold text-neutral-800">종료일</span>
+                  <input
+                    type="date"
+                    value={eventEndDate}
+                    onChange={(event) => setEventEndDate(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none transition focus:border-neutral-950"
+                  />
+                </label>
+              </div>
+
+              <label className="block">
+                <span className="text-sm font-semibold text-neutral-800">행사 기간 메모</span>
+                <input
+                  value={periodNote}
+                  onChange={(event) => setPeriodNote(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-950"
+                  placeholder="선택 입력"
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-semibold text-neutral-800">정렬 순서</span>
                 <input
                   type="number"
                   value={sortOrder}
                   onChange={(event) => setSortOrder(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-950"
                   placeholder="0"
                 />
               </label>
-            </div>
 
-            <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
-              <span>
-                <span className="block text-sm font-bold text-neutral-800">
-                  공개 여부
+              <label className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3">
+                <span>
+                  <span className="block text-sm font-semibold text-neutral-800">공개 여부</span>
+                  <span className="mt-1 block text-xs text-neutral-500">
+                    공개 상태여야 메인 페이지에 노출됩니다.
+                  </span>
                 </span>
-                <span className="mt-1 block text-xs text-neutral-500">
-                  공개 상태여야 메인 페이지에 노출됩니다.
-                </span>
-              </span>
-
-              <input
-                type="checkbox"
-                checked={isPublic}
-                onChange={(event) => setIsPublic(event.target.checked)}
-                className="h-5 w-5"
-              />
-            </label>
-
-            <div>
-              <span className="text-sm font-bold text-neutral-800">
-                행사 썸네일
-              </span>
-
-              <label className="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center hover:border-neutral-950">
-                {thumbnailPreviewUrl ? (
-                  <img
-                    src={thumbnailPreviewUrl}
-                    alt="썸네일 미리보기"
-                    className="aspect-[32/45] w-44 rounded-2xl object-cover shadow-sm"
-                  />
-                ) : (
-                  <>
-                    <span className="text-sm font-black text-neutral-700">
-                      썸네일 이미지 선택
-                    </span>
-                    <span className="mt-2 text-xs leading-5 text-neutral-400">
-                      포스터형 이미지는 32:45 비율을 추천합니다.
-                    </span>
-                  </>
-                )}
-
                 <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleThumbnailChange}
-                  className="hidden"
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(event) => setIsPublic(event.target.checked)}
+                  className="h-5 w-5"
                 />
               </label>
+
+              <div>
+                <span className="text-sm font-semibold text-neutral-800">행사 썸네일</span>
+                <label className="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50/80 px-4 py-8 text-center transition hover:border-neutral-950 hover:bg-white">
+                  {thumbnailPreviewUrl ? (
+                    <img
+                      src={thumbnailPreviewUrl}
+                      alt="썸네일 미리보기"
+                      className="aspect-[32/45] w-44 rounded-2xl object-cover shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+                    />
+                  ) : (
+                    <>
+                      <span className="text-sm font-bold text-neutral-700">썸네일 이미지 선택</span>
+                      <span className="mt-2 text-xs leading-5 text-neutral-400">
+                        포스터형 이미지는 32:45 비율을 추천합니다.
+                      </span>
+                    </>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleThumbnailChange}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingEvent}
+                className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-bold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-300"
+              >
+                {isSubmittingEvent ? "등록 중..." : "행사 등록"}
+              </button>
             </div>
-
-            {message ? (
-              <p className="rounded-2xl bg-neutral-100 px-4 py-3 text-sm leading-6 text-neutral-700">
-                {message}
-              </p>
-            ) : null}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-            >
-              {isSubmitting ? '등록 중...' : '행사 등록'}
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </section>
     </main>
   );

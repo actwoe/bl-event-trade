@@ -119,10 +119,26 @@ export default async function HomePage() {
   const sortedCollections = sortCollectionsByStatus(collections, today);
 
   return (
-    <main className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
-      <section className="mx-auto w-full max-w-md rounded-3xl border border-neutral-200/80 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.045)] sm:max-w-lg">
-        <header>
-          <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
+    <main className="w-full bg-neutral-100 px-4 pb-5 pt-5 sm:pb-6 sm:pt-6">
+      <section className="mx-auto w-full max-w-md overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)] sm:max-w-lg">
+        <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_52%,#fdf2f8_100%)] p-5">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <Link
+                href="/"
+                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
+              >
+                ← 메인으로
+              </Link>
+
+              <Link
+                href="/cardform"
+                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
+              >
+                이미지 제보하기
+              </Link>
+            </div>
+
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">
             Popup & Callabo Cafe Trade Board
           </p>
 
@@ -130,26 +146,31 @@ export default async function HomePage() {
             팝업 & 콜카 굿즈 교환판
           </h1>
 
-          <p className="mt-2 text-sm leading-6 text-neutral-500">
+          <p className="mt-2 text-sm font-semibold leading-6 text-neutral-700">
             어떤 행사의 굿즈를 교환할까요?
           </p>
         </header>
 
-        <div className="mt-6 border-t border-neutral-200 pt-5">
-          <div>
-            <h2 className="text-lg font-black text-neutral-950">행사 목록</h2>
+        <div className="bg-white p-5">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-neutral-950">교환판 목록</h2>
+              <p className="mt-1 text-xs font-medium text-neutral-400">
+                공개된 교환판 {collections.length}개
+              </p>
+            </div>
           </div>
 
           {error ? (
-            <p className="mt-4 rounded-2xl bg-neutral-100 px-4 py-3 text-sm leading-6 text-neutral-700">
+            <p className="mt-4 rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-600">
               {error}
             </p>
           ) : null}
 
           {!error && collections.length === 0 ? (
-            <div className="mt-5 rounded-2xl bg-neutral-100 px-4 py-10 text-center">
+            <div className="mt-5 rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/70 px-4 py-10 text-center">
               <p className="text-sm font-bold text-neutral-400">
-                아직 공개된 행사가 없습니다.
+                아직 공개된 교환판이 없습니다.
               </p>
             </div>
           ) : null}
@@ -167,9 +188,9 @@ export default async function HomePage() {
                   <Link
                     key={collection.id}
                     href={`/trade/${collection.slug}`}
-                    className="group overflow-hidden rounded-2xl border border-neutral-200/80 bg-white shadow-[0_6px_18px_rgba(15,23,42,0.035)] transition hover:-translate-y-0.5 hover:border-neutral-950 hover:shadow-[0_14px_34px_rgba(15,23,42,0.075)]"
+                    className="group overflow-hidden rounded-2xl border border-neutral-200/70 bg-white transition hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
                   >
-                    <div className="relative aspect-[32/45] bg-neutral-100">
+                    <div className="relative aspect-[32/45] bg-neutral-50">
                       {thumbnailUrl ? (
                         <img
                           src={thumbnailUrl}
@@ -185,19 +206,19 @@ export default async function HomePage() {
                       )}
 
                       {ended ? (
-                        <span className="absolute left-2 top-2 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black text-white">
+                        <span className="absolute left-2 top-2 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-bold text-white">
                           종료
                         </span>
                       ) : null}
                     </div>
 
                     <div className="p-3">
-                      <h3 className="line-clamp-2 break-keep text-sm font-black leading-5 text-neutral-950">
+                      <h3 className="line-clamp-2 break-keep text-sm font-bold leading-5 text-neutral-900">
                         {collection.title}
                       </h3>
 
                       {periodLabel ? (
-                        <p className="mt-1 line-clamp-2 text-[11px] font-bold leading-5 text-neutral-400">
+                        <p className="mt-1 line-clamp-2 text-[11px] font-medium leading-5 text-neutral-400">
                           {periodLabel}
                         </p>
                       ) : null}

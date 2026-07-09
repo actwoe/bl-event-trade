@@ -1534,23 +1534,34 @@ export default function AdminEventManagePage() {
   return (
     <main className="min-h-screen bg-neutral-100 px-4 py-5">
       <section className="mx-auto w-full max-w-md sm:max-w-lg">
-        <header className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
+        <div className="overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
+          <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_52%,#fdf2f8_100%)] p-5">
+          <div className="mb-6 flex items-center justify-between gap-3">
             <Link
               href="/admin/events"
-              className="rounded-full border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-600"
+              className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
             >
               ← 행사 목록
             </Link>
 
-            {eventData ? (
-              <Link
-                href={`/trade/${eventData.slug}`}
-                className="rounded-full border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-600"
+            <div className="flex shrink-0 items-center gap-2">
+              {eventData ? (
+                <Link
+                  href={`/trade/${eventData.slug}`}
+                  className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
+                >
+                  교환판 보기
+                </Link>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
               >
-                교환판 보기
-              </Link>
-            ) : null}
+                로그아웃
+              </button>
+            </div>
           </div>
 
           <div className="mt-6">
@@ -1566,17 +1577,17 @@ export default function AdminEventManagePage() {
               팝업 & 콜카 굿즈 교환판의 행사 정보, 작품 목록, 굿즈 이미지를 관리합니다.
             </p>
           </div>
-        </header>
+          </header>
 
-        {message ? (
-          <p className="mt-4 rounded-2xl bg-white px-4 py-3 text-sm leading-6 text-neutral-700 shadow-sm">
+          {message ? (
+            <p className="mx-5 mt-5 rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-700">
             {message}
           </p>
         ) : null}
 
         <form
           onSubmit={handleUpdateEvent}
-          className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm"
+          className="p-5"
         >
           <h2 className="text-lg font-black text-neutral-950">행사 수정</h2>
 
@@ -1718,6 +1729,7 @@ export default function AdminEventManagePage() {
             </button>
           </div>
         </form>
+        </div>
 
         <form
           onSubmit={handleAddWork}

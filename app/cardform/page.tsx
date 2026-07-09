@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { nanoid } from "nanoid";
 import { supabase } from "@/lib/supabase";
@@ -345,11 +346,27 @@ export default function CardFormPage() {
   }
 
   return (
-    <main className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
+    <main className="w-full bg-neutral-100 px-4 pb-5 pt-5 sm:pb-6 sm:pt-6">
       <section className="mx-auto w-full max-w-md sm:max-w-lg">
-        <header className="rounded-3xl border border-neutral-200/80 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
+        <div className="overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
+          <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_52%,#fdf2f8_100%)] p-5">
+            <div className="mb-6 flex items-center justify-between gap-3">
+              <Link
+                href="/"
+                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
+              >
+                ← 메인으로
+              </Link>
+
+              <Link
+                href="/cardform"
+                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
+              >
+                이미지 제보하기
+              </Link>
+            </div>
+
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">
               Popup & Callabo Cafe Trade Board
             </p>
 
@@ -357,15 +374,15 @@ export default function CardFormPage() {
               이미지 제보
             </h1>
 
-            <div className="mt-5 rounded-2xl bg-neutral-100 p-4 text-xs leading-6 text-neutral-600">
-              <p>실제 굿즈 이미지를 제보해주시면 운영에 많은 도움이 됩니다!</p>
-              <p>제보 이미지는 관리자가 검수한 뒤 팝업 & 콜카 굿즈 교환판에 반영됩니다.</p>
+            <div className="mt-5 rounded-2xl border border-white/60 bg-white/65 p-4 text-xs leading-6 text-neutral-600 shadow-[0_8px_20px_rgba(15,23,42,0.025)]">
+              <p>팝업 & 콜카 굿즈 교환판에 없는 굿즈 이미지를 제보해 주세요.</p>
+              <p>가급적 빛 반사가 없는 정방형 이미지를 권장합니다.</p>
+              <p>제보 이미지는 관리자 검수 후 교환판에 추가됩니다.</p>
             </div>
-          </div>
-        </header>
+          </header>
 
-        {isSubmitted ? (
-          <section className="mt-5 rounded-3xl border border-neutral-200/80 bg-white p-5 text-center shadow-[0_10px_28px_rgba(15,23,42,0.045)]">
+          {isSubmitted ? (
+            <section className="p-5 text-center">
             <h2 className="text-xl font-black text-neutral-950">
               제보가 접수되었습니다
             </h2>
@@ -377,7 +394,7 @@ export default function CardFormPage() {
             <button
               type="button"
               onClick={() => setIsSubmitted(false)}
-              className="mt-6 w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white"
+              className="mt-6 w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-bold text-white transition hover:bg-neutral-800"
             >
               다른 이미지 제보하기
             </button>
@@ -385,18 +402,18 @@ export default function CardFormPage() {
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="mt-5 rounded-3xl border border-neutral-200/80 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.045)]"
+            className="p-5"
           >
             <div className="space-y-5">
               <label className="block">
-                <span className="text-sm font-bold text-neutral-800">
+                <span className="text-sm font-semibold text-neutral-800">
                   행사 선택
                 </span>
 
                 <select
                   value={collectionId}
                   onChange={(event) => setCollectionId(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
                 >
                   {collections.length > 0 ? (
                     collections.map((collection) => (
@@ -411,7 +428,7 @@ export default function CardFormPage() {
               </label>
 
               <label className="block">
-                <span className="text-sm font-bold text-neutral-800">
+                <span className="text-sm font-semibold text-neutral-800">
                   작품 선택
                 </span>
 
@@ -419,7 +436,7 @@ export default function CardFormPage() {
                   value={workTitle}
                   onChange={(event) => setWorkTitle(event.target.value)}
                   disabled={workTitles.length === 0}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950 disabled:bg-neutral-100 disabled:text-neutral-400"
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900 disabled:bg-neutral-100 disabled:text-neutral-400"
                 >
                   {workTitles.length > 0 ? (
                     workTitles.map((title) => (
@@ -438,9 +455,9 @@ export default function CardFormPage() {
                 </p>
               </label>
 
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-sm font-bold text-neutral-800">
+                  <span className="text-sm font-semibold text-neutral-800">
                     굿즈 종류
                   </span>
 
@@ -449,7 +466,7 @@ export default function CardFormPage() {
                     onChange={(event) =>
                       handleCategoryChange(event.target.value as TradeCategory)
                     }
-                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
                   >
                     {TRADE_CATEGORIES.map((option) => (
                       <option key={option.id} value={option.id}>
@@ -460,7 +477,7 @@ export default function CardFormPage() {
                 </label>
 
                 <label className="block">
-                  <span className="text-sm font-bold text-neutral-800">
+                  <span className="text-sm font-semibold text-neutral-800">
                     특전 하위 분류
                   </span>
 
@@ -470,7 +487,7 @@ export default function CardFormPage() {
                       setBenefitSubcategory(event.target.value)
                     }
                     disabled={!canSelectBenefitSubcategory}
-                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950 disabled:bg-neutral-100 disabled:text-neutral-400"
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900 disabled:bg-neutral-100 disabled:text-neutral-400"
                   >
                     {category !== "benefit" ? (
                       <option value="">특전 선택 시 사용</option>
@@ -490,7 +507,7 @@ export default function CardFormPage() {
               </div>
 
               <div>
-                <span className="text-sm font-bold text-neutral-800">
+                <span className="text-sm font-semibold text-neutral-800">
                   이미지
                 </span>
 
@@ -503,7 +520,7 @@ export default function CardFormPage() {
                     />
                   ) : (
                     <>
-                      <span className="text-sm font-black text-neutral-700">
+                      <span className="text-sm font-bold text-neutral-700">
                         이미지 선택
                       </span>
                       <span className="mt-2 text-xs leading-5 text-neutral-400">
@@ -522,7 +539,7 @@ export default function CardFormPage() {
               </div>
 
               {message ? (
-                <p className="rounded-2xl bg-neutral-100 px-4 py-3 text-sm leading-6 text-neutral-700">
+                <p className="rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-600">
                   {message}
                 </p>
               ) : null}
@@ -534,13 +551,14 @@ export default function CardFormPage() {
                   collections.length === 0 ||
                   workTitles.length === 0
                 }
-                className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+                className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-bold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-300"
               >
                 {isSubmitting ? "제보 중..." : "이미지 제보하기"}
               </button>
             </div>
           </form>
-        )}
+          )}
+        </div>
       </section>
     </main>
   );
