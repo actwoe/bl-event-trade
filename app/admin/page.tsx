@@ -148,6 +148,13 @@ export default function AdminHomePage() {
                 유저가 제보한 이미지를 검수하고 교환판에 반영합니다.
               </p>
             </Link>
+
+            <Link href="/admin/trade-lab" className={cardClassName}>
+              <p className="text-base font-bold text-neutral-950">교환판 테스트</p>
+              <p className="mt-1 text-sm leading-6 text-neutral-500">
+                실서비스와 분리된 화면에서 PNG와 모바일 저장 변경을 검증합니다.
+              </p>
+            </Link>
           </div>
         </div>
       </section>
