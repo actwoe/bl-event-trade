@@ -9,6 +9,8 @@ export type TradeCategory =
 
 export type TradeImageRatio = 'square' | 'photocard';
 
+export type TradeCategoryDisplayMode = 'grouped' | 'simple';
+
 export const TRADE_CATEGORIES: { id: TradeCategory; label: string }[] = [
   { id: 'benefit', label: '특전' },
   { id: 'deco_photo_pack', label: '데코 포토팩' },
@@ -33,6 +35,7 @@ export type TradeBoard = {
   contact: string;
   memo: string;
   cards: TradeCard[];
+  categoryDisplayMode?: TradeCategoryDisplayMode;
 };
 
 export type RegisteredTradeItem = {
@@ -58,4 +61,6 @@ export type TradeCollectionSummary = {
   slug: string;
   title: string;
   description: string | null;
+  thumbnailUrl?: string | null;
+  themeThumbnailUrl?: string | null;
 };

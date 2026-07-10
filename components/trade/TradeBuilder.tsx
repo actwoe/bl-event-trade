@@ -11,6 +11,7 @@ import {
   TradeBoard,
   TradeCard,
   TradeCategory,
+  TradeCategoryDisplayMode,
   TradeCollectionSummary,
   TradeImageRatio,
   TradeSide,
@@ -53,6 +54,7 @@ function createInitialBoard(): TradeBoard {
     contact: "",
     memo: "",
     cards: [],
+    categoryDisplayMode: "grouped",
   };
 }
 
@@ -393,6 +395,13 @@ export function TradeBuilder({
     });
   }
 
+  function updateCategoryDisplayMode(mode: TradeCategoryDisplayMode) {
+    setBoard((prev) => ({
+      ...prev,
+      categoryDisplayMode: mode,
+    }));
+  }
+
   function changeCategoryFilter(value: CategoryFilterValue) {
     setSelectedCategory(value);
 
@@ -701,6 +710,45 @@ export function TradeBuilder({
                 </div>
               ) : null}
             </section>
+
+            <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-neutral-950">
+                    교환판 구분 방식
+                  </p>
+                  <p className="mt-1 text-xs text-neutral-400">
+                    굿즈 분류별로 나누거나, 한 번에 모아볼 수 있습니다.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => updateCategoryDisplayMode("grouped")}
+                  className={
+                    board.categoryDisplayMode !== "simple"
+                      ? "rounded-2xl bg-neutral-950 px-3 py-3 text-xs font-black text-white"
+                      : "rounded-2xl bg-white px-3 py-3 text-xs font-bold text-neutral-500 ring-1 ring-neutral-200"
+                  }
+                >
+                  분류별 구분
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => updateCategoryDisplayMode("simple")}
+                  className={
+                    board.categoryDisplayMode === "simple"
+                      ? "rounded-2xl bg-neutral-950 px-3 py-3 text-xs font-black text-white"
+                      : "rounded-2xl bg-white px-3 py-3 text-xs font-bold text-neutral-500 ring-1 ring-neutral-200"
+                  }
+                >
+                  구분 없이 보기
+                </button>
+              </div>
+            </section>
           </div>
 
           <div className="mt-8 border-t border-neutral-100 pt-6">
@@ -852,6 +900,7 @@ function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
     <button
       type="button"
       onClick={onClick}
+      aria-label={`${title} 이미지 추가${count > 0 ? `, 현재 ${count}개 선택됨` : ""}`}
       className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-left transition hover:border-neutral-950 hover:bg-white"
     >
       <div className="flex items-center justify-between gap-2">
@@ -862,12 +911,10 @@ function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
           <span className="text-sm font-black text-neutral-950">{title}</span>
         </span>
 
-        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-neutral-500 ring-1 ring-neutral-200">
-          {count}개
+        <span className="shrink-0 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black text-white">
+          + 추가
         </span>
       </div>
-
-      <p className="mt-1 text-[11px] font-black text-neutral-500">+ 추가</p>
     </button>
   );
 }
@@ -1162,11 +1209,14 @@ function RegisteredItemCard({
           className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
         />
 
-        {selected ? (
-          <span className="absolute right-1.5 top-1.5 rounded-full bg-neutral-950 px-2 py-1 text-[10px] font-black leading-none text-white">
-            ×{quantity}
-          </span>
-        ) : null}
+        <button
+          type="button"
+          onClick={onIncrease}
+          className="absolute right-1.5 top-1.5 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black leading-none text-white shadow-sm"
+          aria-label="이미지 추가"
+        >
+          + 추가
+        </button>
       </div>
 
       <div className="p-2">
@@ -1199,16 +1249,7 @@ function RegisteredItemCard({
               +
             </button>
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={onIncrease}
-            className="mt-2 flex h-8 w-full items-center justify-center rounded-lg bg-neutral-950 text-sm font-black text-white"
-            aria-label="수량 늘리기"
-          >
-            +
-          </button>
-        )}
+        ) : null}
       </div>
     </article>
   );
@@ -1288,45 +1329,45 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
             </select>
           </div>
 
-          <div className="flex shrink-0 items-center gap-1.5">
-            <div className="flex h-8 items-center overflow-hidden rounded-full border border-neutral-200 bg-white">
-              <button
-                type="button"
-                onClick={decreaseQuantity}
-                className="flex h-8 w-7 items-center justify-center text-sm font-black text-neutral-500"
-                aria-label="수량 줄이기"
-              >
-                −
-              </button>
-              <span className="min-w-6 px-0.5 text-center text-xs font-black text-neutral-950">
-                {quantity}
-              </span>
-              <button
-                type="button"
-                onClick={increaseQuantity}
-                className="flex h-8 w-7 items-center justify-center text-sm font-black text-neutral-500"
-                aria-label="수량 늘리기"
-              >
-                +
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={onRemove}
-              aria-label="선택한 이미지 삭제"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-black text-neutral-400 shadow-sm ring-1 ring-neutral-200 hover:bg-red-50 hover:text-red-500 hover:ring-red-200"
-            >
-              ×
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="선택한 이미지 삭제"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-black text-neutral-400 shadow-sm ring-1 ring-neutral-200 hover:bg-red-50 hover:text-red-500 hover:ring-red-200"
+          >
+            ×
+          </button>
         </div>
 
-        <div className="min-w-0 space-y-0.5 text-xs leading-5">
-          <p className="truncate font-black text-neutral-950">
-            {card.workTitle || "작품명 없음"}
-          </p>
-          <p className="truncate text-neutral-500">{metaLabel}</p>
+        <div className="flex min-w-0 items-start gap-2">
+          <div className="min-w-0 flex-1 space-y-0.5 text-xs leading-5">
+            <p className="truncate font-black text-neutral-950">
+              {card.workTitle || "작품명 없음"}
+            </p>
+            <p className="truncate text-neutral-500">{metaLabel}</p>
+          </div>
+
+          <div className="flex h-8 shrink-0 items-center overflow-hidden rounded-full border border-neutral-200 bg-white">
+            <button
+              type="button"
+              onClick={decreaseQuantity}
+              className="flex h-8 w-7 items-center justify-center text-sm font-black text-neutral-500"
+              aria-label="수량 줄이기"
+            >
+              −
+            </button>
+            <span className="min-w-6 px-0.5 text-center text-xs font-black text-neutral-950">
+              {quantity}
+            </span>
+            <button
+              type="button"
+              onClick={increaseQuantity}
+              className="flex h-8 w-7 items-center justify-center text-sm font-black text-neutral-500"
+              aria-label="수량 늘리기"
+            >
+              +
+            </button>
+          </div>
         </div>
       </div>
     </div>

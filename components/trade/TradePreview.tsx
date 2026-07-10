@@ -22,6 +22,7 @@ type SideBlockProps = {
   title: string;
   emoji: string;
   cards: TradeCard[];
+  hasDivider?: boolean;
 };
 
 type PreviewCardProps = {
@@ -58,13 +59,14 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
     const nickname = board.nickname.trim();
     const contact = board.contact.trim();
     const memoChips = getMemoChips(board.memo);
-    const hasMeta = nickname || contact || memoChips.length > 0;
+    const profileText = [nickname, contact].filter(Boolean).join(' · ');
+    const useSimpleMode = board.categoryDisplayMode === 'simple';
 
     return (
       <div ref={ref} className="w-[560px] bg-white p-6 text-neutral-950">
         <header className="rounded-[28px] border-2 border-neutral-950 bg-white p-5">
           <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <p className="text-[10px] font-black uppercase tracking-[0.24em] text-neutral-400">
                 Trade Board
               </p>
@@ -72,48 +74,42 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
               <h1 className="mt-1 break-keep text-2xl font-black leading-tight tracking-tight">
                 {collectionTitle}
               </h1>
+
+              {profileText ? (
+                <p className="mt-2 text-[12px] font-bold leading-5 text-neutral-500">
+                  {profileText}
+                </p>
+              ) : null}
             </div>
 
-            <div className="shrink-0 rounded-full bg-neutral-950 px-4 py-2 text-xs font-black text-white">
-              GOODS
-            </div>
+            {memoChips.length > 0 ? (
+              <div className="flex max-w-[210px] shrink-0 flex-wrap justify-end gap-1.5">
+                {memoChips.map((chip) => (
+                  <span
+                    key={chip}
+                    className="rounded-full bg-neutral-950 px-3 py-1.5 text-[10px] font-black leading-none text-white"
+                  >
+                    {chip}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
-
-          {hasMeta ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              {contact ? (
-                <span className="rounded-full bg-neutral-950 px-3 py-1.5 text-[11px] font-black text-white">
-                  {contact}
-                </span>
-              ) : null}
-
-              {nickname ? (
-                <span className="rounded-full bg-neutral-100 px-3 py-1.5 text-[11px] font-black text-neutral-700">
-                  {nickname}
-                </span>
-              ) : null}
-
-              {memoChips.map((chip) => (
-                <span
-                  key={chip}
-                  className="rounded-full bg-neutral-100 px-3 py-1.5 text-[11px] font-bold text-neutral-600"
-                >
-                  {chip}
-                </span>
-              ))}
-            </div>
-          ) : null}
         </header>
 
-        <section className="mt-5 space-y-5">
+        <section className="mt-5 space-y-4">
           {hasCards ? (
-            TRADE_CATEGORIES.map((category) => (
-              <CategorySection
-                key={category.id}
-                category={category.id}
-                cards={board.cards}
-              />
-            ))
+            useSimpleMode ? (
+              <SimpleSection cards={board.cards} />
+            ) : (
+              TRADE_CATEGORIES.map((category) => (
+                <CategorySection
+                  key={category.id}
+                  category={category.id}
+                  cards={board.cards}
+                />
+              ))
+            )
           ) : (
             <div className="rounded-[28px] border-2 border-dashed border-neutral-200 px-6 py-16 text-center">
               <p className="text-lg font-black text-neutral-300">
@@ -154,27 +150,65 @@ function CategorySection({ category, cards }: CategorySectionProps) {
   }
 
   return (
-    <section className="overflow-hidden rounded-[28px] border-2 border-neutral-950 bg-white">
-      <div className="bg-neutral-950 px-5 py-3">
-        <h2 className="text-lg font-black text-white">{categoryLabel}</h2>
+    <section className="rounded-[28px] bg-white px-1 py-2">
+      <div className="mb-3 flex items-center gap-3 px-1">
+        <h2 className="shrink-0 text-[13px] font-black text-neutral-950">
+          {categoryLabel}
+        </h2>
+        <div className="h-px flex-1 bg-neutral-200" />
       </div>
 
-      <div className="grid grid-cols-2 gap-4 p-4">
+      <div className="grid grid-cols-2">
         {haveCards.length > 0 ? (
-          <SideBlock title="있어요" emoji="🙋🏻‍♀️" cards={haveCards} />
+          <SideBlock
+            title="있어요"
+            emoji="🙋🏻‍♀️"
+            cards={haveCards}
+            hasDivider={false}
+          />
         ) : null}
 
         {wantCards.length > 0 ? (
-          <SideBlock title="구해요" emoji="❤️" cards={wantCards} />
+          <SideBlock
+            title="구해요"
+            emoji="❤️"
+            cards={wantCards}
+            hasDivider={haveCards.length > 0}
+          />
         ) : null}
       </div>
     </section>
   );
 }
 
-function SideBlock({ title, emoji, cards }: SideBlockProps) {
+function SimpleSection({ cards }: { cards: TradeCard[] }) {
+  const haveCards = cards.filter((card) => card.side === 'have');
+  const wantCards = cards.filter((card) => card.side === 'want');
+
   return (
-    <div>
+    <section className="rounded-[28px] bg-white px-1 py-2">
+      <div className="grid grid-cols-2">
+        <SideBlock
+          title="있어요"
+          emoji="🙋🏻‍♀️"
+          cards={haveCards}
+          hasDivider={false}
+        />
+
+        <SideBlock
+          title="구해요"
+          emoji="❤️"
+          cards={wantCards}
+          hasDivider={true}
+        />
+      </div>
+    </section>
+  );
+}
+
+function SideBlock({ title, emoji, cards, hasDivider = false }: SideBlockProps) {
+  return (
+    <div className={hasDivider ? "min-w-0 border-l border-neutral-200 pl-4" : "min-w-0 pr-4"}>
       <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-neutral-100 px-4 py-2">
         <span className="text-sm">{emoji}</span>
         <span className="text-sm font-black text-neutral-950">{title}</span>
@@ -193,8 +227,8 @@ function PreviewCard({ card }: PreviewCardProps) {
   const metaLabel = getCardMetaLabel(card);
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
-      <div className="relative bg-white p-1.5">
+    <article className="overflow-hidden rounded-2xl bg-white">
+      <div className="relative bg-white px-1 pt-0">
         <img
           src={card.imageUrl}
           alt={card.memo || card.workTitle}
@@ -202,7 +236,7 @@ function PreviewCard({ card }: PreviewCardProps) {
         />
       </div>
 
-      <div className="border-t border-neutral-100 px-2 py-2">
+      <div className="px-1.5 pb-1.5 pt-0.5">
         <p className="line-clamp-1 text-[10px] font-black text-neutral-950">
           {card.workTitle || '작품명'}
         </p>
