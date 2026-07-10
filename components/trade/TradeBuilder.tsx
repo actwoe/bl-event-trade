@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toPng } from "html-to-image";
 import { nanoid } from "nanoid";
 import {
   RegisteredTradeItem,
@@ -16,7 +17,6 @@ import {
   TradeSide,
 } from "@/lib/trade-types";
 import { TradePreview } from "./TradePreview";
-import { QuantityBadge } from "./QuantityBadge";
 
 type TradeBuilderProps = {
   collection: TradeCollectionSummary;
@@ -25,6 +25,7 @@ type TradeBuilderProps = {
 };
 
 const PREVIEW_WIDTH = 560;
+const EXPORT_IMAGE_WIDTH = 1200;
 const ALL_WORKS_VALUE = "all";
 const ALL_CATEGORIES_VALUE = "all";
 const ALL_BENEFIT_SUBCATEGORIES_VALUE = "all";
@@ -46,382 +47,6 @@ const TRADE_CONDITIONS = [
   "양도 가능",
   "미세 하자 있음",
 ];
-
-function prefersTouchSaveFlow() {
-  const isMobileUa = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const isIpadDesktopUa =
-    navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent);
-
-  return (
-    isMobileUa ||
-    isIpadDesktopUa ||
-    (navigator.maxTouchPoints > 0 && window.innerWidth < 1024)
-  );
-}
-
-async function savePngBlob(
-  blob: Blob,
-  filename: string,
-  onShowPreview: (previewUrl: string) => void,
-) {
-  const isTouchSaveFlow = prefersTouchSaveFlow();
-  const previewUrl = URL.createObjectURL(blob);
-
-  // PC에서는 공유 시트를 띄우지 않고 즉시 PNG 파일로 다운로드합니다.
-  if (!isTouchSaveFlow) {
-    const link = document.createElement("a");
-    link.download = filename;
-    link.href = previewUrl;
-    link.rel = "noopener";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.setTimeout(() => URL.revokeObjectURL(previewUrl), 30_000);
-    return;
-  }
-
-  const file = new File([blob], filename, { type: "image/png" });
-
-  if (navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title: filename });
-      URL.revokeObjectURL(previewUrl);
-      return;
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        URL.revokeObjectURL(previewUrl);
-        return;
-      }
-    }
-  }
-
-  // iOS/Android에서 공유가 지원되지 않으면 원본 PNG를 열어 길게 눌러 저장합니다.
-  onShowPreview(previewUrl);
-  return;
-
-}
-
-
-function roundedRect(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number,
-) {
-  const safeRadius = Math.min(radius, width / 2, height / 2);
-  context.beginPath();
-  context.roundRect(x, y, width, height, safeRadius);
-}
-
-function drawCenteredText(
-  context: CanvasRenderingContext2D,
-  value: string,
-  centerX: number,
-  y: number,
-  maxWidth: number,
-  font: string,
-  color: string,
-) {
-  context.save();
-  context.font = font;
-  context.fillStyle = color;
-  context.textAlign = "center";
-  context.textBaseline = "alphabetic";
-
-  let nextValue = value;
-  while (nextValue.length > 1 && context.measureText(nextValue).width > maxWidth) {
-    nextValue = nextValue.slice(0, -1);
-  }
-  if (nextValue !== value) nextValue = `${nextValue.slice(0, -1)}…`;
-
-  context.fillText(nextValue, centerX, y);
-  context.restore();
-}
-
-async function loadCanvasImage(source: string) {
-  const resolvedSource =
-    source.startsWith("data:") || source.startsWith("blob:")
-      ? source
-      : `/api/image-proxy?url=${encodeURIComponent(source)}`;
-
-  return await new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.decoding = "async";
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
-    image.src = resolvedSource;
-  });
-}
-
-function drawContainedImage(
-  context: CanvasRenderingContext2D,
-  image: HTMLImageElement,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-) {
-  const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
-  const drawWidth = image.naturalWidth * scale;
-  const drawHeight = image.naturalHeight * scale;
-  const drawX = x + (width - drawWidth) / 2;
-  const drawY = y + (height - drawHeight) / 2;
-  context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
-}
-
-async function renderBoardToPngBlob(
-  board: TradeBoard,
-  collectionTitle: string,
-) {
-  const width = 560;
-  const scale = 2000 / width;
-  const sideWidth = 244;
-  const sideLeft = { have: 28, want: 288 } as const;
-  const cardWidth = 112;
-  const cardGap = 12;
-  const rowGap = 18;
-  const grouped = board.categoryDisplayMode !== "simple";
-  const cardsWithImages = await Promise.all(
-    board.cards.map(async (card) => ({ card, image: await loadCanvasImage(card.imageUrl) })),
-  );
-
-  const getGroups = () => {
-    const groups: Array<{ key: string; label: string }> = [];
-    for (const card of board.cards) {
-      const subcategory = getBenefitSubcategoryLabel(card.benefitSubcategory);
-      const key = card.category === "benefit" && subcategory
-        ? `benefit:${subcategory}`
-        : card.category;
-      const label = card.category === "benefit" && subcategory
-        ? subcategory
-        : getCategoryLabel(card.category);
-      if (!groups.some((group) => group.key === key)) groups.push({ key, label });
-    }
-    return groups;
-  };
-
-  const cardGroupKey = (card: TradeCard) => {
-    const subcategory = getBenefitSubcategoryLabel(card.benefitSubcategory);
-    return card.category === "benefit" && subcategory
-      ? `benefit:${subcategory}`
-      : card.category;
-  };
-
-  const cardHeight = (card: TradeCard, showMeta: boolean) =>
-    (card.imageRatio === "photocard" ? 170 : 112) + 24 + (showMeta ? 16 : 0);
-
-  const gridHeight = (cards: TradeCard[], showMeta: boolean) => {
-    if (cards.length === 0) return 0;
-    let height = 0;
-    for (let index = 0; index < cards.length; index += 2) {
-      const rowCards = cards.slice(index, index + 2);
-      height += Math.max(...rowCards.map((card) => cardHeight(card, showMeta)));
-      if (index + 2 < cards.length) height += rowGap;
-    }
-    return height;
-  };
-
-  const headerBottom = 112;
-  const sideHeaderY = 124;
-  const contentStartY = 164;
-  let contentHeight = contentStartY;
-  if (grouped) {
-    for (const group of getGroups()) {
-      const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
-      const want = board.cards.filter((card) => card.side === "want" && cardGroupKey(card) === group.key);
-      contentHeight += 25 + Math.max(gridHeight(have, false), gridHeight(want, false), 112) + 24;
-    }
-  } else {
-    const have = board.cards.filter((card) => card.side === "have");
-    const want = board.cards.filter((card) => card.side === "want");
-    contentHeight += Math.max(gridHeight(have, true), gridHeight(want, true), 112) + 24;
-  }
-  const height = Math.max(300, contentHeight + 24);
-
-  const canvas = document.createElement("canvas");
-  canvas.width = width * scale;
-  canvas.height = height * scale;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("이미지 생성 도구를 사용할 수 없습니다.");
-  context.scale(scale, scale);
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, width, height);
-
-  context.save();
-  context.shadowColor = "rgba(15, 23, 42, 0.12)";
-  context.shadowBlur = 24;
-  context.shadowOffsetY = 8;
-  roundedRect(context, 20, 20, 520, height - 40, 26);
-  context.fillStyle = "#ffffff";
-  context.fill();
-  context.restore();
-
-  roundedRect(context, 20, 20, 520, headerBottom - 20, 26);
-  context.fillStyle = "#0a0a0a";
-  context.fill();
-  context.fillRect(20, headerBottom - 26, 520, 26);
-
-  const koreanFont = "'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif";
-  const emojiFont = "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
-
-  context.fillStyle = "#a3a3a3";
-  context.font = `900 9px ${koreanFont}`;
-  context.fillText("TRADE BOARD", 40, 46);
-  context.fillStyle = "#ffffff";
-  context.font = `900 22px ${koreanFont}`;
-  context.fillText(collectionTitle, 40, 73);
-  const profile = [board.nickname, board.contact].filter(Boolean).join(" · ");
-  if (profile) {
-    context.fillStyle = "#d4d4d4";
-    context.font = `600 11px ${koreanFont}`;
-    context.fillText(profile, 40, 94);
-  }
-
-  const conditionChips = board.memo
-    .split(" · ")
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .slice(0, 6);
-
-  if (conditionChips.length > 0) {
-    context.save();
-    context.font = `800 9px ${koreanFont}`;
-    let chipRight = 520;
-    let chipY = 39;
-    let line = 0;
-    for (const chip of conditionChips) {
-      const chipWidth = Math.min(context.measureText(chip).width + 18, 116);
-      if (chipRight - chipWidth < 300) {
-        line += 1;
-        if (line >= 2) break;
-        chipRight = 520;
-        chipY += 24;
-      }
-      roundedRect(context, chipRight - chipWidth, chipY, chipWidth, 18, 9);
-      context.fillStyle = "#ffffff";
-      context.fill();
-      drawCenteredText(
-        context,
-        chip,
-        chipRight - chipWidth / 2,
-        chipY + 12,
-        chipWidth - 12,
-        `800 9px ${koreanFont}`,
-        "#171717",
-      );
-      chipRight -= chipWidth + 6;
-    }
-    context.restore();
-  }
-
-  for (const side of ["have", "want"] as const) {
-    roundedRect(context, sideLeft[side], sideHeaderY, sideWidth, 22, 8);
-    context.fillStyle = "#e5e5e5";
-    context.fill();
-
-    const centerX = sideLeft[side] + sideWidth / 2;
-    const emoji = side === "have" ? "🙋🏻‍♀️" : "❤️";
-    const label = side === "have" ? "있어요" : "구해요";
-    context.font = `12px ${emojiFont}`;
-    const emojiWidth = context.measureText(emoji).width;
-    context.font = `900 11px ${koreanFont}`;
-    const labelWidth = context.measureText(label).width;
-    const totalWidth = emojiWidth + 5 + labelWidth;
-    context.fillStyle = "#404040";
-    context.font = `12px ${emojiFont}`;
-    context.fillText(emoji, centerX - totalWidth / 2, sideHeaderY + 15);
-    context.font = `900 11px ${koreanFont}`;
-    context.fillText(label, centerX - totalWidth / 2 + emojiWidth + 5, sideHeaderY + 15);
-  }
-
-  const imageMap = new Map(cardsWithImages.map(({ card, image }) => [card.id, image]));
-
-  const drawCard = (card: TradeCard, x: number, y: number, showMeta: boolean) => {
-    const imageHeight = card.imageRatio === "photocard" ? 170 : 112;
-    roundedRect(context, x, y, cardWidth, imageHeight, 12);
-    context.fillStyle = "#f5f5f5";
-    context.fill();
-    context.save();
-    roundedRect(context, x, y, cardWidth, imageHeight, 12);
-    context.clip();
-    const image = imageMap.get(card.id);
-    if (image) drawContainedImage(context, image, x, y, cardWidth, imageHeight);
-    context.restore();
-
-    const quantity = getCardQuantity(card);
-    if (quantity > 1) {
-      context.beginPath();
-      context.arc(x + cardWidth - 12, y + 14, 8, 0, Math.PI * 2);
-      context.fillStyle = "#171717";
-      context.fill();
-      drawCenteredText(context, `×${quantity}`, x + cardWidth - 12, y + 17, 14, "900 7px Arial, sans-serif", "#ffffff");
-    }
-
-    drawCenteredText(context, card.workTitle || "작품명", x + cardWidth / 2, y + imageHeight + 17, cardWidth, `800 11px ${koreanFont}`, "#171717");
-    if (showMeta) {
-      drawCenteredText(context, getCardMetaLabel(card), x + cardWidth / 2, y + imageHeight + 32, cardWidth, `500 9px ${koreanFont}`, "#737373");
-    }
-  };
-
-  const drawGrid = (cards: TradeCard[], side: "have" | "want", startY: number, showMeta: boolean) => {
-    let y = startY;
-    for (let index = 0; index < cards.length; index += 2) {
-      const rowCards = cards.slice(index, index + 2);
-      rowCards.forEach((card, col) => drawCard(card, sideLeft[side] + col * (cardWidth + cardGap), y, showMeta));
-      y += Math.max(...rowCards.map((card) => cardHeight(card, showMeta))) + rowGap;
-    }
-    return cards.length ? y - startY - rowGap : 0;
-  };
-
-  let y = contentStartY;
-  if (grouped) {
-    for (const group of getGroups()) {
-      context.fillStyle = "#171717";
-      context.font = `900 10px ${koreanFont}`;
-      context.fillText(group.label, 28, y + 11);
-      const groupLabelWidth = context.measureText(group.label).width;
-      context.strokeStyle = "#d4d4d4";
-      context.lineWidth = 1;
-      context.beginPath();
-      context.moveTo(Math.min(28 + groupLabelWidth + 12, 500), y + 7);
-      context.lineTo(532, y + 7);
-      context.stroke();
-      const gridY = y + 24;
-      const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
-      const want = board.cards.filter((card) => card.side === "want" && cardGroupKey(card) === group.key);
-      const haveHeight = drawGrid(have, "have", gridY, false);
-      const wantHeight = drawGrid(want, "want", gridY, false);
-      const groupHeight = Math.max(haveHeight, wantHeight, 112);
-      context.strokeStyle = "#e5e5e5";
-      context.beginPath();
-      context.moveTo(280, gridY);
-      context.lineTo(280, gridY + groupHeight);
-      context.stroke();
-      y = gridY + groupHeight + 24;
-    }
-  } else {
-    const have = board.cards.filter((card) => card.side === "have");
-    const want = board.cards.filter((card) => card.side === "want");
-    const haveHeight = drawGrid(have, "have", y, true);
-    const wantHeight = drawGrid(want, "want", y, true);
-    const groupHeight = Math.max(haveHeight, wantHeight, 112);
-    context.strokeStyle = "#e5e5e5";
-    context.beginPath();
-    context.moveTo(280, y);
-    context.lineTo(280, y + groupHeight);
-    context.stroke();
-    y += groupHeight + 24;
-  }
-
-  return await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) resolve(blob);
-      else reject(new Error("PNG 파일을 생성하지 못했습니다."));
-    }, "image/png");
-  });
-}
 
 function createInitialBoard(): TradeBoard {
   return {
@@ -587,13 +212,11 @@ export function TradeBuilder({
     useState<BenefitSubcategoryFilterValue>(ALL_BENEFIT_SUBCATEGORIES_VALUE);
   const [addModalSide, setAddModalSide] = useState<TradeSide | null>(null);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
   const [previewScale, setPreviewScale] = useState(0.6);
   const [previewHeight, setPreviewHeight] = useState(1000);
 
   const previewAreaRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-
 
   const workTitleOptions = useMemo(() => {
     const titles = registeredItems
@@ -928,21 +551,21 @@ export function TradeBuilder({
   }
 
   async function downloadImage() {
-    if (!canDownload) return;
+    if (!previewRef.current) return;
 
     try {
       setIsExporting(true);
-      const blob = await renderBoardToPngBlob(board, collection.title);
 
-      await savePngBlob(
-        blob,
-        `${collection.slug}-trade-board.png`,
-        setExportPreviewUrl,
-      );
-    } catch (error) {
-      console.error("교환판 PNG 저장에 실패했습니다.", error);
-      const message = error instanceof Error ? error.message : "알 수 없는 오류";
-      window.alert(`이미지 저장에 실패했습니다.\n${message}`);
+      const dataUrl = await toPng(previewRef.current, {
+        pixelRatio: EXPORT_IMAGE_WIDTH / PREVIEW_WIDTH,
+        backgroundColor: "#ffffff",
+        cacheBust: true,
+      });
+
+      const link = document.createElement("a");
+      link.download = `${collection.slug}-trade-board.png`;
+      link.href = dataUrl;
+      link.click();
     } finally {
       setIsExporting(false);
     }
@@ -1281,13 +904,6 @@ export function TradeBuilder({
           onUpload={(files) => addUploadedCards(addModalSide, files)}
         />
       ) : null}
-
-      {exportPreviewUrl ? (
-        <ExportPreviewModal
-          imageUrl={exportPreviewUrl}
-          onClose={() => setExportPreviewUrl(null)}
-        />
-      ) : null}
     </section>
   );
 }
@@ -1298,52 +914,6 @@ type AddSideButtonProps = {
   count: number;
   onClick: () => void;
 };
-
-type ExportPreviewModalProps = {
-  imageUrl: string;
-  onClose: () => void;
-};
-
-function ExportPreviewModal({ imageUrl, onClose }: ExportPreviewModalProps) {
-  return (
-    <div className="fixed inset-0 z-50 bg-neutral-950/70 px-4 py-5">
-      <div className="mx-auto flex h-full w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-xl sm:max-w-lg">
-        <header className="shrink-0 border-b border-neutral-100 p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-400">
-                Save Image
-              </p>
-              <h2 className="mt-1 text-xl font-black text-neutral-950">
-                교환판 이미지 저장
-              </h2>
-              <p className="mt-2 text-xs leading-5 text-neutral-500">
-                아래 이미지를 길게 눌러 사진 앱에 저장하거나 공유해 주세요.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xl font-black text-neutral-500"
-              aria-label="닫기"
-            >
-              ×
-            </button>
-          </div>
-        </header>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          <img
-            src={imageUrl}
-            alt="저장할 교환판 이미지"
-            className="w-full rounded-2xl border border-neutral-200 bg-white"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
   return (
@@ -1614,8 +1184,6 @@ function GoodsWorkReference({ referenceImages }: GoodsWorkReferenceProps) {
               key={image.id}
               src={image.imageUrl}
               alt="굿즈 작품 확인용 공지 이미지"
-              loading="lazy"
-              decoding="async"
               className="w-full rounded-2xl bg-white object-contain ring-1 ring-neutral-200"
             />
           ))}
@@ -1654,37 +1222,30 @@ function RegisteredItemCard({
           : "overflow-hidden rounded-2xl border border-neutral-300 bg-neutral-50 text-left shadow-sm"
       }
     >
-      <button
-        type="button"
-        onClick={onIncrease}
-        className="w-full text-left"
-        aria-label={`${item.workTitle} 수량 늘리기`}
-      >
-        <div className="relative border-b border-neutral-200 bg-neutral-100">
-          <img
-            src={item.imageUrl}
-            alt={item.itemName}
-            loading="lazy"
-            decoding="async"
-            className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain`}
-          />
+      <div className="relative border-b border-neutral-200 bg-neutral-100">
+        <img
+          src={item.imageUrl}
+          alt={item.itemName}
+          className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
+        />
 
-          <QuantityBadge quantity={quantity} />
-        </div>
-
-        <div className="p-2">
-          <p className="line-clamp-1 text-center text-[11px] font-black text-neutral-950">
-            {item.workTitle}
-          </p>
-          <p className="mt-0.5 line-clamp-1 text-center text-[10px] text-neutral-500">
-            {metaLabel}
-          </p>
-        </div>
-      </button>
-
-      <div className="px-2 pb-2">
         {selected ? (
-          <div className="flex items-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
+          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-neutral-950 text-[10px] font-black leading-none text-white">
+            ×{quantity}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="p-2">
+        <p className="line-clamp-1 text-[11px] font-black text-neutral-950">
+          {item.workTitle}
+        </p>
+        <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">
+          {metaLabel}
+        </p>
+
+        {selected ? (
+          <div className="mt-2 flex items-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
             <button
               type="button"
               onClick={onDecrease}
@@ -1709,7 +1270,7 @@ function RegisteredItemCard({
           <button
             type="button"
             onClick={onIncrease}
-            className="flex h-8 w-full items-center justify-center rounded-lg bg-neutral-950 text-sm font-black text-white"
+            className="mt-2 flex h-8 w-full items-center justify-center rounded-lg bg-neutral-950 text-sm font-black text-white"
             aria-label="수량 늘리기"
           >
             +
@@ -1751,6 +1312,12 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
           alt=""
           className="h-full w-full object-contain p-1"
         />
+
+        {quantity > 1 ? (
+          <span className="absolute right-1 top-1 rounded-full bg-neutral-950 px-1.5 py-0.5 text-[10px] font-black text-white">
+            ×{quantity}
+          </span>
+        ) : null}
       </div>
 
       <div className="min-w-0 space-y-2">
