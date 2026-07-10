@@ -8,7 +8,7 @@ export function QuantityBadge({ quantity }: QuantityBadgeProps) {
   }
 
   return (
-    <span className="absolute right-2.5 top-2.5 flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-neutral-950 px-1.5 text-[9px] font-black leading-none text-white shadow-sm">
+    <span className="absolute right-2.5 top-2.5 z-10 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-neutral-950 px-1 text-[8px] font-black leading-none text-white shadow-sm">
       ×{quantity}
     </span>
   );

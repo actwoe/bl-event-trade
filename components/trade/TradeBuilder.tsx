@@ -34,6 +34,23 @@ const ALL_CATEGORIES_VALUE = "all";
 const ALL_BENEFIT_SUBCATEGORIES_VALUE = "all";
 const NO_BENEFIT_SUBCATEGORY_VALUE = "__none__";
 
+function getDisplayImageUrl(source: string) {
+  if (!source || source.startsWith("data:") || source.startsWith("blob:")) {
+    return source;
+  }
+
+  if (typeof window !== "undefined") {
+    try {
+      const url = new URL(source, window.location.href);
+      if (url.origin === window.location.origin) return url.href;
+    } catch {
+      return source;
+    }
+  }
+
+  return `/api/image-proxy?url=${encodeURIComponent(source)}`;
+}
+
 type CategoryFilterValue = TradeCategory | typeof ALL_CATEGORIES_VALUE;
 type BenefitSubcategoryFilterValue = string;
 
@@ -652,107 +669,42 @@ export function TradeBuilder({
     if (!previewElement) return;
 
     const waitForImage = (image: HTMLImageElement) =>
-      new Promise<void>((resolve) => {
+      new Promise<void>((resolve, reject) => {
         if (image.complete && image.naturalWidth > 0) {
           resolve();
           return;
         }
 
-        const finish = () => {
+        const cleanup = () => {
           window.clearTimeout(timeoutId);
-          image.removeEventListener("load", finish);
-          image.removeEventListener("error", finish);
+          image.removeEventListener("load", handleLoad);
+          image.removeEventListener("error", handleError);
+        };
+        const handleLoad = () => {
+          cleanup();
           resolve();
         };
-        const timeoutId = window.setTimeout(finish, 15000);
+        const handleError = () => {
+          cleanup();
+          reject(new Error(`Image load failed: ${image.currentSrc || image.src}`));
+        };
+        const timeoutId = window.setTimeout(() => {
+          cleanup();
+          reject(new Error(`Image load timed out: ${image.currentSrc || image.src}`));
+        }, 20000);
 
-        image.addEventListener("load", finish, { once: true });
-        image.addEventListener("error", finish, { once: true });
+        image.addEventListener("load", handleLoad, { once: true });
+        image.addEventListener("error", handleError, { once: true });
       });
-
-    const blobToDataUrl = (blob: Blob) =>
-      new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(blob);
-      });
-
-    const imageToDataUrl = async (image: HTMLImageElement) => {
-      const source = image.currentSrc || image.src;
-
-      if (!source || source.startsWith("data:")) return source;
-
-      if (source.startsWith("blob:")) {
-        const response = await fetch(source);
-
-        if (!response.ok) {
-          throw new Error(`Blob image request failed: ${response.status}`);
-        }
-
-        return blobToDataUrl(await response.blob());
-      }
-
-      if (image.complete && image.naturalWidth > 0) {
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = image.naturalWidth;
-          canvas.height = image.naturalHeight;
-          const context = canvas.getContext("2d");
-
-          if (context) {
-            context.drawImage(image, 0, 0);
-            return canvas.toDataURL("image/png");
-          }
-        } catch {
-          // CORS로 캔버스 변환이 막힌 경우 fetch 방식으로 다시 시도합니다.
-        }
-      }
-
-      const response = await fetch(source, {
-        cache: "no-store",
-        credentials: "omit",
-        mode: "cors",
-      });
-
-      if (!response.ok) {
-        throw new Error(`Image request failed: ${response.status}`);
-      }
-
-      return blobToDataUrl(await response.blob());
-    };
-
-    const originalImages = Array.from(
-      previewElement.querySelectorAll<HTMLImageElement>("img"),
-    );
-    const originalSources = originalImages.map((image) => ({
-      image,
-      src: image.getAttribute("src"),
-      crossOrigin: image.getAttribute("crossorigin"),
-      referrerPolicy: image.getAttribute("referrerpolicy"),
-    }));
 
     try {
       setIsExporting(true);
-
       await document.fonts?.ready;
 
-      await Promise.all(
-        originalImages.map(async (image) => {
-          try {
-            const dataUrl = await imageToDataUrl(image);
-
-            if (dataUrl) {
-              image.removeAttribute("crossorigin");
-              image.removeAttribute("referrerpolicy");
-              image.src = dataUrl;
-              await waitForImage(image);
-            }
-          } catch (error) {
-            console.warn("미리보기 이미지를 PNG에 포함하지 못했습니다.", error);
-          }
-        }),
+      const images = Array.from(
+        previewElement.querySelectorAll<HTMLImageElement>("img"),
       );
+      await Promise.all(images.map(waitForImage));
 
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() =>
@@ -761,7 +713,6 @@ export function TradeBuilder({
       });
 
       const dataUrl = await capturePreviewPng(previewElement);
-
       await savePngDataUrl(
         dataUrl,
         `${collection.slug}-trade-board.png`,
@@ -769,28 +720,10 @@ export function TradeBuilder({
       );
     } catch (error) {
       console.error("교환판 PNG 저장에 실패했습니다.", error);
-      window.alert("이미지 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      window.alert(
+        "굿즈 이미지를 불러오지 못해 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+      );
     } finally {
-      for (const original of originalSources) {
-        if (original.src === null) {
-          original.image.removeAttribute("src");
-        } else {
-          original.image.setAttribute("src", original.src);
-        }
-
-        if (original.crossOrigin === null) {
-          original.image.removeAttribute("crossorigin");
-        } else {
-          original.image.setAttribute("crossorigin", original.crossOrigin);
-        }
-
-        if (original.referrerPolicy === null) {
-          original.image.removeAttribute("referrerpolicy");
-        } else {
-          original.image.setAttribute("referrerpolicy", original.referrerPolicy);
-        }
-      }
-
       setIsExporting(false);
     }
   }
@@ -1507,9 +1440,9 @@ function RegisteredItemCard({
       >
         <div className="relative border-b border-neutral-200 bg-neutral-100">
           <img
-            src={item.imageUrl}
+            src={getDisplayImageUrl(item.imageUrl)}
             alt={item.itemName}
-            className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
+            className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain`}
           />
 
           <QuantityBadge quantity={quantity} />
@@ -1590,10 +1523,11 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
     <div className="grid grid-cols-[64px_1fr] gap-3 rounded-xl bg-neutral-50 p-3">
       <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-white">
         <img
-          src={card.imageUrl}
+          src={getDisplayImageUrl(card.imageUrl)}
           alt=""
-          className="h-full w-full object-contain p-1"
+          className="h-full w-full object-contain"
         />
+        <QuantityBadge quantity={quantity} />
       </div>
 
       <div className="min-w-0 space-y-2">

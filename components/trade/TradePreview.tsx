@@ -22,6 +22,23 @@ type QuantityTradeCard = TradeCard & {
   quantity?: number;
 };
 
+function getDisplayImageUrl(source: string) {
+  if (!source || source.startsWith('data:') || source.startsWith('blob:')) {
+    return source;
+  }
+
+  if (typeof window !== 'undefined') {
+    try {
+      const url = new URL(source, window.location.href);
+      if (url.origin === window.location.origin) return url.href;
+    } catch {
+      return source;
+    }
+  }
+
+  return `/api/image-proxy?url=${encodeURIComponent(source)}`;
+}
+
 function getMemoChips(memo: string) {
   return memo
     .split(' · ')
@@ -290,19 +307,17 @@ function PreviewCard({ card, showMeta }: PreviewCardProps) {
 
   return (
     <article className="overflow-hidden rounded-2xl bg-white">
-      <div className="relative bg-white px-1 pt-0">
+      <div className="relative bg-white">
         <img
-          src={card.imageUrl}
+          src={getDisplayImageUrl(card.imageUrl)}
           alt={card.memo || card.workTitle}
-          crossOrigin="anonymous"
-          referrerPolicy="no-referrer"
-          className="aspect-[3/4] w-full rounded-xl bg-white object-contain"
+          className={`${card.imageRatio === 'photocard' ? 'aspect-[55/85]' : 'aspect-square'} w-full rounded-xl bg-white object-contain`}
         />
 
         <QuantityBadge quantity={quantity} />
       </div>
 
-      <div className="-mt-1 px-1.5 pb-1 pt-0">
+      <div className="px-1 pb-1 pt-0.5 text-center">
         <p className="line-clamp-1 text-[10px] font-black leading-4 text-neutral-950">
           {card.workTitle || '작품명'}
         </p>
@@ -310,12 +325,6 @@ function PreviewCard({ card, showMeta }: PreviewCardProps) {
         {showMeta ? (
           <p className="mt-0 line-clamp-1 text-[9px] font-bold leading-3 text-neutral-500">
             {metaLabel}
-          </p>
-        ) : null}
-
-        {card.memo ? (
-          <p className="mt-0.5 line-clamp-1 text-[9px] font-bold leading-3 text-neutral-400">
-            {card.memo}
           </p>
         ) : null}
       </div>
