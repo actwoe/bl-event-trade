@@ -20,14 +20,6 @@ type SideBlockProps = {
   hasDivider?: boolean;
 };
 
-type GroupedSideBlockProps = {
-  title: string;
-  emoji: string;
-  side: 'have' | 'want';
-  cards: TradeCard[];
-  hasDivider?: boolean;
-};
-
 type PreviewCardProps = {
   card: TradeCard;
 };
@@ -79,7 +71,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
 
     return (
       <div ref={ref} className="w-[560px] bg-white p-6 text-neutral-950">
-        <div className="overflow-hidden rounded-[30px] border-2 border-neutral-950 bg-white">
+        <div className="overflow-hidden rounded-[30px] bg-white">
           <header className="bg-neutral-950 px-5 py-4 text-white">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
@@ -135,37 +127,39 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
 );
 
 function GroupedSection({ cards }: { cards: TradeCard[] }) {
+  const haveCards = cards.filter((card) => card.side === 'have');
+  const wantCards = cards.filter((card) => card.side === 'want');
+
   return (
     <section className="bg-white px-1 py-1.5">
       <div className="grid grid-cols-2">
-        <GroupedSideBlock
+        <GroupedSideColumn
           title="있어요"
           emoji="🙋🏻‍♀️"
-          side="have"
-          cards={cards}
+          cards={haveCards}
           hasDivider={false}
         />
-
-        <GroupedSideBlock
+        <GroupedSideColumn
           title="구해요"
           emoji="❤️"
-          side="want"
-          cards={cards}
-          hasDivider
+          cards={wantCards}
+          hasDivider={true}
         />
       </div>
     </section>
   );
 }
 
-function GroupedSideBlock({
+function GroupedSideColumn({
   title,
   emoji,
-  side,
   cards,
   hasDivider = false,
-}: GroupedSideBlockProps) {
-  const sideCards = cards.filter((card) => card.side === side);
+}: SideBlockProps) {
+  const populatedCategories = TRADE_CATEGORIES.map((category) => ({
+    ...category,
+    cards: cards.filter((card) => card.category === category.id),
+  })).filter((category) => category.cards.length > 0);
 
   return (
     <div
@@ -175,47 +169,44 @@ function GroupedSideBlock({
           : 'min-w-0 pr-3'
       }
     >
-      <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5">
-        <span className="text-xs">{emoji}</span>
-        <span className="text-xs font-black text-neutral-950">{title}</span>
+      <div className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-neutral-950 px-3 py-2.5 text-white">
+        <span className="text-sm">{emoji}</span>
+        <span className="text-sm font-black">{title}</span>
       </div>
 
-      <div className="space-y-4">
-        {TRADE_CATEGORIES.map((category) => {
-          const categoryCards = sideCards.filter(
-            (card) => card.category === category.id,
-          );
-
-          if (categoryCards.length === 0) {
-            return null;
-          }
-
-          return (
-            <section key={category.id}>
-              <div className="mb-1.5 flex items-center gap-2">
-                <h2 className="shrink-0 text-[11px] font-black text-neutral-700">
-                  {category.label}
-                </h2>
-                <div className="h-px flex-1 bg-neutral-200" />
-              </div>
-
-              {categoryCards.length === 1 ? (
-                <div className="flex justify-center">
-                  <div className="w-[calc(50%-0.25rem)]">
-                    <PreviewCard card={categoryCards[0]} />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
-                  {categoryCards.map((card) => (
-                    <PreviewCard key={card.id} card={card} />
-                  ))}
-                </div>
-              )}
-            </section>
-          );
-        })}
+      <div className="space-y-3">
+        {populatedCategories.map((category) => (
+          <section key={category.id}>
+            <div className="mb-1.5 flex items-center gap-2">
+              <h2 className="shrink-0 text-[11px] font-black text-neutral-700">
+                {category.label}
+              </h2>
+              <div className="h-px flex-1 bg-neutral-200" />
+            </div>
+            <CardGrid cards={category.cards} />
+          </section>
+        ))}
       </div>
+    </div>
+  );
+}
+
+function CardGrid({ cards }: { cards: TradeCard[] }) {
+  if (cards.length === 1) {
+    return (
+      <div className="flex justify-center">
+        <div className="w-[calc(50%-0.25rem)]">
+          <PreviewCard card={cards[0]} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+      {cards.map((card) => (
+        <PreviewCard key={card.id} card={card} />
+      ))}
     </div>
   );
 }
@@ -254,24 +245,12 @@ function SideBlock({ title, emoji, cards, hasDivider = false }: SideBlockProps) 
           : 'min-w-0 pr-3'
       }
     >
-      <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5">
-        <span className="text-xs">{emoji}</span>
-        <span className="text-xs font-black text-neutral-950">{title}</span>
+      <div className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-neutral-950 px-3 py-2.5 text-white">
+        <span className="text-sm">{emoji}</span>
+        <span className="text-sm font-black">{title}</span>
       </div>
 
-      {cards.length === 1 ? (
-        <div className="flex justify-center">
-          <div className="w-[calc(50%-0.25rem)]">
-            <PreviewCard card={cards[0]} />
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
-          {cards.map((card) => (
-            <PreviewCard key={card.id} card={card} />
-          ))}
-        </div>
-      )}
+      <CardGrid cards={cards} />
     </div>
   );
 }
@@ -290,7 +269,7 @@ function PreviewCard({ card }: PreviewCardProps) {
         />
 
         {quantity > 1 ? (
-          <span className="absolute right-2.5 top-2.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white shadow-sm">
+          <span className="absolute right-3 top-3 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white">
             ×{quantity}
           </span>
         ) : null}

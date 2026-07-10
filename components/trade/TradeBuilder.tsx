@@ -553,13 +553,42 @@ export function TradeBuilder({
   async function downloadImage() {
     if (!previewRef.current) return;
 
+    const previewElement = previewRef.current;
+    const images = Array.from(previewElement.querySelectorAll("img"));
+    const originalSources = images.map((image) => image.src);
+
     try {
       setIsExporting(true);
 
-      const dataUrl = await toPng(previewRef.current, {
+      await Promise.all(
+        images.map(async (image) => {
+          if (image.src.startsWith("data:")) return;
+
+          try {
+            const response = await fetch(image.src, { cache: "no-store" });
+            if (!response.ok) return;
+
+            const blob = await response.blob();
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result));
+              reader.onerror = () => reject(reader.error);
+              reader.readAsDataURL(blob);
+            });
+
+            image.src = dataUrl;
+            await image.decode().catch(() => undefined);
+          } catch {
+            // 변환하지 못한 이미지는 원본 URL로 html-to-image가 다시 시도합니다.
+          }
+        }),
+      );
+
+      const dataUrl = await toPng(previewElement, {
         pixelRatio: EXPORT_IMAGE_WIDTH / PREVIEW_WIDTH,
         backgroundColor: "#ffffff",
-        cacheBust: true,
+        cacheBust: false,
+        includeQueryParams: true,
       });
 
       const link = document.createElement("a");
@@ -567,6 +596,9 @@ export function TradeBuilder({
       link.href = dataUrl;
       link.click();
     } finally {
+      images.forEach((image, index) => {
+        image.src = originalSources[index];
+      });
       setIsExporting(false);
     }
   }
@@ -1229,8 +1261,8 @@ function RegisteredItemCard({
           className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
         />
 
-        {quantity > 1 ? (
-          <span className="absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[8px] font-black leading-none text-white">
+        {selected ? (
+          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-neutral-950 text-[10px] font-black leading-none text-white">
             ×{quantity}
           </span>
         ) : null}
@@ -1314,7 +1346,7 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
         />
 
         {quantity > 1 ? (
-          <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[8px] font-black leading-none text-white">
+          <span className="absolute right-1 top-1 rounded-full bg-neutral-950 px-1.5 py-0.5 text-[10px] font-black text-white">
             ×{quantity}
           </span>
         ) : null}
