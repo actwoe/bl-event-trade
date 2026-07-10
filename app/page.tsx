@@ -138,11 +138,7 @@ export default async function HomePage() {
               </Link>
             </div>
 
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">
-            Popup & Callabo Cafe Trade Board
-          </p>
-
-          <h1 className="mt-1 break-keep text-2xl font-black leading-tight text-neutral-950">
+          <h1 className="break-keep text-2xl font-black leading-tight text-neutral-950">
             팝업 & 콜카 굿즈 교환판
           </h1>
 
@@ -152,15 +148,6 @@ export default async function HomePage() {
         </header>
 
         <div className="bg-white p-5">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-black text-neutral-950">교환판 목록</h2>
-              <p className="mt-1 text-xs font-medium text-neutral-400">
-                공개된 교환판 {collections.length}개
-              </p>
-            </div>
-          </div>
-
           {error ? (
             <p className="mt-4 rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-600">
               {error}
@@ -176,7 +163,7 @@ export default async function HomePage() {
           ) : null}
 
           {sortedCollections.length > 0 ? (
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3">
               {sortedCollections.map((collection) => {
                 const thumbnailUrl = collection.thumbnail_path
                   ? getTradeAssetUrl(collection.thumbnail_path)

@@ -590,11 +590,7 @@ export function TradeBuilder({
               </Link>
             </div>
 
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
-              Popup & Callabo Cafe Trade Board
-            </p>
-
-            <h1 className="mt-1 text-2xl font-black text-neutral-950">
+            <h1 className="text-2xl font-black text-neutral-950">
               {collection.title}
             </h1>
 
@@ -623,12 +619,9 @@ export function TradeBuilder({
                     닉네임 / SNS ID
                   </p>
                   <p className="mt-1 text-xs text-neutral-400">
-                    필요할 때만 입력해주세요.
+                    필요할 때만 입력하시면 됩니다.
                   </p>
                 </div>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-500">
-                  {isProfileOpen ? "접기" : "선택 입력"}
-                </span>
               </button>
 
               {isProfileOpen ? (
@@ -676,14 +669,9 @@ export function TradeBuilder({
                     거래 조건 선택
                   </p>
                   <p className="mt-1 text-xs text-neutral-400">
-                    체크한 조건만 팝업 & 콜카 굿즈 교환판에 표시됩니다.
+                    원하는 교환 조건을 선택할 수 있습니다
                   </p>
                 </div>
-                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-500">
-                  {isConditionsOpen
-                    ? "접기"
-                    : `${selectedConditions.length}개 선택`}
-                </span>
               </button>
 
               {isConditionsOpen ? (
@@ -859,23 +847,21 @@ type AddSideButtonProps = {
   onClick: () => void;
 };
 
-function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
+function AddSideButton({ title, emoji: _emoji, count, onClick }: AddSideButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-3xl border border-neutral-200 bg-neutral-50 p-4 text-left transition hover:border-neutral-950 hover:bg-white"
+      className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-3 text-left transition hover:border-neutral-950 hover:bg-white"
     >
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-2xl">{emoji}</span>
-        <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-neutral-500">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-black text-neutral-950">{title}</p>
+        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-neutral-500">
           {count}개
         </span>
       </div>
 
-      <p className="mt-4 text-lg font-black text-neutral-950">{title}</p>
-
-      <p className="mt-1 text-sm font-black text-neutral-500">+ 추가</p>
+      <p className="mt-1 text-xs font-black text-neutral-500">+ 이미지 추가</p>
     </button>
   );
 }
@@ -1246,16 +1232,7 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
   }
 
   return (
-    <div className="relative grid grid-cols-[64px_1fr] gap-3 rounded-xl bg-neutral-50 p-3 pr-10">
-      <button
-        type="button"
-        onClick={onRemove}
-        aria-label="선택한 이미지 삭제"
-        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white text-sm font-black text-neutral-400 shadow-sm ring-1 ring-neutral-200 hover:bg-red-50 hover:text-red-500 hover:ring-red-200"
-      >
-        ×
-      </button>
-
+    <div className="grid grid-cols-[64px_1fr] gap-3 rounded-xl bg-neutral-50 p-3">
       <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-white">
         <img
           src={card.imageUrl}
@@ -1271,40 +1248,51 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
       </div>
 
       <div className="min-w-0 space-y-2">
-        <div className="grid grid-cols-2 gap-2 pr-7">
-          <select
-            value={card.side}
-            onChange={(event) =>
-              onUpdate({
-                side: event.target.value as TradeSide,
-              })
-            }
-            className="rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
-            aria-label="있어요 또는 구해요"
-          >
-            <option value="have">있어요</option>
-            <option value="want">구해요</option>
-          </select>
+        <div className="flex items-start gap-2">
+          <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+            <select
+              value={card.side}
+              onChange={(event) =>
+                onUpdate({
+                  side: event.target.value as TradeSide,
+                })
+              }
+              className="min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
+              aria-label="있어요 또는 구해요"
+            >
+              <option value="have">있어요</option>
+              <option value="want">구해요</option>
+            </select>
 
-          <select
-            value={card.category}
-            onChange={(event) =>
-              onUpdate({
-                category: event.target.value as TradeCategory,
-              })
-            }
-            className="rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
-            aria-label="굿즈 종류"
+            <select
+              value={card.category}
+              onChange={(event) =>
+                onUpdate({
+                  category: event.target.value as TradeCategory,
+                })
+              }
+              className="min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
+              aria-label="굿즈 종류"
+            >
+              {TRADE_CATEGORIES.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="선택한 이미지 삭제"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-black text-neutral-400 shadow-sm ring-1 ring-neutral-200 hover:bg-red-50 hover:text-red-500 hover:ring-red-200"
           >
-            {TRADE_CATEGORIES.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.label}
-              </option>
-            ))}
-          </select>
+            ×
+          </button>
         </div>
 
-        <div className="flex items-center justify-between gap-3 pr-7">
+        <div className="space-y-2">
           <div className="min-w-0 space-y-0.5 text-xs leading-5">
             <p className="truncate font-black text-neutral-950">
               {card.workTitle || "작품명 없음"}
@@ -1312,26 +1300,28 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
             <p className="truncate text-neutral-500">{metaLabel}</p>
           </div>
 
-          <div className="flex shrink-0 items-center overflow-hidden rounded-full border border-neutral-200 bg-white">
-            <button
-              type="button"
-              onClick={decreaseQuantity}
-              className="flex h-8 w-8 items-center justify-center text-sm font-black text-neutral-500"
-              aria-label="수량 줄이기"
-            >
-              −
-            </button>
-            <span className="min-w-8 px-1 text-center text-xs font-black text-neutral-950">
-              {quantity}
-            </span>
-            <button
-              type="button"
-              onClick={increaseQuantity}
-              className="flex h-8 w-8 items-center justify-center text-sm font-black text-neutral-500"
-              aria-label="수량 늘리기"
-            >
-              +
-            </button>
+          <div className="flex justify-end">
+            <div className="flex shrink-0 items-center overflow-hidden rounded-full border border-neutral-200 bg-white">
+              <button
+                type="button"
+                onClick={decreaseQuantity}
+                className="flex h-8 w-8 items-center justify-center text-sm font-black text-neutral-500"
+                aria-label="수량 줄이기"
+              >
+                −
+              </button>
+              <span className="min-w-8 px-1 text-center text-xs font-black text-neutral-950">
+                {quantity}
+              </span>
+              <button
+                type="button"
+                onClick={increaseQuantity}
+                className="flex h-8 w-8 items-center justify-center text-sm font-black text-neutral-500"
+                aria-label="수량 늘리기"
+              >
+                +
+              </button>
+            </div>
           </div>
         </div>
       </div>

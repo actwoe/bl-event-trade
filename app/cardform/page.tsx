@@ -366,17 +366,12 @@ export default function CardFormPage() {
               </Link>
             </div>
 
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">
-              Popup & Callabo Cafe Trade Board
-            </p>
-
-            <h1 className="mt-1 text-2xl font-black text-neutral-950">
+            <h1 className="text-2xl font-black text-neutral-950">
               이미지 제보
             </h1>
 
             <div className="mt-5 rounded-2xl border border-white/60 bg-white/65 p-4 text-xs leading-6 text-neutral-600 shadow-[0_8px_20px_rgba(15,23,42,0.025)]">
-              <p>팝업 & 콜카 굿즈 교환판에 없는 굿즈 이미지를 제보해 주세요.</p>
-              <p>가급적 빛 반사가 없는 정방형 이미지를 권장합니다.</p>
+              <p>실물이 없는 굿즈 이미지를 제보해주시면 많은 도움이 됩니다!</p>
               <p>제보 이미지는 관리자 검수 후 교환판에 추가됩니다.</p>
             </div>
           </header>
