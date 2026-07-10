@@ -1768,11 +1768,16 @@ type GoodsWorkReferenceProps = {
 };
 
 function GoodsWorkReference({ referenceImages }: GoodsWorkReferenceProps) {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <details
-      className="mb-4 border-b border-neutral-100 pb-4 pt-1"
-    >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl bg-neutral-50 px-3 py-2.5 text-left ring-1 ring-neutral-200 [&::-webkit-details-marker]:hidden">
+    <section className="mb-4 border-b border-neutral-100 pb-4 pt-1">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between gap-3 rounded-2xl bg-neutral-50 px-3 py-2.5 text-left ring-1 ring-neutral-200"
+        aria-expanded={isOpen}
+      >
         <span className="flex min-w-0 items-center gap-1.5">
           <span aria-hidden="true" className="shrink-0 text-xs leading-none">
             🔍
@@ -1783,29 +1788,31 @@ function GoodsWorkReference({ referenceImages }: GoodsWorkReferenceProps) {
         </span>
 
         <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-neutral-500 ring-1 ring-neutral-200">
-          보기
+          {isOpen ? "접기" : "보기"}
         </span>
-      </summary>
+      </button>
 
-      {referenceImages.length > 0 ? (
-        <div className="mt-3 max-h-80 space-y-3 overflow-y-auto pr-1">
-          {referenceImages.map((image) => (
-            <img
-              key={image.id}
-              src={image.imageUrl}
-              alt="굿즈 작품 확인용 공지 이미지"
-              loading="eager"
-              decoding="async"
-              className="w-full rounded-2xl bg-white object-contain ring-1 ring-neutral-200"
-            />
-          ))}
-        </div>
-      ) : (
-        <p className="mt-3 rounded-xl bg-neutral-50 px-4 py-5 text-center text-xs leading-5 text-neutral-400 ring-1 ring-neutral-200">
-          아직 작품 확인용 공지 이미지가 등록되어 있지 않습니다.
-        </p>
-      )}
-    </details>
+      {isOpen ? (
+        referenceImages.length > 0 ? (
+          <div className="mt-3 max-h-80 space-y-3 overflow-y-auto pr-1">
+            {referenceImages.map((image) => (
+              <img
+                key={image.id}
+                src={image.imageUrl}
+                alt="굿즈 작품 확인용 공지 이미지"
+                loading="eager"
+                decoding="async"
+                className="block h-auto w-full rounded-2xl bg-white object-contain ring-1 ring-neutral-200"
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 rounded-xl bg-neutral-50 px-4 py-5 text-center text-xs leading-5 text-neutral-400 ring-1 ring-neutral-200">
+            등록된 공지 이미지를 불러오지 못했습니다.
+          </p>
+        )
+      ) : null}
+    </section>
   );
 }
 
