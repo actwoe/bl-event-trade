@@ -5,21 +5,11 @@ import {
   TRADE_CATEGORIES,
   TradeBoard,
   TradeCard,
-  TradeCategory,
 } from '@/lib/trade-types';
 
 type TradePreviewProps = {
   board: TradeBoard;
   collectionTitle: string;
-};
-
-type SideColumnProps = {
-  title: string;
-  emoji: string;
-  side: 'have' | 'want';
-  cards: TradeCard[];
-  grouped: boolean;
-  hasDivider?: boolean;
 };
 
 type PreviewCardProps = {
@@ -155,23 +145,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
 
           <section className="px-4 py-4">
             {hasCards ? (
-              <div className="grid grid-cols-2">
-                <SideColumn
-                  title="있어요"
-                  emoji="🙋🏻‍♀️"
-                  side="have"
-                  cards={board.cards}
-                  grouped={grouped}
-                />
-                <SideColumn
-                  title="구해요"
-                  emoji="❤️"
-                  side="want"
-                  cards={board.cards}
-                  grouped={grouped}
-                  hasDivider
-                />
-              </div>
+              <TradeColumns cards={board.cards} grouped={grouped} />
             ) : (
               <div className="rounded-[28px] border-2 border-dashed border-neutral-200 px-6 py-16 text-center">
                 <p className="text-lg font-black text-neutral-300">
@@ -186,51 +160,97 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
   },
 );
 
-function SideColumn({
-  title,
-  emoji,
-  side,
+function TradeColumns({
   cards,
   grouped,
-  hasDivider = false,
-}: SideColumnProps) {
-  const sideCards = cards.filter((card) => card.side === side);
-  const cardGroups = getCardGroups(sideCards);
+}: {
+  cards: TradeCard[];
+  grouped: boolean;
+}) {
+  const haveCards = cards.filter((card) => card.side === 'have');
+  const wantCards = cards.filter((card) => card.side === 'want');
 
   return (
-    <section
-      className={
-        hasDivider
-          ? 'min-w-0 border-l border-neutral-200 pl-3'
-          : 'min-w-0 pr-3'
-      }
-    >
-      <div className="mb-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-neutral-200 px-3 py-3 text-neutral-800 shadow-[0_4px_12px_rgba(15,23,42,0.14)]">
-        <span className="text-sm leading-none">{emoji}</span>
-        <span className="text-sm font-black leading-none">{title}</span>
+    <div>
+      <div className="grid grid-cols-2 gap-3">
+        <TradeSideHeader title="있어요" emoji="🙋🏻‍♀️" />
+        <TradeSideHeader title="구해요" emoji="❤️" />
       </div>
 
       {grouped ? (
-        <div className="flex flex-col gap-4">
-          {cardGroups.map((group) => (
-            <section
-              key={group.key}
-              className="block w-full [break-inside:avoid] [-webkit-column-break-inside:avoid]"
-            >
-              <div className="mb-2 flex min-h-5 w-full items-center gap-2">
-                <h2 className="shrink-0 text-[10px] font-black leading-5 text-neutral-700">
-                  {group.label}
-                </h2>
-                <div className="h-px min-w-0 flex-1 bg-neutral-200" />
-              </div>
-              <CardGrid cards={group.cards} />
-            </section>
-          ))}
-        </div>
+        <GroupedTradeRows haveCards={haveCards} wantCards={wantCards} />
       ) : (
-        <CardGrid cards={sideCards} />
+        <div className="mt-3 grid grid-cols-2">
+          <div className="min-w-0 pr-3">
+            <CardGrid cards={haveCards} />
+          </div>
+          <div className="min-w-0 border-l border-neutral-200 pl-3">
+            <CardGrid cards={wantCards} />
+          </div>
+        </div>
       )}
-    </section>
+    </div>
+  );
+}
+
+function TradeSideHeader({ title, emoji }: { title: string; emoji: string }) {
+  return (
+    <div className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-neutral-200 px-3 py-3 text-neutral-800 shadow-[0_4px_12px_rgba(15,23,42,0.14)]">
+      <span className="text-sm leading-none">{emoji}</span>
+      <span className="text-sm font-black leading-none">{title}</span>
+    </div>
+  );
+}
+
+function GroupedTradeRows({
+  haveCards,
+  wantCards,
+}: {
+  haveCards: TradeCard[];
+  wantCards: TradeCard[];
+}) {
+  const haveGroups = getCardGroups(haveCards);
+  const wantGroups = getCardGroups(wantCards);
+  const groupOrder: Array<{ key: string; label: string }> = [];
+
+  for (const group of [...haveGroups, ...wantGroups]) {
+    if (!groupOrder.some((item) => item.key === group.key)) {
+      groupOrder.push({ key: group.key, label: group.label });
+    }
+  }
+
+  return (
+    <div className="mt-4 flex flex-col gap-5">
+      {groupOrder.map((group) => {
+        const haveGroupCards =
+          haveGroups.find((item) => item.key === group.key)?.cards ?? [];
+        const wantGroupCards =
+          wantGroups.find((item) => item.key === group.key)?.cards ?? [];
+
+        return (
+          <section
+            key={group.key}
+            className="block w-full [break-inside:avoid] [-webkit-column-break-inside:avoid]"
+          >
+            <div className="mb-2 flex min-h-5 w-full items-center gap-2">
+              <h2 className="shrink-0 text-[10px] font-black leading-5 text-neutral-700">
+                {group.label}
+              </h2>
+              <div className="h-px min-w-0 flex-1 bg-neutral-300" />
+            </div>
+
+            <div className="grid grid-cols-2">
+              <div className="min-w-0 pr-3">
+                <CardGrid cards={haveGroupCards} />
+              </div>
+              <div className="min-w-0 border-l border-neutral-200 pl-3">
+                <CardGrid cards={wantGroupCards} />
+              </div>
+            </div>
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
