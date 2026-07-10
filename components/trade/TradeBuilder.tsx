@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toPng } from "html-to-image";
 import { nanoid } from "nanoid";
 import {
   RegisteredTradeItem,
@@ -26,9 +25,6 @@ type TradeBuilderProps = {
 };
 
 const PREVIEW_WIDTH = 560;
-const EXPORT_IMAGE_WIDTH = 1200;
-const MAX_CANVAS_DIMENSION = 4096;
-const MAX_CANVAS_PIXELS = 16_777_216;
 const ALL_WORKS_VALUE = "all";
 const ALL_CATEGORIES_VALUE = "all";
 const ALL_BENEFIT_SUBCATEGORIES_VALUE = "all";
@@ -51,49 +47,37 @@ const TRADE_CONDITIONS = [
   "미세 하자 있음",
 ];
 
-function getExportPixelRatio(element: HTMLElement) {
-  const targetRatio = EXPORT_IMAGE_WIDTH / PREVIEW_WIDTH;
-  const width = PREVIEW_WIDTH;
-  const height = element.scrollHeight || element.offsetHeight || width;
+async function savePngBlob(
+  blob: Blob,
+  filename: string,
+  onShowPreview: (previewUrl: string) => void,
+) {
+  const file = new File([blob], filename, { type: "image/png" });
 
-  const ratioByWidth = MAX_CANVAS_DIMENSION / width;
-  const ratioByHeight = MAX_CANVAS_DIMENSION / height;
-  const ratioByArea = Math.sqrt(MAX_CANVAS_PIXELS / (width * height));
-
-  return Math.min(targetRatio, ratioByWidth, ratioByHeight, ratioByArea);
-}
-
-async function capturePreviewPng(element: HTMLElement) {
-  const pixelRatio = getExportPixelRatio(element);
-  const options = {
-    pixelRatio,
-    backgroundColor: "#ffffff",
-    cacheBust: false,
-    includeQueryParams: true,
-  } as const;
-
-  let dataUrl = await toPng(element, options);
-  let previousLength = 0;
-  let retries = 0;
-
-  while (dataUrl.length !== previousLength && retries < 5) {
-    previousLength = dataUrl.length;
-    dataUrl = await toPng(element, options);
-    retries += 1;
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+    }
   }
 
-  if (dataUrl.length < 100) {
-    throw new Error("Empty PNG export");
+  const previewUrl = URL.createObjectURL(blob);
+
+  if (prefersTouchSaveFlow()) {
+    onShowPreview(previewUrl);
+    return;
   }
 
-  return dataUrl;
-}
-
-async function dataUrlToPngFile(dataUrl: string, filename: string) {
-  const response = await fetch(dataUrl);
-  const blob = await response.blob();
-
-  return new File([blob], filename, { type: "image/png" });
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = previewUrl;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(previewUrl), 30_000);
 }
 
 function prefersTouchSaveFlow() {
@@ -106,41 +90,6 @@ function prefersTouchSaveFlow() {
     isIpadDesktopUa ||
     (navigator.maxTouchPoints > 0 && window.innerWidth < 1024)
   );
-}
-
-async function savePngDataUrl(
-  dataUrl: string,
-  filename: string,
-  onShowPreview: (previewUrl: string) => void,
-) {
-  const file = await dataUrlToPngFile(dataUrl, filename);
-
-  if (navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({
-        files: [file],
-        title: filename,
-      });
-      return;
-    } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") {
-        return;
-      }
-    }
-  }
-
-  if (prefersTouchSaveFlow()) {
-    onShowPreview(dataUrl);
-    return;
-  }
-
-  const link = document.createElement("a");
-  link.download = filename;
-  link.href = dataUrl;
-  link.rel = "noopener";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
 }
 
 function createInitialBoard(): TradeBoard {
@@ -700,107 +649,32 @@ export function TradeBuilder({
   }
 
   async function downloadImage() {
-    const previewElement = previewRef.current;
-
-    if (!previewElement) return;
-
-    const waitForImage = (image: HTMLImageElement) =>
-      new Promise<void>((resolve) => {
-        if (image.complete && image.naturalWidth > 0) {
-          resolve();
-          return;
-        }
-
-        const finish = () => {
-          window.clearTimeout(timeoutId);
-          image.removeEventListener("load", finish);
-          image.removeEventListener("error", finish);
-          resolve();
-        };
-        const timeoutId = window.setTimeout(finish, 15000);
-
-        image.addEventListener("load", finish, { once: true });
-        image.addEventListener("error", finish, { once: true });
-      });
-
-    const blobToDataUrl = (blob: Blob) =>
-      new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(reader.error);
-        reader.readAsDataURL(blob);
-      });
-
-    const imageToDataUrl = async (image: HTMLImageElement) => {
-      const source = image.currentSrc || image.src;
-
-      if (!source || source.startsWith("data:")) return source;
-
-      const requestUrl = source.startsWith("blob:")
-        ? source
-        : `/api/image-proxy?url=${encodeURIComponent(source)}`;
-      const response = await fetch(requestUrl, {
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-
-      if (!response.ok) {
-        throw new Error(`Image request failed: ${response.status}`);
-      }
-
-      return blobToDataUrl(await response.blob());
-    };
-
-    const originalImages = Array.from(
-      previewElement.querySelectorAll<HTMLImageElement>("img"),
-    );
-    const originalSources = originalImages.map((image) => ({
-      image,
-      src: image.getAttribute("src"),
-      crossOrigin: image.getAttribute("crossorigin"),
-      referrerPolicy: image.getAttribute("referrerpolicy"),
-    }));
+    if (!canDownload) return;
 
     try {
       setIsExporting(true);
 
-      await document.fonts?.ready;
-
-      const imageResults = await Promise.allSettled(
-        originalImages.map(async (image) => {
-          const dataUrl = await imageToDataUrl(image);
-
-          if (!dataUrl) {
-            throw new Error("빈 이미지 주소입니다.");
-          }
-
-          image.removeAttribute("crossorigin");
-          image.removeAttribute("referrerpolicy");
-          image.src = dataUrl;
-          await waitForImage(image);
-
-          if (!image.complete || image.naturalWidth <= 0) {
-            throw new Error("이미지를 불러오지 못했습니다.");
-          }
+      const response = await fetch("/api/trade-board-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          board,
+          collectionTitle: collection.title,
         }),
-      );
-      const failedImages = imageResults.filter((result) => result.status === "rejected");
-
-      if (failedImages.length > 0) {
-        console.error("PNG에 포함하지 못한 이미지가 있습니다.", failedImages);
-        throw new Error("PNG 이미지 변환 실패");
-      }
-
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-        );
       });
 
-      const dataUrl = await capturePreviewPng(previewElement);
+      if (!response.ok) {
+        throw new Error(`PNG 생성 실패: ${response.status}`);
+      }
 
-      await savePngDataUrl(
-        dataUrl,
+      const blob = await response.blob();
+
+      if (!blob.type.startsWith("image/") || blob.size < 1000) {
+        throw new Error("생성된 PNG 파일이 올바르지 않습니다.");
+      }
+
+      await savePngBlob(
+        blob,
         `${collection.slug}-trade-board.png`,
         setExportPreviewUrl,
       );
@@ -808,26 +682,6 @@ export function TradeBuilder({
       console.error("교환판 PNG 저장에 실패했습니다.", error);
       window.alert("이미지 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
-      for (const original of originalSources) {
-        if (original.src === null) {
-          original.image.removeAttribute("src");
-        } else {
-          original.image.setAttribute("src", original.src);
-        }
-
-        if (original.crossOrigin === null) {
-          original.image.removeAttribute("crossorigin");
-        } else {
-          original.image.setAttribute("crossorigin", original.crossOrigin);
-        }
-
-        if (original.referrerPolicy === null) {
-          original.image.removeAttribute("referrerpolicy");
-        } else {
-          original.image.setAttribute("referrerpolicy", original.referrerPolicy);
-        }
-      }
-
       setIsExporting(false);
     }
   }
@@ -1169,7 +1023,10 @@ export function TradeBuilder({
       {exportPreviewUrl ? (
         <ExportPreviewModal
           imageUrl={exportPreviewUrl}
-          onClose={() => setExportPreviewUrl(null)}
+          onClose={() => {
+            URL.revokeObjectURL(exportPreviewUrl);
+            setExportPreviewUrl(null);
+          }}
         />
       ) : null}
     </section>
