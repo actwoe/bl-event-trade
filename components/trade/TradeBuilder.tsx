@@ -92,6 +92,289 @@ async function savePngBlob(
   window.setTimeout(() => URL.revokeObjectURL(previewUrl), 30_000);
 }
 
+
+function roundedRect(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const safeRadius = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.roundRect(x, y, width, height, safeRadius);
+}
+
+function drawCenteredText(
+  context: CanvasRenderingContext2D,
+  value: string,
+  centerX: number,
+  y: number,
+  maxWidth: number,
+  font: string,
+  color: string,
+) {
+  context.save();
+  context.font = font;
+  context.fillStyle = color;
+  context.textAlign = "center";
+  context.textBaseline = "alphabetic";
+
+  let nextValue = value;
+  while (nextValue.length > 1 && context.measureText(nextValue).width > maxWidth) {
+    nextValue = nextValue.slice(0, -1);
+  }
+  if (nextValue !== value) nextValue = `${nextValue.slice(0, -1)}…`;
+
+  context.fillText(nextValue, centerX, y);
+  context.restore();
+}
+
+async function loadCanvasImage(source: string) {
+  const resolvedSource =
+    source.startsWith("data:") || source.startsWith("blob:")
+      ? source
+      : `/api/image-proxy?url=${encodeURIComponent(source)}`;
+
+  return await new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
+    image.src = resolvedSource;
+  });
+}
+
+function drawContainedImage(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) {
+  const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+  const drawWidth = image.naturalWidth * scale;
+  const drawHeight = image.naturalHeight * scale;
+  const drawX = x + (width - drawWidth) / 2;
+  const drawY = y + (height - drawHeight) / 2;
+  context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+}
+
+async function renderBoardToPngBlob(
+  board: TradeBoard,
+  collectionTitle: string,
+) {
+  const scale = 2;
+  const width = 560;
+  const sideWidth = 244;
+  const sideLeft = { have: 28, want: 288 } as const;
+  const cardWidth = 112;
+  const cardGap = 12;
+  const rowGap = 18;
+  const grouped = board.categoryDisplayMode !== "simple";
+  const cardsWithImages = await Promise.all(
+    board.cards.map(async (card) => ({ card, image: await loadCanvasImage(card.imageUrl) })),
+  );
+
+  const getGroups = () => {
+    const groups: Array<{ key: string; label: string }> = [];
+    for (const card of board.cards) {
+      const subcategory = getBenefitSubcategoryLabel(card.benefitSubcategory);
+      const key = card.category === "benefit" && subcategory
+        ? `benefit:${subcategory}`
+        : card.category;
+      const label = card.category === "benefit" && subcategory
+        ? subcategory
+        : getCategoryLabel(card.category);
+      if (!groups.some((group) => group.key === key)) groups.push({ key, label });
+    }
+    return groups;
+  };
+
+  const cardGroupKey = (card: TradeCard) => {
+    const subcategory = getBenefitSubcategoryLabel(card.benefitSubcategory);
+    return card.category === "benefit" && subcategory
+      ? `benefit:${subcategory}`
+      : card.category;
+  };
+
+  const cardHeight = (card: TradeCard, showMeta: boolean) =>
+    (card.imageRatio === "photocard" ? 170 : 112) + 24 + (showMeta ? 16 : 0);
+
+  const gridHeight = (cards: TradeCard[], showMeta: boolean) => {
+    if (cards.length === 0) return 0;
+    let height = 0;
+    for (let index = 0; index < cards.length; index += 2) {
+      const rowCards = cards.slice(index, index + 2);
+      height += Math.max(...rowCards.map((card) => cardHeight(card, showMeta)));
+      if (index + 2 < cards.length) height += rowGap;
+    }
+    return height;
+  };
+
+  let contentHeight = 188;
+  if (grouped) {
+    for (const group of getGroups()) {
+      const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
+      const want = board.cards.filter((card) => card.side === "want" && cardGroupKey(card) === group.key);
+      contentHeight += 25 + Math.max(gridHeight(have, false), gridHeight(want, false), 112) + 24;
+    }
+  } else {
+    const have = board.cards.filter((card) => card.side === "have");
+    const want = board.cards.filter((card) => card.side === "want");
+    contentHeight += Math.max(gridHeight(have, true), gridHeight(want, true), 112) + 24;
+  }
+  if (board.memo.trim()) contentHeight += 58;
+  const height = Math.max(320, contentHeight + 24);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width * scale;
+  canvas.height = height * scale;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("이미지 생성 도구를 사용할 수 없습니다.");
+  context.scale(scale, scale);
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+
+  context.save();
+  context.shadowColor = "rgba(15, 23, 42, 0.12)";
+  context.shadowBlur = 24;
+  context.shadowOffsetY = 8;
+  roundedRect(context, 20, 20, 520, height - 40, 26);
+  context.fillStyle = "#ffffff";
+  context.fill();
+  context.restore();
+
+  roundedRect(context, 20, 20, 520, 110, 26);
+  context.fillStyle = "#0a0a0a";
+  context.fill();
+  context.fillRect(20, 90, 520, 40);
+
+  context.fillStyle = "#a3a3a3";
+  context.font = "900 10px Arial, sans-serif";
+  context.fillText("TRADE BOARD", 40, 52);
+  context.fillStyle = "#ffffff";
+  context.font = "900 24px Arial, 'Apple SD Gothic Neo', sans-serif";
+  context.fillText(collectionTitle, 40, 84);
+  const profile = [board.nickname, board.contact].filter(Boolean).join(" · ");
+  if (profile) {
+    context.fillStyle = "#d4d4d4";
+    context.font = "600 12px Arial, 'Apple SD Gothic Neo', sans-serif";
+    context.fillText(profile, 40, 108);
+  }
+
+  for (const side of ["have", "want"] as const) {
+    roundedRect(context, sideLeft[side], 140, sideWidth, 24, 8);
+    context.fillStyle = "#e5e5e5";
+    context.fill();
+    drawCenteredText(
+      context,
+      side === "have" ? "있어요" : "구해요",
+      sideLeft[side] + sideWidth / 2,
+      157,
+      sideWidth - 16,
+      "900 11px Arial, 'Apple SD Gothic Neo', sans-serif",
+      "#404040",
+    );
+  }
+
+  const imageMap = new Map(cardsWithImages.map(({ card, image }) => [card.id, image]));
+
+  const drawCard = (card: TradeCard, x: number, y: number, showMeta: boolean) => {
+    const imageHeight = card.imageRatio === "photocard" ? 170 : 112;
+    roundedRect(context, x, y, cardWidth, imageHeight, 12);
+    context.fillStyle = "#f5f5f5";
+    context.fill();
+    context.save();
+    roundedRect(context, x, y, cardWidth, imageHeight, 12);
+    context.clip();
+    const image = imageMap.get(card.id);
+    if (image) drawContainedImage(context, image, x, y, cardWidth, imageHeight);
+    context.restore();
+
+    const quantity = getCardQuantity(card);
+    if (quantity > 1) {
+      context.beginPath();
+      context.arc(x + cardWidth - 12, y + 14, 8, 0, Math.PI * 2);
+      context.fillStyle = "#171717";
+      context.fill();
+      drawCenteredText(context, `×${quantity}`, x + cardWidth - 12, y + 17, 14, "900 7px Arial, sans-serif", "#ffffff");
+    }
+
+    drawCenteredText(context, card.workTitle || "작품명", x + cardWidth / 2, y + imageHeight + 17, cardWidth, "800 11px Arial, 'Apple SD Gothic Neo', sans-serif", "#171717");
+    if (showMeta) {
+      drawCenteredText(context, getCardMetaLabel(card), x + cardWidth / 2, y + imageHeight + 32, cardWidth, "500 9px Arial, 'Apple SD Gothic Neo', sans-serif", "#737373");
+    }
+  };
+
+  const drawGrid = (cards: TradeCard[], side: "have" | "want", startY: number, showMeta: boolean) => {
+    let y = startY;
+    for (let index = 0; index < cards.length; index += 2) {
+      const rowCards = cards.slice(index, index + 2);
+      rowCards.forEach((card, col) => drawCard(card, sideLeft[side] + col * (cardWidth + cardGap), y, showMeta));
+      y += Math.max(...rowCards.map((card) => cardHeight(card, showMeta))) + rowGap;
+    }
+    return cards.length ? y - startY - rowGap : 0;
+  };
+
+  let y = 188;
+  if (grouped) {
+    for (const group of getGroups()) {
+      context.fillStyle = "#171717";
+      context.font = "900 10px Arial, 'Apple SD Gothic Neo', sans-serif";
+      context.fillText(group.label, 28, y + 11);
+      context.strokeStyle = "#d4d4d4";
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(80, y + 7);
+      context.lineTo(532, y + 7);
+      context.stroke();
+      const gridY = y + 24;
+      const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
+      const want = board.cards.filter((card) => card.side === "want" && cardGroupKey(card) === group.key);
+      const haveHeight = drawGrid(have, "have", gridY, false);
+      const wantHeight = drawGrid(want, "want", gridY, false);
+      const groupHeight = Math.max(haveHeight, wantHeight, 112);
+      context.strokeStyle = "#e5e5e5";
+      context.beginPath();
+      context.moveTo(280, gridY);
+      context.lineTo(280, gridY + groupHeight);
+      context.stroke();
+      y = gridY + groupHeight + 24;
+    }
+  } else {
+    const have = board.cards.filter((card) => card.side === "have");
+    const want = board.cards.filter((card) => card.side === "want");
+    const haveHeight = drawGrid(have, "have", y, true);
+    const wantHeight = drawGrid(want, "want", y, true);
+    const groupHeight = Math.max(haveHeight, wantHeight, 112);
+    context.strokeStyle = "#e5e5e5";
+    context.beginPath();
+    context.moveTo(280, y);
+    context.lineTo(280, y + groupHeight);
+    context.stroke();
+    y += groupHeight + 24;
+  }
+
+  if (board.memo.trim()) {
+    roundedRect(context, 28, y, 504, 42, 12);
+    context.fillStyle = "#f5f5f5";
+    context.fill();
+    context.fillStyle = "#525252";
+    context.font = "700 11px Arial, 'Apple SD Gothic Neo', sans-serif";
+    context.fillText(board.memo.trim(), 40, y + 25);
+  }
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error("PNG 파일을 생성하지 못했습니다."));
+    }, "image/png");
+  });
+}
+
 function createInitialBoard(): TradeBoard {
   return {
     nickname: "",
@@ -601,57 +884,7 @@ export function TradeBuilder({
 
     try {
       setIsExporting(true);
-
-      const cards = await Promise.all(
-        board.cards.map(async (card) => {
-          if (!card.imageUrl.startsWith("blob:")) return card;
-
-          const response = await fetch(card.imageUrl);
-          if (!response.ok) {
-            throw new Error("업로드한 이미지를 읽지 못했습니다.");
-          }
-
-          const uploadedBlob = await response.blob();
-          const dataUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(String(reader.result));
-            reader.onerror = () => reject(reader.error);
-            reader.readAsDataURL(uploadedBlob);
-          });
-
-          return { ...card, imageUrl: dataUrl };
-        }),
-      );
-
-      const response = await fetch("/api/trade-board-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          board: { ...board, cards },
-          collectionTitle: collection.title,
-        }),
-      });
-
-      if (!response.ok) {
-        let message = `PNG 생성 실패 (${response.status})`;
-        const responseText = await response.text();
-
-        if (responseText) {
-          try {
-            const payload = JSON.parse(responseText) as { error?: string };
-            if (payload.error) message = payload.error;
-          } catch {
-            message = responseText;
-          }
-        }
-
-        throw new Error(message);
-      }
-
-      const blob = await response.blob();
-      if (!blob.type.startsWith("image/") || blob.size < 1000) {
-        throw new Error("생성된 이미지 파일이 올바르지 않습니다.");
-      }
+      const blob = await renderBoardToPngBlob(board, collection.title);
 
       await savePngBlob(
         blob,
