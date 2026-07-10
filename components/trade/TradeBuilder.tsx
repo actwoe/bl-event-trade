@@ -17,6 +17,12 @@ import {
 } from "@/lib/trade-types";
 import { TradePreview } from "./TradePreview";
 import { QuantityBadge } from "./QuantityBadge";
+import { supabase } from "@/lib/supabase";
+import {
+  MAX_TRADE_GROUPS,
+  parseSavedTradeGroupBoard,
+  SavedTradeGroupBoard,
+} from "@/lib/trade-groups";
 
 type TradeBuilderProps = {
   collection: TradeCollectionSummary;
@@ -32,6 +38,7 @@ const NO_BENEFIT_SUBCATEGORY_VALUE = "__none__";
 
 type CategoryFilterValue = TradeCategory | typeof ALL_CATEGORIES_VALUE;
 type BenefitSubcategoryFilterValue = string;
+type UserAuthState = "checking" | "signed-in" | "signed-out";
 
 type QuantityTradeCard = TradeCard & {
   quantity?: number;
@@ -447,6 +454,90 @@ function createInitialBoard(): TradeBoard {
   };
 }
 
+function createSavedTradeGroupBoard(
+  board: TradeBoard,
+  selectedConditions: string[],
+) {
+  let skippedUploadCount = 0;
+
+  const cards: SavedTradeGroupBoard["cards"] = board.cards.flatMap((card) => {
+    const quantityCard = card as QuantityTradeCard;
+
+    if (!quantityCard.registeredItemId) {
+      skippedUploadCount += 1;
+      return [];
+    }
+
+    return [
+      {
+        itemId: quantityCard.registeredItemId,
+        side: card.side,
+        quantity: getCardQuantity(card),
+        category: card.category,
+        workTitle: card.workTitle,
+        memo: card.memo,
+        imageRatio: card.imageRatio === "photocard" ? "photocard" : "square",
+        benefitSubcategory: card.benefitSubcategory ?? null,
+      },
+    ];
+  });
+
+  const boardData: SavedTradeGroupBoard = {
+    version: 1,
+    nickname: board.nickname,
+    contact: board.contact,
+    selectedConditions,
+    categoryDisplayMode:
+      board.categoryDisplayMode === "simple" ? "simple" : "grouped",
+    cards,
+  };
+
+  return { boardData, skippedUploadCount };
+}
+
+function restoreSavedTradeGroupBoard(
+  boardData: SavedTradeGroupBoard,
+  registeredItems: RegisteredTradeItem[],
+) {
+  const itemMap = new Map(registeredItems.map((item) => [item.id, item]));
+
+  const cards: QuantityTradeCard[] = boardData.cards.flatMap((savedCard) => {
+    const item = itemMap.get(savedCard.itemId);
+
+    if (!item) {
+      return [];
+    }
+
+    return [
+      {
+        id: nanoid(),
+        side: savedCard.side,
+        category: savedCard.category,
+        imageUrl: item.imageUrl,
+        workTitle: savedCard.workTitle || item.workTitle,
+        memo: savedCard.memo || item.itemName,
+        imageRatio: savedCard.imageRatio,
+        benefitSubcategory:
+          savedCard.benefitSubcategory ?? item.benefitSubcategory ?? null,
+        quantity: savedCard.quantity,
+        registeredItemId: item.id,
+      },
+    ];
+  });
+
+  return {
+    board: {
+      nickname: boardData.nickname,
+      contact: boardData.contact,
+      memo: boardData.selectedConditions.join(" · "),
+      cards,
+      categoryDisplayMode: boardData.categoryDisplayMode,
+    } satisfies TradeBoard,
+    selectedConditions: boardData.selectedConditions,
+    missingCardCount: boardData.cards.length - cards.length,
+  };
+}
+
 function sortKoreanTitles(titles: string[]) {
   return [...titles].sort((a, b) =>
     a.localeCompare(b, "ko-KR", {
@@ -604,6 +695,15 @@ export function TradeBuilder({
   const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
   const [previewScale, setPreviewScale] = useState(0.6);
   const [previewHeight, setPreviewHeight] = useState(1000);
+  const [userAuthState, setUserAuthState] =
+    useState<UserAuthState>("checking");
+  const [currentUserId, setCurrentUserId] = useState("");
+  const [savedGroupCount, setSavedGroupCount] = useState(0);
+  const [activeGroupId, setActiveGroupId] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [groupSaveMessage, setGroupSaveMessage] = useState("");
+  const [isSavingGroup, setIsSavingGroup] = useState(false);
+  const [isLoadingGroup, setIsLoadingGroup] = useState(false);
 
   const previewAreaRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -695,6 +795,108 @@ export function TradeBuilder({
   const canDownload = useMemo(() => {
     return board.cards.length > 0;
   }, [board.cards]);
+
+  const directUploadCardCount = useMemo(() => {
+    return board.cards.filter(
+      (card) => !(card as QuantityTradeCard).registeredItemId,
+    ).length;
+  }, [board.cards]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadUserAndSavedGroup() {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData.session?.user;
+
+      if (!isMounted) return;
+
+      if (!user) {
+        setUserAuthState("signed-out");
+        setCurrentUserId("");
+        return;
+      }
+
+      setUserAuthState("signed-in");
+      setCurrentUserId(user.id);
+
+      const { count, error: countError } = await supabase
+        .from("trade_groups")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
+
+      if (!isMounted) return;
+
+      if (countError) {
+        console.error(countError);
+        setGroupSaveMessage(
+          "저장 기능을 확인할 수 없습니다. Supabase SQL 적용 여부를 확인해 주세요.",
+        );
+      } else {
+        setSavedGroupCount(count ?? 0);
+      }
+
+      const groupId = new URLSearchParams(window.location.search).get("group");
+      if (!groupId) return;
+
+      setIsLoadingGroup(true);
+
+      const { data: groupData, error: groupError } = await supabase
+        .from("trade_groups")
+        .select("id, collection_id, name, board_data")
+        .eq("id", groupId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (!isMounted) return;
+
+      setIsLoadingGroup(false);
+
+      if (groupError || !groupData) {
+        if (groupError) console.error(groupError);
+        setGroupSaveMessage("저장한 교환판을 불러오지 못했습니다.");
+        return;
+      }
+
+      if (groupData.collection_id !== collection.id) {
+        setGroupSaveMessage(
+          "이 저장 그룹은 다른 행사 교환판입니다. 내 교환판에서 다시 열어 주세요.",
+        );
+        return;
+      }
+
+      const parsedBoard = parseSavedTradeGroupBoard(groupData.board_data);
+
+      if (!parsedBoard) {
+        setGroupSaveMessage("저장된 교환판 데이터 형식을 확인할 수 없습니다.");
+        return;
+      }
+
+      const restored = restoreSavedTradeGroupBoard(
+        parsedBoard,
+        registeredItems,
+      );
+
+      setActiveGroupId(groupData.id);
+      setGroupName(groupData.name);
+      setSelectedConditions(restored.selectedConditions);
+      setBoard(restored.board);
+
+      if (restored.missingCardCount > 0) {
+        setGroupSaveMessage(
+          `현재 행사에서 삭제된 굿즈 ${restored.missingCardCount}개는 제외하고 불러왔습니다.`,
+        );
+      } else {
+        setGroupSaveMessage("저장한 교환판을 불러왔습니다.");
+      }
+    }
+
+    void loadUserAndSavedGroup();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [collection.id, registeredItems]);
 
   useEffect(() => {
     if (board.cards.length === 0) return;
@@ -955,6 +1157,117 @@ export function TradeBuilder({
     setAddModalSide(null);
   }
 
+  async function saveTradeGroup() {
+    if (userAuthState !== "signed-in" || !currentUserId) {
+      setGroupSaveMessage("로그인 후 교환판을 저장할 수 있습니다.");
+      return;
+    }
+
+    const normalizedName = groupName.trim();
+
+    if (!normalizedName) {
+      setGroupSaveMessage("저장할 교환판 이름을 입력해 주세요.");
+      return;
+    }
+
+    if (normalizedName.length > 40) {
+      setGroupSaveMessage("교환판 이름은 40자 이하로 입력해 주세요.");
+      return;
+    }
+
+    if (!activeGroupId && savedGroupCount >= MAX_TRADE_GROUPS) {
+      setGroupSaveMessage(
+        `교환판 그룹은 최대 ${MAX_TRADE_GROUPS}개까지 저장할 수 있습니다.`,
+      );
+      return;
+    }
+
+    const { boardData, skippedUploadCount } = createSavedTradeGroupBoard(
+      board,
+      selectedConditions,
+    );
+
+    try {
+      setIsSavingGroup(true);
+      setGroupSaveMessage("");
+
+      if (activeGroupId) {
+        const { error } = await supabase
+          .from("trade_groups")
+          .update({
+            name: normalizedName,
+            board_data: boardData,
+          })
+          .eq("id", activeGroupId)
+          .eq("user_id", currentUserId);
+
+        if (error) throw error;
+
+        setGroupSaveMessage(
+          skippedUploadCount > 0
+            ? `교환판을 저장했습니다. 직접 추가 이미지 ${skippedUploadCount}개는 저장에서 제외되었습니다.`
+            : "교환판을 저장했습니다.",
+        );
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("trade_groups")
+        .insert({
+          user_id: currentUserId,
+          collection_id: collection.id,
+          name: normalizedName,
+          board_data: boardData,
+        })
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      setActiveGroupId(data.id);
+      setSavedGroupCount((current) => current + 1);
+
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.set("group", data.id);
+      window.history.replaceState({}, "", nextUrl);
+
+      setGroupSaveMessage(
+        skippedUploadCount > 0
+          ? `새 교환판을 저장했습니다. 직접 추가 이미지 ${skippedUploadCount}개는 저장에서 제외되었습니다.`
+          : "새 교환판을 저장했습니다.",
+      );
+    } catch (error) {
+      console.error(error);
+      setGroupSaveMessage(
+        "교환판을 저장하지 못했습니다. 저장 그룹이 3개인지, Supabase SQL이 적용됐는지 확인해 주세요.",
+      );
+    } finally {
+      setIsSavingGroup(false);
+    }
+  }
+
+  function startNewTradeGroup() {
+    if (!activeGroupId) return;
+
+    if (savedGroupCount >= MAX_TRADE_GROUPS) {
+      setGroupSaveMessage(
+        `교환판 그룹은 최대 ${MAX_TRADE_GROUPS}개까지 저장할 수 있습니다.`,
+      );
+      return;
+    }
+
+    setActiveGroupId("");
+    setGroupName("");
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("group");
+    window.history.replaceState({}, "", nextUrl);
+
+    setGroupSaveMessage(
+      "현재 교환판 내용은 유지됩니다. 새 이름을 입력한 뒤 새 그룹으로 저장해 주세요.",
+    );
+  }
+
   async function downloadImage() {
     if (!canDownload) return;
 
@@ -979,6 +1292,11 @@ export function TradeBuilder({
   function resetBoard() {
     setSelectedConditions([]);
     setBoard(createInitialBoard());
+    setGroupSaveMessage(
+      activeGroupId
+        ? "화면을 초기화했습니다. 저장 버튼을 누르면 현재 그룹에 반영됩니다."
+        : "",
+    );
   }
 
   const scaledPreviewHeight = Math.ceil(previewHeight * previewScale);
@@ -1226,6 +1544,102 @@ export function TradeBuilder({
               )}
             </div>
           </div>
+
+          <section className="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-neutral-950">
+                  내 교환판 저장
+                </p>
+                <p className="mt-1 text-xs leading-5 text-neutral-400">
+                  로그인하면 그룹을 최대 {MAX_TRADE_GROUPS}개까지 저장하고 다시 수정할 수 있습니다.
+                </p>
+              </div>
+
+              {userAuthState === "signed-in" ? (
+                <Link
+                  href="/my-trades"
+                  className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-neutral-500 ring-1 ring-neutral-200"
+                >
+                  {savedGroupCount}/{MAX_TRADE_GROUPS}
+                </Link>
+              ) : null}
+            </div>
+
+            {userAuthState === "checking" || isLoadingGroup ? (
+              <p className="mt-4 rounded-xl bg-white px-3 py-3 text-xs text-neutral-500 ring-1 ring-neutral-200">
+                계정과 저장 교환판을 확인하는 중입니다.
+              </p>
+            ) : userAuthState === "signed-out" ? (
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <Link
+                  href={`/login?next=${encodeURIComponent(`/trade/${collection.slug}`)}`}
+                  className="rounded-xl bg-neutral-950 px-3 py-3 text-center text-xs font-black text-white"
+                >
+                  로그인
+                </Link>
+                <Link
+                  href="/signup"
+                  className="rounded-xl border border-neutral-300 bg-white px-3 py-3 text-center text-xs font-black text-neutral-600"
+                >
+                  회원가입
+                </Link>
+              </div>
+            ) : (
+              <div className="mt-4">
+                <label className="block">
+                  <span className="text-[11px] font-black text-neutral-500">
+                    {activeGroupId ? "현재 그룹 이름" : "새 교환판 이름"}
+                  </span>
+                  <input
+                    value={groupName}
+                    onChange={(event) => setGroupName(event.target.value)}
+                    maxLength={40}
+                    className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-950"
+                    placeholder="예: 토요일 현장 교환"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={saveTradeGroup}
+                  disabled={isSavingGroup || (!activeGroupId && savedGroupCount >= MAX_TRADE_GROUPS)}
+                  className="mt-3 w-full rounded-xl bg-neutral-950 px-4 py-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+                >
+                  {isSavingGroup
+                    ? "저장 중..."
+                    : activeGroupId
+                      ? "현재 그룹에 저장"
+                      : "새 그룹으로 저장"}
+                </button>
+
+                {activeGroupId ? (
+                  <button
+                    type="button"
+                    onClick={startNewTradeGroup}
+                    disabled={savedGroupCount >= MAX_TRADE_GROUPS}
+                    className="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-xs font-black text-neutral-600 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:bg-neutral-100 disabled:text-neutral-300"
+                  >
+                    {savedGroupCount >= MAX_TRADE_GROUPS
+                      ? `최대 ${MAX_TRADE_GROUPS}개 저장됨`
+                      : "현재 내용으로 새 그룹 만들기"}
+                  </button>
+                ) : null}
+
+                {directUploadCardCount > 0 ? (
+                  <p className="mt-2 text-[11px] leading-5 text-amber-700">
+                    직접 추가한 이미지 {directUploadCardCount}개는 현재 그룹 저장에서 제외됩니다. PNG 저장에는 그대로 포함됩니다.
+                  </p>
+                ) : null}
+              </div>
+            )}
+
+            {groupSaveMessage ? (
+              <p className="mt-3 rounded-xl bg-white px-3 py-3 text-xs leading-5 text-neutral-600 ring-1 ring-neutral-200">
+                {groupSaveMessage}
+              </p>
+            ) : null}
+          </section>
 
           <div className="mt-6 grid grid-cols-2 gap-2">
             <button
