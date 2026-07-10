@@ -14,6 +14,7 @@ type TradePreviewProps = {
 
 type PreviewCardProps = {
   card: TradeCard;
+  showMeta: boolean;
 };
 
 type QuantityTradeCard = TradeCard & {
@@ -46,7 +47,7 @@ function getCardMetaLabel(card: TradeCard) {
       : '';
 
   if (card.category === 'benefit' && benefitSubcategory) {
-    return `${categoryLabel} · ${benefitSubcategory}`;
+    return benefitSubcategory;
   }
 
   return categoryLabel;
@@ -182,10 +183,10 @@ function TradeColumns({
       ) : (
         <div className="mt-3 grid grid-cols-2">
           <div className="min-w-0 pr-3">
-            <CardGrid cards={haveCards} />
+            <CardGrid cards={haveCards} showMeta />
           </div>
           <div className="min-w-0 border-l border-neutral-200 pl-3">
-            <CardGrid cards={wantCards} />
+            <CardGrid cards={wantCards} showMeta />
           </div>
         </div>
       )}
@@ -241,10 +242,10 @@ function GroupedTradeRows({
 
             <div className="grid grid-cols-2">
               <div className="min-w-0 pr-3">
-                <CardGrid cards={haveGroupCards} />
+                <CardGrid cards={haveGroupCards} showMeta={false} />
               </div>
               <div className="min-w-0 border-l border-neutral-200 pl-3">
-                <CardGrid cards={wantGroupCards} />
+                <CardGrid cards={wantGroupCards} showMeta={false} />
               </div>
             </div>
           </section>
@@ -254,7 +255,7 @@ function GroupedTradeRows({
   );
 }
 
-function CardGrid({ cards }: { cards: TradeCard[] }) {
+function CardGrid({ cards, showMeta }: { cards: TradeCard[]; showMeta: boolean }) {
   if (cards.length === 0) {
     return (
       <div className="flex min-h-20 items-center justify-center rounded-xl bg-neutral-50 px-3 text-center text-[10px] font-bold text-neutral-300">
@@ -267,7 +268,7 @@ function CardGrid({ cards }: { cards: TradeCard[] }) {
     return (
       <div className="flex justify-center">
         <div className="w-[calc(50%-0.25rem)]">
-          <PreviewCard card={cards[0]} />
+          <PreviewCard card={cards[0]} showMeta={showMeta} />
         </div>
       </div>
     );
@@ -276,13 +277,13 @@ function CardGrid({ cards }: { cards: TradeCard[] }) {
   return (
     <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
       {cards.map((card) => (
-        <PreviewCard key={card.id} card={card} />
+        <PreviewCard key={card.id} card={card} showMeta={showMeta} />
       ))}
     </div>
   );
 }
 
-function PreviewCard({ card }: PreviewCardProps) {
+function PreviewCard({ card, showMeta }: PreviewCardProps) {
   const metaLabel = getCardMetaLabel(card);
   const quantity = getCardQuantity(card);
 
@@ -298,7 +299,7 @@ function PreviewCard({ card }: PreviewCardProps) {
         />
 
         {quantity > 1 ? (
-          <span className="absolute right-3 top-3 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white">
+          <span className="absolute right-2 top-4 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white shadow-sm">
             ×{quantity}
           </span>
         ) : null}
@@ -309,9 +310,11 @@ function PreviewCard({ card }: PreviewCardProps) {
           {card.workTitle || '작품명'}
         </p>
 
-        <p className="mt-0 line-clamp-1 text-[9px] font-bold leading-3 text-neutral-500">
-          {metaLabel}
-        </p>
+        {showMeta ? (
+          <p className="mt-0 line-clamp-1 text-[9px] font-bold leading-3 text-neutral-500">
+            {metaLabel}
+          </p>
+        ) : null}
 
         {card.memo ? (
           <p className="mt-0.5 line-clamp-1 text-[9px] font-bold leading-3 text-neutral-400">

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toBlob } from "html-to-image";
+import { toPng } from "html-to-image";
 import { nanoid } from "nanoid";
 import {
   RegisteredTradeItem,
@@ -616,53 +616,35 @@ export function TradeBuilder({
       return blobToDataUrl(await response.blob());
     };
 
-    let exportNode: HTMLDivElement | null = null;
-    let objectUrl = "";
+    const originalImages = Array.from(
+      previewElement.querySelectorAll<HTMLImageElement>("img"),
+    );
+    const originalSources = originalImages.map((image) => ({
+      image,
+      src: image.getAttribute("src"),
+      crossOrigin: image.getAttribute("crossorigin"),
+      referrerPolicy: image.getAttribute("referrerpolicy"),
+    }));
 
     try {
       setIsExporting(true);
 
       await document.fonts?.ready;
 
-      exportNode = previewElement.cloneNode(true) as HTMLDivElement;
-      exportNode.style.position = "fixed";
-      exportNode.style.left = "-100000px";
-      exportNode.style.top = "0";
-      exportNode.style.width = `${PREVIEW_WIDTH}px`;
-      exportNode.style.height = "auto";
-      exportNode.style.transform = "none";
-      exportNode.style.pointerEvents = "none";
-      exportNode.style.zIndex = "-1";
-      exportNode.setAttribute("aria-hidden", "true");
-      document.body.appendChild(exportNode);
-
-      const sourceImages = Array.from(
-        previewElement.querySelectorAll<HTMLImageElement>("img"),
-      );
-      const exportImages = Array.from(
-        exportNode.querySelectorAll<HTMLImageElement>("img"),
-      );
-
       await Promise.all(
-        exportImages.map(async (exportImage, index) => {
-          const sourceImage = sourceImages[index];
-
-          if (!sourceImage) return;
-
-          const sourceRect = sourceImage.getBoundingClientRect();
-          exportImage.style.width = `${sourceRect.width}px`;
-          exportImage.style.height = `${sourceRect.height}px`;
-          exportImage.removeAttribute("crossorigin");
-          exportImage.removeAttribute("referrerpolicy");
-
+        originalImages.map(async (image) => {
           try {
-            exportImage.src = await imageToDataUrl(sourceImage);
+            const dataUrl = await imageToDataUrl(image);
+
+            if (dataUrl) {
+              image.removeAttribute("crossorigin");
+              image.removeAttribute("referrerpolicy");
+              image.src = dataUrl;
+              await waitForImage(image);
+            }
           } catch (error) {
             console.warn("미리보기 이미지를 PNG에 포함하지 못했습니다.", error);
-            exportImage.src = sourceImage.currentSrc || sourceImage.src;
           }
-
-          await waitForImage(exportImage);
         }),
       );
 
@@ -672,21 +654,16 @@ export function TradeBuilder({
         );
       });
 
-      const imageBlob = await toBlob(exportNode, {
+      const dataUrl = await toPng(previewElement, {
         pixelRatio: EXPORT_IMAGE_WIDTH / PREVIEW_WIDTH,
         backgroundColor: "#ffffff",
         cacheBust: false,
         includeQueryParams: true,
       });
 
-      if (!imageBlob) {
-        throw new Error("PNG 파일을 생성하지 못했습니다.");
-      }
-
-      objectUrl = URL.createObjectURL(imageBlob);
       const link = document.createElement("a");
       link.download = `${collection.slug}-trade-board.png`;
-      link.href = objectUrl;
+      link.href = dataUrl;
       link.rel = "noopener";
       document.body.appendChild(link);
       link.click();
@@ -695,10 +672,24 @@ export function TradeBuilder({
       console.error("교환판 PNG 저장에 실패했습니다.", error);
       window.alert("이미지 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
-      exportNode?.remove();
+      for (const original of originalSources) {
+        if (original.src === null) {
+          original.image.removeAttribute("src");
+        } else {
+          original.image.setAttribute("src", original.src);
+        }
 
-      if (objectUrl) {
-        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        if (original.crossOrigin === null) {
+          original.image.removeAttribute("crossorigin");
+        } else {
+          original.image.setAttribute("crossorigin", original.crossOrigin);
+        }
+
+        if (original.referrerPolicy === null) {
+          original.image.removeAttribute("referrerpolicy");
+        } else {
+          original.image.setAttribute("referrerpolicy", original.referrerPolicy);
+        }
       }
 
       setIsExporting(false);
@@ -1363,8 +1354,8 @@ function RegisteredItemCard({
           className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
         />
 
-        {selected ? (
-          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-neutral-950 text-[10px] font-black leading-none text-white">
+        {quantity > 1 ? (
+          <span className="absolute right-2 top-3 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white shadow-sm">
             ×{quantity}
           </span>
         ) : null}
@@ -1448,7 +1439,7 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
         />
 
         {quantity > 1 ? (
-          <span className="absolute right-1 top-1 rounded-full bg-neutral-950 px-1.5 py-0.5 text-[10px] font-black text-white">
+          <span className="absolute right-1.5 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white shadow-sm">
             ×{quantity}
           </span>
         ) : null}
