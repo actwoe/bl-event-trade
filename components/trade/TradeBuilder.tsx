@@ -47,6 +47,18 @@ const TRADE_CONDITIONS = [
   "미세 하자 있음",
 ];
 
+function prefersTouchSaveFlow() {
+  const isMobileUa = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const isIpadDesktopUa =
+    navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent);
+
+  return (
+    isMobileUa ||
+    isIpadDesktopUa ||
+    (navigator.maxTouchPoints > 0 && window.innerWidth < 1024)
+  );
+}
+
 async function savePngBlob(
   blob: Blob,
   filename: string,
@@ -78,18 +90,6 @@ async function savePngBlob(
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(previewUrl), 30_000);
-}
-
-function prefersTouchSaveFlow() {
-  const isMobileUa = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const isIpadDesktopUa =
-    navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent);
-
-  return (
-    isMobileUa ||
-    isIpadDesktopUa ||
-    (navigator.maxTouchPoints > 0 && window.innerWidth < 1024)
-  );
 }
 
 function createInitialBoard(): TradeBoard {
@@ -654,23 +654,51 @@ export function TradeBuilder({
     try {
       setIsExporting(true);
 
+      const cards = await Promise.all(
+        board.cards.map(async (card) => {
+          if (!card.imageUrl.startsWith("blob:")) return card;
+
+          const response = await fetch(card.imageUrl);
+          if (!response.ok) {
+            throw new Error("업로드한 이미지를 읽지 못했습니다.");
+          }
+
+          const uploadedBlob = await response.blob();
+          const dataUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result));
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(uploadedBlob);
+          });
+
+          return { ...card, imageUrl: dataUrl };
+        }),
+      );
+
       const response = await fetch("/api/trade-board-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          board,
+          board: { ...board, cards },
           collectionTitle: collection.title,
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`PNG 생성 실패: ${response.status}`);
+        let message = `PNG 생성 실패 (${response.status})`;
+        try {
+          const payload = (await response.json()) as { error?: string };
+          if (payload.error) message = payload.error;
+        } catch {
+          const text = await response.text();
+          if (text) message = text;
+        }
+        throw new Error(message);
       }
 
       const blob = await response.blob();
-
       if (!blob.type.startsWith("image/") || blob.size < 1000) {
-        throw new Error("생성된 PNG 파일이 올바르지 않습니다.");
+        throw new Error("생성된 이미지 파일이 올바르지 않습니다.");
       }
 
       await savePngBlob(
@@ -680,7 +708,8 @@ export function TradeBuilder({
       );
     } catch (error) {
       console.error("교환판 PNG 저장에 실패했습니다.", error);
-      window.alert("이미지 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      const message = error instanceof Error ? error.message : "알 수 없는 오류";
+      window.alert(`이미지 저장에 실패했습니다.\n${message}`);
     } finally {
       setIsExporting(false);
     }
@@ -1023,10 +1052,7 @@ export function TradeBuilder({
       {exportPreviewUrl ? (
         <ExportPreviewModal
           imageUrl={exportPreviewUrl}
-          onClose={() => {
-            URL.revokeObjectURL(exportPreviewUrl);
-            setExportPreviewUrl(null);
-          }}
+          onClose={() => setExportPreviewUrl(null)}
         />
       ) : null}
     </section>
