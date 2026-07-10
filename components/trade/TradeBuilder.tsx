@@ -54,15 +54,13 @@ const TRADE_CONDITIONS = [
 ];
 
 function prefersTouchSaveFlow() {
-  const isMobileUa = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const userAgent = navigator.userAgent;
+  const isPhoneOrTabletUa = /iPhone|iPad|iPod|Android/i.test(userAgent);
   const isIpadDesktopUa =
-    navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent);
+    navigator.maxTouchPoints > 1 && /Macintosh/i.test(userAgent);
 
-  return (
-    isMobileUa ||
-    isIpadDesktopUa ||
-    (navigator.maxTouchPoints > 0 && window.innerWidth < 1024)
-  );
+  // 터치 모니터·2-in-1 노트북·작게 줄인 PC 브라우저는 모바일로 취급하지 않습니다.
+  return isPhoneOrTabletUa || isIpadDesktopUa;
 }
 
 async function savePngBlob(
@@ -70,32 +68,37 @@ async function savePngBlob(
   filename: string,
   onShowPreview: (previewUrl: string) => void,
 ) {
+  const isTouchSaveFlow = prefersTouchSaveFlow();
+  const previewUrl = URL.createObjectURL(blob);
+
+  if (!isTouchSaveFlow) {
+    const link = document.createElement("a");
+    link.download = filename;
+    link.href = previewUrl;
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(previewUrl), 30_000);
+    return;
+  }
+
   const file = new File([blob], filename, { type: "image/png" });
 
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: filename });
+      URL.revokeObjectURL(previewUrl);
       return;
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (error instanceof Error && error.name === "AbortError") {
+        URL.revokeObjectURL(previewUrl);
+        return;
+      }
     }
   }
 
-  const previewUrl = URL.createObjectURL(blob);
-
-  if (prefersTouchSaveFlow()) {
-    onShowPreview(previewUrl);
-    return;
-  }
-
-  const link = document.createElement("a");
-  link.download = filename;
-  link.href = previewUrl;
-  link.rel = "noopener";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(previewUrl), 30_000);
+  onShowPreview(previewUrl);
 }
 
 
@@ -137,20 +140,32 @@ function drawCenteredText(
   context.restore();
 }
 
-async function loadCanvasImage(source: string) {
+const canvasImageCache = new Map<string, Promise<HTMLImageElement>>();
+
+function loadCanvasImage(source: string) {
+  const cachedImage = canvasImageCache.get(source);
+  if (cachedImage) return cachedImage;
+
   const resolvedSource =
     source.startsWith("data:") || source.startsWith("blob:")
       ? source
       : `/api/image-proxy?url=${encodeURIComponent(source)}`;
 
-  return await new Promise<HTMLImageElement>((resolve, reject) => {
+  const imagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.decoding = "async";
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
+    image.onerror = () => {
+      canvasImageCache.delete(source);
+      reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
+    };
     image.src = resolvedSource;
   });
+
+  canvasImageCache.set(source, imagePromise);
+  return imagePromise;
 }
+
 
 function drawContainedImage(
   context: CanvasRenderingContext2D,
@@ -172,8 +187,8 @@ async function renderBoardToPngBlob(
   board: TradeBoard,
   collectionTitle: string,
 ) {
-  const scale = 2;
   const width = 560;
+  const scale = 2000 / width;
   const sideWidth = 244;
   const sideLeft = { have: 28, want: 288 } as const;
   const cardWidth = 112;
@@ -220,7 +235,10 @@ async function renderBoardToPngBlob(
     return height;
   };
 
-  let contentHeight = 188;
+  const headerBottom = 112;
+  const sideHeaderY = 124;
+  const contentStartY = 164;
+  let contentHeight = contentStartY;
   if (grouped) {
     for (const group of getGroups()) {
       const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
@@ -232,8 +250,7 @@ async function renderBoardToPngBlob(
     const want = board.cards.filter((card) => card.side === "want");
     contentHeight += Math.max(gridHeight(have, true), gridHeight(want, true), 112) + 24;
   }
-  if (board.memo.trim()) contentHeight += 58;
-  const height = Math.max(320, contentHeight + 24);
+  const height = Math.max(300, contentHeight + 24);
 
   const canvas = document.createElement("canvas");
   canvas.width = width * scale;
@@ -253,37 +270,82 @@ async function renderBoardToPngBlob(
   context.fill();
   context.restore();
 
-  roundedRect(context, 20, 20, 520, 110, 26);
+  roundedRect(context, 20, 20, 520, headerBottom - 20, 26);
   context.fillStyle = "#0a0a0a";
   context.fill();
-  context.fillRect(20, 90, 520, 40);
+  context.fillRect(20, headerBottom - 26, 520, 26);
+
+  const koreanFont = "'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif";
+  const emojiFont = "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
 
   context.fillStyle = "#a3a3a3";
-  context.font = "900 10px Arial, sans-serif";
-  context.fillText("TRADE BOARD", 40, 52);
+  context.font = `900 9px ${koreanFont}`;
+  context.fillText("TRADE BOARD", 40, 46);
   context.fillStyle = "#ffffff";
-  context.font = "900 24px Arial, 'Apple SD Gothic Neo', sans-serif";
-  context.fillText(collectionTitle, 40, 84);
+  context.font = `900 22px ${koreanFont}`;
+  context.fillText(collectionTitle, 40, 73);
   const profile = [board.nickname, board.contact].filter(Boolean).join(" · ");
   if (profile) {
     context.fillStyle = "#d4d4d4";
-    context.font = "600 12px Arial, 'Apple SD Gothic Neo', sans-serif";
-    context.fillText(profile, 40, 108);
+    context.font = `600 11px ${koreanFont}`;
+    context.fillText(profile, 40, 94);
+  }
+
+  const conditionChips = board.memo
+    .split(" · ")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  if (conditionChips.length > 0) {
+    context.save();
+    context.font = `800 9px ${koreanFont}`;
+    let chipRight = 520;
+    let chipY = 39;
+    let line = 0;
+    for (const chip of conditionChips) {
+      const chipWidth = Math.min(context.measureText(chip).width + 18, 116);
+      if (chipRight - chipWidth < 300) {
+        line += 1;
+        if (line >= 2) break;
+        chipRight = 520;
+        chipY += 24;
+      }
+      roundedRect(context, chipRight - chipWidth, chipY, chipWidth, 18, 9);
+      context.fillStyle = "#ffffff";
+      context.fill();
+      drawCenteredText(
+        context,
+        chip,
+        chipRight - chipWidth / 2,
+        chipY + 12,
+        chipWidth - 12,
+        `800 9px ${koreanFont}`,
+        "#171717",
+      );
+      chipRight -= chipWidth + 6;
+    }
+    context.restore();
   }
 
   for (const side of ["have", "want"] as const) {
-    roundedRect(context, sideLeft[side], 140, sideWidth, 24, 8);
+    roundedRect(context, sideLeft[side], sideHeaderY, sideWidth, 22, 8);
     context.fillStyle = "#e5e5e5";
     context.fill();
-    drawCenteredText(
-      context,
-      side === "have" ? "있어요" : "구해요",
-      sideLeft[side] + sideWidth / 2,
-      157,
-      sideWidth - 16,
-      "900 11px Arial, 'Apple SD Gothic Neo', sans-serif",
-      "#404040",
-    );
+
+    const centerX = sideLeft[side] + sideWidth / 2;
+    const emoji = side === "have" ? "🙋" : "❤";
+    const label = side === "have" ? "있어요" : "구해요";
+    context.font = `12px ${emojiFont}`;
+    const emojiWidth = context.measureText(emoji).width;
+    context.font = `900 11px ${koreanFont}`;
+    const labelWidth = context.measureText(label).width;
+    const totalWidth = emojiWidth + 5 + labelWidth;
+    context.fillStyle = "#404040";
+    context.font = `12px ${emojiFont}`;
+    context.fillText(emoji, centerX - totalWidth / 2, sideHeaderY + 15);
+    context.font = `900 11px ${koreanFont}`;
+    context.fillText(label, centerX - totalWidth / 2 + emojiWidth + 5, sideHeaderY + 15);
   }
 
   const imageMap = new Map(cardsWithImages.map(({ card, image }) => [card.id, image]));
@@ -325,7 +387,7 @@ async function renderBoardToPngBlob(
     return cards.length ? y - startY - rowGap : 0;
   };
 
-  let y = 188;
+  let y = contentStartY;
   if (grouped) {
     for (const group of getGroups()) {
       context.fillStyle = "#171717";
@@ -364,14 +426,6 @@ async function renderBoardToPngBlob(
     y += groupHeight + 24;
   }
 
-  if (board.memo.trim()) {
-    roundedRect(context, 28, y, 504, 42, 12);
-    context.fillStyle = "#f5f5f5";
-    context.fill();
-    context.fillStyle = "#525252";
-    context.font = "700 11px Arial, 'Apple SD Gothic Neo', sans-serif";
-    context.fillText(board.memo.trim(), 40, y + 25);
-  }
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -638,6 +692,19 @@ export function TradeBuilder({
 
   const canDownload = useMemo(() => {
     return board.cards.length > 0;
+  }, [board.cards]);
+
+  useEffect(() => {
+    if (board.cards.length === 0) return;
+
+    const preload = () => {
+      void Promise.allSettled(
+        board.cards.map((card) => loadCanvasImage(card.imageUrl)),
+      );
+    };
+
+    const timer = window.setTimeout(preload, 120);
+    return () => window.clearTimeout(timer);
   }, [board.cards]);
 
   useEffect(() => {
@@ -1392,6 +1459,8 @@ function AddItemModal({
       ? selectedBenefitSubcategory
       : "",
   );
+  const [uploadedFileCount, setUploadedFileCount] = useState(0);
+  const [uploadedPreviewUrls, setUploadedPreviewUrls] = useState<string[]>([]);
   const uploadBenefitSubcategoryOptions = useMemo(() => {
     const values = registeredItems
       .filter(
@@ -1507,35 +1576,18 @@ function AddItemModal({
         <div className="flex-1 overflow-y-auto px-5 pb-5 pt-1">
           <GoodsWorkReference referenceImages={referenceImages} />
 
-          {filteredItems.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3">
-              {filteredItems.map((item) => {
-                const quantity = getRegisteredItemQuantity(
-                  selectedCards,
-                  item,
-                  side,
-                );
-
-                return (
-                  <RegisteredItemCard
-                    key={item.id}
-                    item={item}
-                    quantity={quantity}
-                    onIncrease={() => onIncreaseItem(item)}
-                    onDecrease={() => onDecreaseItem(item)}
-                  />
-                );
-              })}
-            </div>
-          ) : (
-            <p className="rounded-2xl bg-neutral-50 px-4 py-10 text-center text-xs text-neutral-400">
-              선택한 조건에 등록된 이미지가 없습니다.
-            </p>
-          )}
-
-          <details className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-            <summary className="cursor-pointer text-sm font-black text-neutral-950">
-              직접 이미지 업로드
+          <details className="mb-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-neutral-950 [&::-webkit-details-marker]:hidden">
+              <span>직접 이미지 업로드</span>
+              {uploadedFileCount > 0 ? (
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black text-emerald-700">
+                  {uploadedFileCount}장 추가 완료
+                </span>
+              ) : (
+                <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-neutral-400 ring-1 ring-neutral-200">
+                  열기
+                </span>
+              )}
             </summary>
 
             <p className="mt-2 text-xs leading-5 text-neutral-500">
@@ -1631,11 +1683,68 @@ function AddItemModal({
                         ? uploadBenefitSubcategory || null
                         : null,
                   });
+
+                  setUploadedPreviewUrls((currentUrls) => {
+                    currentUrls.forEach((url) => URL.revokeObjectURL(url));
+                    return Array.from(files)
+                      .filter((file) => file.type.startsWith("image/"))
+                      .slice(0, 4)
+                      .map((file) => URL.createObjectURL(file));
+                  });
+                  setUploadedFileCount(files.length);
                   event.target.value = "";
                 }}
               />
             </label>
+
+            {uploadedFileCount > 0 ? (
+              <div className="mt-3 rounded-xl bg-emerald-50 p-3 ring-1 ring-emerald-200">
+                <p className="text-center text-xs font-black text-emerald-700">
+                  이미지 {uploadedFileCount}장이 {sideLabel}에 추가되었습니다.
+                </p>
+                {uploadedPreviewUrls.length > 0 ? (
+                  <div className="mt-3 flex justify-center gap-2 overflow-hidden">
+                    {uploadedPreviewUrls.map((url, index) => (
+                      <img
+                        key={url}
+                        src={url}
+                        alt={`추가된 직접 이미지 ${index + 1}`}
+                        className="h-14 w-14 rounded-lg bg-white object-cover ring-1 ring-emerald-200"
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </details>
+
+          {filteredItems.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3">
+              {filteredItems.map((item) => {
+                const quantity = getRegisteredItemQuantity(
+                  selectedCards,
+                  item,
+                  side,
+                );
+
+                return (
+                  <RegisteredItemCard
+                    key={item.id}
+                    item={item}
+                    quantity={quantity}
+                    onIncrease={() => onIncreaseItem(item)}
+                    onDecrease={() => onDecreaseItem(item)}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <p className="rounded-2xl bg-neutral-50 px-4 py-10 text-center text-xs text-neutral-400">
+              선택한 조건에 등록된 이미지가 없습니다.
+            </p>
+          )}
+
+
         </div>
 
         <footer className="shrink-0 border-t border-neutral-100 p-4">
