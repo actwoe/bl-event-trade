@@ -911,10 +911,12 @@ function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
           <span className="text-sm font-black text-neutral-950">{title}</span>
         </span>
 
-        <span className="shrink-0 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black text-white">
-          + 추가
+        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-neutral-500 ring-1 ring-neutral-200">
+          {count}개
         </span>
       </div>
+
+      <p className="mt-1 text-[11px] font-black text-neutral-500">+ 추가</p>
     </button>
   );
 }

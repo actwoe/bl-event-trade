@@ -29,11 +29,23 @@ type PreviewCardProps = {
   card: TradeCard;
 };
 
+type QuantityTradeCard = TradeCard & {
+  quantity?: number;
+};
+
 function getMemoChips(memo: string) {
   return memo
     .split(' · ')
     .map((text) => text.trim())
     .filter(Boolean);
+}
+
+function getCardQuantity(card: TradeCard) {
+  const quantity = (card as QuantityTradeCard).quantity ?? 1;
+
+  if (!Number.isFinite(quantity)) return 1;
+
+  return Math.max(1, Math.floor(quantity));
 }
 
 function getCardMetaLabel(card: TradeCard) {
@@ -64,68 +76,62 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
 
     return (
       <div ref={ref} className="w-[560px] bg-white p-6 text-neutral-950">
-        <header className="rounded-[28px] border-2 border-neutral-950 bg-white p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-neutral-400">
-                Trade Board
-              </p>
-
-              <h1 className="mt-1 break-keep text-2xl font-black leading-tight tracking-tight">
-                {collectionTitle}
-              </h1>
-
-              {profileText ? (
-                <p className="mt-2 text-[12px] font-bold leading-5 text-neutral-500">
-                  {profileText}
+        <div className="overflow-hidden rounded-[30px] border-2 border-neutral-950 bg-white">
+          <header className="bg-neutral-950 px-5 py-4 text-white">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/55">
+                  Trade Board
                 </p>
+
+                <h1 className="mt-1 break-keep text-2xl font-black leading-tight tracking-tight text-white">
+                  {collectionTitle}
+                </h1>
+
+                {profileText ? (
+                  <p className="mt-2 text-[12px] font-bold leading-5 text-white/70">
+                    {profileText}
+                  </p>
+                ) : null}
+              </div>
+
+              {memoChips.length > 0 ? (
+                <div className="flex max-w-[210px] shrink-0 flex-wrap justify-end gap-1.5">
+                  {memoChips.map((chip) => (
+                    <span
+                      key={chip}
+                      className="rounded-full bg-white px-3 py-1.5 text-[10px] font-black leading-none text-neutral-950"
+                    >
+                      {chip}
+                    </span>
+                  ))}
+                </div>
               ) : null}
             </div>
+          </header>
 
-            {memoChips.length > 0 ? (
-              <div className="flex max-w-[210px] shrink-0 flex-wrap justify-end gap-1.5">
-                {memoChips.map((chip) => (
-                  <span
-                    key={chip}
-                    className="rounded-full bg-neutral-950 px-3 py-1.5 text-[10px] font-black leading-none text-white"
-                  >
-                    {chip}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </header>
-
-        <section className="mt-5 space-y-4">
-          {hasCards ? (
-            useSimpleMode ? (
-              <SimpleSection cards={board.cards} />
+          <section className="space-y-3 px-4 py-4">
+            {hasCards ? (
+              useSimpleMode ? (
+                <SimpleSection cards={board.cards} />
+              ) : (
+                TRADE_CATEGORIES.map((category) => (
+                  <CategorySection
+                    key={category.id}
+                    category={category.id}
+                    cards={board.cards}
+                  />
+                ))
+              )
             ) : (
-              TRADE_CATEGORIES.map((category) => (
-                <CategorySection
-                  key={category.id}
-                  category={category.id}
-                  cards={board.cards}
-                />
-              ))
-            )
-          ) : (
-            <div className="rounded-[28px] border-2 border-dashed border-neutral-200 px-6 py-16 text-center">
-              <p className="text-lg font-black text-neutral-300">
-                선택된 이미지가 없습니다
-              </p>
-            </div>
-          )}
-        </section>
-
-        <footer className="mt-6 border-t border-neutral-200 pt-4 text-center text-[10px] font-bold leading-5 text-neutral-400">
-          <p>본 이미지는 비공식 팬메이드 교환판입니다.</p>
-          <p>
-            사이트에 기재된 모든 이미지의 저작권은 키다리스튜디오와 각
-            작가님들께 있습니다.
-          </p>
-        </footer>
+              <div className="rounded-[28px] border-2 border-dashed border-neutral-200 px-6 py-16 text-center">
+                <p className="text-lg font-black text-neutral-300">
+                  선택된 이미지가 없습니다
+                </p>
+              </div>
+            )}
+          </section>
+        </div>
       </div>
     );
   },
@@ -150,9 +156,9 @@ function CategorySection({ category, cards }: CategorySectionProps) {
   }
 
   return (
-    <section className="rounded-[28px] bg-white px-1 py-2">
-      <div className="mb-3 flex items-center gap-3 px-1">
-        <h2 className="shrink-0 text-[13px] font-black text-neutral-950">
+    <section className="bg-white px-1 py-1.5">
+      <div className="mb-2 flex items-center gap-3 px-1">
+        <h2 className="shrink-0 text-[12px] font-black text-neutral-950">
           {categoryLabel}
         </h2>
         <div className="h-px flex-1 bg-neutral-200" />
@@ -186,7 +192,7 @@ function SimpleSection({ cards }: { cards: TradeCard[] }) {
   const wantCards = cards.filter((card) => card.side === 'want');
 
   return (
-    <section className="rounded-[28px] bg-white px-1 py-2">
+    <section className="bg-white px-1 py-1.5">
       <div className="grid grid-cols-2">
         <SideBlock
           title="있어요"
@@ -208,13 +214,19 @@ function SimpleSection({ cards }: { cards: TradeCard[] }) {
 
 function SideBlock({ title, emoji, cards, hasDivider = false }: SideBlockProps) {
   return (
-    <div className={hasDivider ? "min-w-0 border-l border-neutral-200 pl-4" : "min-w-0 pr-4"}>
-      <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-neutral-100 px-4 py-2">
-        <span className="text-sm">{emoji}</span>
-        <span className="text-sm font-black text-neutral-950">{title}</span>
+    <div
+      className={
+        hasDivider
+          ? 'min-w-0 border-l border-neutral-200 pl-3'
+          : 'min-w-0 pr-3'
+      }
+    >
+      <div className="mb-1.5 inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5">
+        <span className="text-xs">{emoji}</span>
+        <span className="text-xs font-black text-neutral-950">{title}</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
         {cards.map((card) => (
           <PreviewCard key={card.id} card={card} />
         ))}
@@ -225,6 +237,7 @@ function SideBlock({ title, emoji, cards, hasDivider = false }: SideBlockProps) 
 
 function PreviewCard({ card }: PreviewCardProps) {
   const metaLabel = getCardMetaLabel(card);
+  const quantity = getCardQuantity(card);
 
   return (
     <article className="overflow-hidden rounded-2xl bg-white">
@@ -234,19 +247,25 @@ function PreviewCard({ card }: PreviewCardProps) {
           alt={card.memo || card.workTitle}
           className="aspect-[3/4] w-full rounded-xl bg-white object-contain"
         />
+
+        {quantity > 1 ? (
+          <span className="absolute right-2 top-1.5 rounded-full bg-neutral-950 px-1.5 py-0.5 text-[9px] font-black leading-none text-white shadow-sm">
+            ×{quantity}
+          </span>
+        ) : null}
       </div>
 
-      <div className="px-1.5 pb-1.5 pt-0.5">
-        <p className="line-clamp-1 text-[10px] font-black text-neutral-950">
+      <div className="px-1.5 pb-1 pt-0">
+        <p className="line-clamp-1 text-[10px] font-black leading-4 text-neutral-950">
           {card.workTitle || '작품명'}
         </p>
 
-        <p className="mt-0.5 line-clamp-1 text-[9px] font-bold leading-4 text-neutral-500">
+        <p className="mt-0 line-clamp-1 text-[9px] font-bold leading-3 text-neutral-500">
           {metaLabel}
         </p>
 
         {card.memo ? (
-          <p className="mt-0.5 line-clamp-1 text-[9px] font-bold leading-4 text-neutral-400">
+          <p className="mt-0.5 line-clamp-1 text-[9px] font-bold leading-3 text-neutral-400">
             {card.memo}
           </p>
         ) : null}
