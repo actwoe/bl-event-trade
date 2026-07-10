@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toPng } from "html-to-image";
+import { toBlob } from "html-to-image";
 import { nanoid } from "nanoid";
 import {
   RegisteredTradeItem,
@@ -551,54 +551,156 @@ export function TradeBuilder({
   }
 
   async function downloadImage() {
-    if (!previewRef.current) return;
-
     const previewElement = previewRef.current;
-    const images = Array.from(previewElement.querySelectorAll("img"));
-    const originalSources = images.map((image) => image.src);
+
+    if (!previewElement) return;
+
+    const waitForImage = (image: HTMLImageElement) =>
+      new Promise<void>((resolve) => {
+        if (image.complete && image.naturalWidth > 0) {
+          resolve();
+          return;
+        }
+
+        const finish = () => {
+          window.clearTimeout(timeoutId);
+          image.removeEventListener("load", finish);
+          image.removeEventListener("error", finish);
+          resolve();
+        };
+        const timeoutId = window.setTimeout(finish, 15000);
+
+        image.addEventListener("load", finish, { once: true });
+        image.addEventListener("error", finish, { once: true });
+      });
+
+    const blobToDataUrl = (blob: Blob) =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+
+    const imageToDataUrl = async (image: HTMLImageElement) => {
+      const source = image.currentSrc || image.src;
+
+      if (!source || source.startsWith("data:")) return source;
+
+      if (image.complete && image.naturalWidth > 0) {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = image.naturalWidth;
+          canvas.height = image.naturalHeight;
+          const context = canvas.getContext("2d");
+
+          if (context) {
+            context.drawImage(image, 0, 0);
+            return canvas.toDataURL("image/png");
+          }
+        } catch {
+          // CORS로 캔버스 변환이 막힌 경우 fetch 방식으로 다시 시도합니다.
+        }
+      }
+
+      const response = await fetch(source, {
+        cache: "no-store",
+        credentials: "omit",
+        mode: "cors",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Image request failed: ${response.status}`);
+      }
+
+      return blobToDataUrl(await response.blob());
+    };
+
+    let exportNode: HTMLDivElement | null = null;
+    let objectUrl = "";
 
     try {
       setIsExporting(true);
 
+      await document.fonts?.ready;
+
+      exportNode = previewElement.cloneNode(true) as HTMLDivElement;
+      exportNode.style.position = "fixed";
+      exportNode.style.left = "-100000px";
+      exportNode.style.top = "0";
+      exportNode.style.width = `${PREVIEW_WIDTH}px`;
+      exportNode.style.height = "auto";
+      exportNode.style.transform = "none";
+      exportNode.style.pointerEvents = "none";
+      exportNode.style.zIndex = "-1";
+      exportNode.setAttribute("aria-hidden", "true");
+      document.body.appendChild(exportNode);
+
+      const sourceImages = Array.from(
+        previewElement.querySelectorAll<HTMLImageElement>("img"),
+      );
+      const exportImages = Array.from(
+        exportNode.querySelectorAll<HTMLImageElement>("img"),
+      );
+
       await Promise.all(
-        images.map(async (image) => {
-          if (image.src.startsWith("data:")) return;
+        exportImages.map(async (exportImage, index) => {
+          const sourceImage = sourceImages[index];
+
+          if (!sourceImage) return;
+
+          const sourceRect = sourceImage.getBoundingClientRect();
+          exportImage.style.width = `${sourceRect.width}px`;
+          exportImage.style.height = `${sourceRect.height}px`;
+          exportImage.removeAttribute("crossorigin");
+          exportImage.removeAttribute("referrerpolicy");
 
           try {
-            const response = await fetch(image.src, { cache: "no-store" });
-            if (!response.ok) return;
-
-            const blob = await response.blob();
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(String(reader.result));
-              reader.onerror = () => reject(reader.error);
-              reader.readAsDataURL(blob);
-            });
-
-            image.src = dataUrl;
-            await image.decode().catch(() => undefined);
-          } catch {
-            // 변환하지 못한 이미지는 원본 URL로 html-to-image가 다시 시도합니다.
+            exportImage.src = await imageToDataUrl(sourceImage);
+          } catch (error) {
+            console.warn("미리보기 이미지를 PNG에 포함하지 못했습니다.", error);
+            exportImage.src = sourceImage.currentSrc || sourceImage.src;
           }
+
+          await waitForImage(exportImage);
         }),
       );
 
-      const dataUrl = await toPng(previewElement, {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        );
+      });
+
+      const imageBlob = await toBlob(exportNode, {
         pixelRatio: EXPORT_IMAGE_WIDTH / PREVIEW_WIDTH,
         backgroundColor: "#ffffff",
         cacheBust: false,
         includeQueryParams: true,
       });
 
+      if (!imageBlob) {
+        throw new Error("PNG 파일을 생성하지 못했습니다.");
+      }
+
+      objectUrl = URL.createObjectURL(imageBlob);
       const link = document.createElement("a");
       link.download = `${collection.slug}-trade-board.png`;
-      link.href = dataUrl;
+      link.href = objectUrl;
+      link.rel = "noopener";
+      document.body.appendChild(link);
       link.click();
+      link.remove();
+    } catch (error) {
+      console.error("교환판 PNG 저장에 실패했습니다.", error);
+      window.alert("이미지 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
-      images.forEach((image, index) => {
-        image.src = originalSources[index];
-      });
+      exportNode?.remove();
+
+      if (objectUrl) {
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      }
+
       setIsExporting(false);
     }
   }

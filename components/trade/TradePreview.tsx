@@ -109,7 +109,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
 
     return (
       <div ref={ref} className="w-[560px] bg-white p-6 text-neutral-950">
-        <div className="overflow-hidden rounded-[30px] bg-white">
+        <div className="overflow-hidden rounded-[30px] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.12)]">
           <header className="bg-neutral-950 px-5 py-4 text-white">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
@@ -195,9 +195,9 @@ function TradeColumns({
 
 function TradeSideHeader({ title, emoji }: { title: string; emoji: string }) {
   return (
-    <div className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-neutral-200 px-3 py-3 text-neutral-800 shadow-[0_4px_12px_rgba(15,23,42,0.14)]">
-      <span className="text-sm leading-none">{emoji}</span>
-      <span className="text-sm font-black leading-none">{title}</span>
+    <div className="flex min-h-8 items-center justify-center gap-1.5 rounded-xl bg-neutral-200 px-3 py-2 text-neutral-700">
+      <span className="text-[12px] leading-none">{emoji}</span>
+      <span className="text-[12px] font-black leading-none">{title}</span>
     </div>
   );
 }
