@@ -64,32 +64,41 @@ async function savePngBlob(
   filename: string,
   onShowPreview: (previewUrl: string) => void,
 ) {
+  const isTouchSaveFlow = prefersTouchSaveFlow();
+  const previewUrl = URL.createObjectURL(blob);
+
+  // PC에서는 공유 시트를 띄우지 않고 즉시 PNG 파일로 다운로드합니다.
+  if (!isTouchSaveFlow) {
+    const link = document.createElement("a");
+    link.download = filename;
+    link.href = previewUrl;
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(previewUrl), 30_000);
+    return;
+  }
+
   const file = new File([blob], filename, { type: "image/png" });
 
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: filename });
+      URL.revokeObjectURL(previewUrl);
       return;
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (error instanceof Error && error.name === "AbortError") {
+        URL.revokeObjectURL(previewUrl);
+        return;
+      }
     }
   }
 
-  const previewUrl = URL.createObjectURL(blob);
+  // iOS/Android에서 공유가 지원되지 않으면 원본 PNG를 열어 길게 눌러 저장합니다.
+  onShowPreview(previewUrl);
+  return;
 
-  if (prefersTouchSaveFlow()) {
-    onShowPreview(previewUrl);
-    return;
-  }
-
-  const link = document.createElement("a");
-  link.download = filename;
-  link.href = previewUrl;
-  link.rel = "noopener";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(previewUrl), 30_000);
 }
 
 
@@ -131,30 +140,19 @@ function drawCenteredText(
   context.restore();
 }
 
-const canvasImageCache = new Map<string, Promise<HTMLImageElement>>();
-
-function loadCanvasImage(source: string) {
-  const cachedImage = canvasImageCache.get(source);
-  if (cachedImage) return cachedImage;
-
+async function loadCanvasImage(source: string) {
   const resolvedSource =
     source.startsWith("data:") || source.startsWith("blob:")
       ? source
       : `/api/image-proxy?url=${encodeURIComponent(source)}`;
 
-  const imagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
+  return await new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.decoding = "async";
     image.onload = () => resolve(image);
-    image.onerror = () => {
-      canvasImageCache.delete(source);
-      reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
-    };
+    image.onerror = () => reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
     image.src = resolvedSource;
   });
-
-  canvasImageCache.set(source, imagePromise);
-  return imagePromise;
 }
 
 function drawContainedImage(
@@ -178,8 +176,7 @@ async function renderBoardToPngBlob(
   collectionTitle: string,
 ) {
   const width = 560;
-  const outputWidth = 2000;
-  const scale = outputWidth / width;
+  const scale = 2000 / width;
   const sideWidth = 244;
   const sideLeft = { have: 28, want: 288 } as const;
   const cardWidth = 112;
@@ -213,7 +210,7 @@ async function renderBoardToPngBlob(
   };
 
   const cardHeight = (card: TradeCard, showMeta: boolean) =>
-    (card.imageRatio === "photocard" ? 170 : 112) + 30 + (showMeta ? 16 : 0);
+    (card.imageRatio === "photocard" ? 170 : 112) + 24 + (showMeta ? 16 : 0);
 
   const gridHeight = (cards: TradeCard[], showMeta: boolean) => {
     if (cards.length === 0) return 0;
@@ -226,7 +223,10 @@ async function renderBoardToPngBlob(
     return height;
   };
 
-  let contentHeight = 188;
+  const headerBottom = 112;
+  const sideHeaderY = 124;
+  const contentStartY = 164;
+  let contentHeight = contentStartY;
   if (grouped) {
     for (const group of getGroups()) {
       const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
@@ -238,12 +238,11 @@ async function renderBoardToPngBlob(
     const want = board.cards.filter((card) => card.side === "want");
     contentHeight += Math.max(gridHeight(have, true), gridHeight(want, true), 112) + 24;
   }
-  if (board.memo.trim()) contentHeight += 58;
-  const height = Math.max(320, contentHeight + 24);
+  const height = Math.max(300, contentHeight + 24);
 
   const canvas = document.createElement("canvas");
-  canvas.width = outputWidth;
-  canvas.height = Math.ceil(height * scale);
+  canvas.width = width * scale;
+  canvas.height = height * scale;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("이미지 생성 도구를 사용할 수 없습니다.");
   context.scale(scale, scale);
@@ -259,37 +258,82 @@ async function renderBoardToPngBlob(
   context.fill();
   context.restore();
 
-  roundedRect(context, 20, 20, 520, 110, 26);
+  roundedRect(context, 20, 20, 520, headerBottom - 20, 26);
   context.fillStyle = "#0a0a0a";
   context.fill();
-  context.fillRect(20, 90, 520, 40);
+  context.fillRect(20, headerBottom - 26, 520, 26);
+
+  const koreanFont = "'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif";
+  const emojiFont = "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
 
   context.fillStyle = "#a3a3a3";
-  context.font = "900 10px Arial, sans-serif";
-  context.fillText("TRADE BOARD", 40, 52);
+  context.font = `900 9px ${koreanFont}`;
+  context.fillText("TRADE BOARD", 40, 46);
   context.fillStyle = "#ffffff";
-  context.font = "900 24px Arial, 'Apple SD Gothic Neo', sans-serif";
-  context.fillText(collectionTitle, 40, 84);
+  context.font = `900 22px ${koreanFont}`;
+  context.fillText(collectionTitle, 40, 73);
   const profile = [board.nickname, board.contact].filter(Boolean).join(" · ");
   if (profile) {
     context.fillStyle = "#d4d4d4";
-    context.font = "600 12px Arial, 'Apple SD Gothic Neo', sans-serif";
-    context.fillText(profile, 40, 108);
+    context.font = `600 11px ${koreanFont}`;
+    context.fillText(profile, 40, 94);
+  }
+
+  const conditionChips = board.memo
+    .split(" · ")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 6);
+
+  if (conditionChips.length > 0) {
+    context.save();
+    context.font = `800 9px ${koreanFont}`;
+    let chipRight = 520;
+    let chipY = 39;
+    let line = 0;
+    for (const chip of conditionChips) {
+      const chipWidth = Math.min(context.measureText(chip).width + 18, 116);
+      if (chipRight - chipWidth < 300) {
+        line += 1;
+        if (line >= 2) break;
+        chipRight = 520;
+        chipY += 24;
+      }
+      roundedRect(context, chipRight - chipWidth, chipY, chipWidth, 18, 9);
+      context.fillStyle = "#ffffff";
+      context.fill();
+      drawCenteredText(
+        context,
+        chip,
+        chipRight - chipWidth / 2,
+        chipY + 12,
+        chipWidth - 12,
+        `800 9px ${koreanFont}`,
+        "#171717",
+      );
+      chipRight -= chipWidth + 6;
+    }
+    context.restore();
   }
 
   for (const side of ["have", "want"] as const) {
-    roundedRect(context, sideLeft[side], 140, sideWidth, 24, 8);
+    roundedRect(context, sideLeft[side], sideHeaderY, sideWidth, 22, 8);
     context.fillStyle = "#e5e5e5";
     context.fill();
-    drawCenteredText(
-      context,
-      side === "have" ? "있어요" : "구해요",
-      sideLeft[side] + sideWidth / 2,
-      157,
-      sideWidth - 16,
-      "900 11px Arial, 'Apple SD Gothic Neo', sans-serif",
-      "#404040",
-    );
+
+    const centerX = sideLeft[side] + sideWidth / 2;
+    const emoji = side === "have" ? "🙋🏻‍♀️" : "❤️";
+    const label = side === "have" ? "있어요" : "구해요";
+    context.font = `12px ${emojiFont}`;
+    const emojiWidth = context.measureText(emoji).width;
+    context.font = `900 11px ${koreanFont}`;
+    const labelWidth = context.measureText(label).width;
+    const totalWidth = emojiWidth + 5 + labelWidth;
+    context.fillStyle = "#404040";
+    context.font = `12px ${emojiFont}`;
+    context.fillText(emoji, centerX - totalWidth / 2, sideHeaderY + 15);
+    context.font = `900 11px ${koreanFont}`;
+    context.fillText(label, centerX - totalWidth / 2 + emojiWidth + 5, sideHeaderY + 15);
   }
 
   const imageMap = new Map(cardsWithImages.map(({ card, image }) => [card.id, image]));
@@ -315,9 +359,9 @@ async function renderBoardToPngBlob(
       drawCenteredText(context, `×${quantity}`, x + cardWidth - 12, y + 17, 14, "900 7px Arial, sans-serif", "#ffffff");
     }
 
-    drawCenteredText(context, card.workTitle || "작품명", x + cardWidth / 2, y + imageHeight + 22, cardWidth, "800 11px Arial, 'Apple SD Gothic Neo', sans-serif", "#171717");
+    drawCenteredText(context, card.workTitle || "작품명", x + cardWidth / 2, y + imageHeight + 17, cardWidth, `800 11px ${koreanFont}`, "#171717");
     if (showMeta) {
-      drawCenteredText(context, getCardMetaLabel(card), x + cardWidth / 2, y + imageHeight + 38, cardWidth, "500 9px Arial, 'Apple SD Gothic Neo', sans-serif", "#737373");
+      drawCenteredText(context, getCardMetaLabel(card), x + cardWidth / 2, y + imageHeight + 32, cardWidth, `500 9px ${koreanFont}`, "#737373");
     }
   };
 
@@ -331,23 +375,19 @@ async function renderBoardToPngBlob(
     return cards.length ? y - startY - rowGap : 0;
   };
 
-  let y = 188;
+  let y = contentStartY;
   if (grouped) {
     for (const group of getGroups()) {
       context.fillStyle = "#171717";
-      context.font = "900 10px Arial, 'Apple SD Gothic Neo', sans-serif";
+      context.font = `900 10px ${koreanFont}`;
       context.fillText(group.label, 28, y + 11);
-
-      const categoryLabelWidth = context.measureText(group.label).width;
-      const separatorStartX = Math.min(520, 28 + categoryLabelWidth + 12);
-      if (separatorStartX < 532) {
-        context.strokeStyle = "#d4d4d4";
-        context.lineWidth = 1;
-        context.beginPath();
-        context.moveTo(separatorStartX, y + 8);
-        context.lineTo(532, y + 8);
-        context.stroke();
-      }
+      const groupLabelWidth = context.measureText(group.label).width;
+      context.strokeStyle = "#d4d4d4";
+      context.lineWidth = 1;
+      context.beginPath();
+      context.moveTo(Math.min(28 + groupLabelWidth + 12, 500), y + 7);
+      context.lineTo(532, y + 7);
+      context.stroke();
       const gridY = y + 24;
       const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
       const want = board.cards.filter((card) => card.side === "want" && cardGroupKey(card) === group.key);
@@ -373,15 +413,6 @@ async function renderBoardToPngBlob(
     context.lineTo(280, y + groupHeight);
     context.stroke();
     y += groupHeight + 24;
-  }
-
-  if (board.memo.trim()) {
-    roundedRect(context, 28, y, 504, 42, 12);
-    context.fillStyle = "#f5f5f5";
-    context.fill();
-    context.fillStyle = "#525252";
-    context.font = "700 11px Arial, 'Apple SD Gothic Neo', sans-serif";
-    context.fillText(board.memo.trim(), 40, y + 25);
   }
 
   return await new Promise<Blob>((resolve, reject) => {
@@ -677,12 +708,6 @@ export function TradeBuilder({
       memo: selectedConditions.join(" · "),
     }));
   }, [selectedConditions]);
-
-  useEffect(() => {
-    void Promise.allSettled(
-      board.cards.map((card) => loadCanvasImage(card.imageUrl)),
-    );
-  }, [board.cards]);
 
   useEffect(() => {
     function updatePreviewSize() {
