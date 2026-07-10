@@ -159,7 +159,7 @@ function CategorySection({ category, cards }: CategorySectionProps) {
         <h2 className="text-lg font-black text-white">{categoryLabel}</h2>
       </div>
 
-      <div className="space-y-4 p-4">
+      <div className="grid grid-cols-2 gap-4 p-4">
         {haveCards.length > 0 ? (
           <SideBlock title="있어요" emoji="🙋🏻‍♀️" cards={haveCards} />
         ) : null}
@@ -180,7 +180,7 @@ function SideBlock({ title, emoji, cards }: SideBlockProps) {
         <span className="text-sm font-black text-neutral-950">{title}</span>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-2">
         {cards.map((card) => (
           <PreviewCard key={card.id} card={card} />
         ))}

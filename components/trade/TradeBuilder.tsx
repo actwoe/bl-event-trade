@@ -847,21 +847,27 @@ type AddSideButtonProps = {
   onClick: () => void;
 };
 
-function AddSideButton({ title, emoji: _emoji, count, onClick }: AddSideButtonProps) {
+function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-3 text-left transition hover:border-neutral-950 hover:bg-white"
+      className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-left transition hover:border-neutral-950 hover:bg-white"
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-black text-neutral-950">{title}</p>
-        <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-neutral-500">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="text-sm" aria-hidden="true">
+            {emoji}
+          </span>
+          <span className="text-sm font-black text-neutral-950">{title}</span>
+        </span>
+
+        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-neutral-500 ring-1 ring-neutral-200">
           {count}개
         </span>
       </div>
 
-      <p className="mt-1 text-xs font-black text-neutral-500">+ 이미지 추가</p>
+      <p className="mt-1 text-[11px] font-black text-neutral-500">+ 추가</p>
     </button>
   );
 }
@@ -1282,47 +1288,45 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
             </select>
           </div>
 
-          <button
-            type="button"
-            onClick={onRemove}
-            aria-label="선택한 이미지 삭제"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-black text-neutral-400 shadow-sm ring-1 ring-neutral-200 hover:bg-red-50 hover:text-red-500 hover:ring-red-200"
-          >
-            ×
-          </button>
-        </div>
-
-        <div className="space-y-2">
-          <div className="min-w-0 space-y-0.5 text-xs leading-5">
-            <p className="truncate font-black text-neutral-950">
-              {card.workTitle || "작품명 없음"}
-            </p>
-            <p className="truncate text-neutral-500">{metaLabel}</p>
-          </div>
-
-          <div className="flex justify-end">
-            <div className="flex shrink-0 items-center overflow-hidden rounded-full border border-neutral-200 bg-white">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex h-8 items-center overflow-hidden rounded-full border border-neutral-200 bg-white">
               <button
                 type="button"
                 onClick={decreaseQuantity}
-                className="flex h-8 w-8 items-center justify-center text-sm font-black text-neutral-500"
+                className="flex h-8 w-7 items-center justify-center text-sm font-black text-neutral-500"
                 aria-label="수량 줄이기"
               >
                 −
               </button>
-              <span className="min-w-8 px-1 text-center text-xs font-black text-neutral-950">
+              <span className="min-w-6 px-0.5 text-center text-xs font-black text-neutral-950">
                 {quantity}
               </span>
               <button
                 type="button"
                 onClick={increaseQuantity}
-                className="flex h-8 w-8 items-center justify-center text-sm font-black text-neutral-500"
+                className="flex h-8 w-7 items-center justify-center text-sm font-black text-neutral-500"
                 aria-label="수량 늘리기"
               >
                 +
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={onRemove}
+              aria-label="선택한 이미지 삭제"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-sm font-black text-neutral-400 shadow-sm ring-1 ring-neutral-200 hover:bg-red-50 hover:text-red-500 hover:ring-red-200"
+            >
+              ×
+            </button>
           </div>
+        </div>
+
+        <div className="min-w-0 space-y-0.5 text-xs leading-5">
+          <p className="truncate font-black text-neutral-950">
+            {card.workTitle || "작품명 없음"}
+          </p>
+          <p className="truncate text-neutral-500">{metaLabel}</p>
         </div>
       </div>
     </div>
