@@ -806,7 +806,7 @@ export function TradeBuilder({
             <button
               type="button"
               onClick={resetBoard}
-              className="rounded-2xl border border-neutral-300 bg-white px-5 py-4 text-sm font-bold text-neutral-700"
+              className="rounded-xl border border-neutral-300 bg-white px-4 py-3 text-xs font-bold text-neutral-700"
             >
               초기화
             </button>
@@ -815,7 +815,7 @@ export function TradeBuilder({
               type="button"
               onClick={downloadImage}
               disabled={!canDownload || isExporting}
-              className="rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+              className="rounded-xl bg-neutral-950 px-4 py-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
             >
               {isExporting ? "저장 중..." : "PNG 저장"}
             </button>
@@ -911,12 +911,10 @@ function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
           <span className="text-sm font-black text-neutral-950">{title}</span>
         </span>
 
-        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-neutral-500 ring-1 ring-neutral-200">
-          {count}개
+        <span className="shrink-0 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black text-white">
+          + 추가
         </span>
       </div>
-
-      <p className="mt-1 text-[11px] font-black text-neutral-500">+ 추가</p>
     </button>
   );
 }
@@ -1211,14 +1209,11 @@ function RegisteredItemCard({
           className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
         />
 
-        <button
-          type="button"
-          onClick={onIncrease}
-          className="absolute right-1.5 top-1.5 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black leading-none text-white shadow-sm"
-          aria-label="이미지 추가"
-        >
-          + 추가
-        </button>
+        {selected ? (
+          <span className="absolute right-1.5 top-1.5 rounded-full bg-neutral-950 px-2 py-1 text-[10px] font-black leading-none text-white">
+            ×{quantity}
+          </span>
+        ) : null}
       </div>
 
       <div className="p-2">
@@ -1251,7 +1246,16 @@ function RegisteredItemCard({
               +
             </button>
           </div>
-        ) : null}
+        ) : (
+          <button
+            type="button"
+            onClick={onIncrease}
+            className="mt-2 flex h-8 w-full items-center justify-center rounded-lg bg-neutral-950 text-sm font-black text-white"
+            aria-label="수량 늘리기"
+          >
+            +
+          </button>
+        )}
       </div>
     </article>
   );
