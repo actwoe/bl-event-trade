@@ -87,8 +87,13 @@ async function imageToDataUrl(url: string) {
     throw new Error(`이미지 형식이 아닙니다 (${contentType})`);
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  return `data:${contentType};base64,${buffer.toString("base64")}`;
+  const sourceBuffer = Buffer.from(await response.arrayBuffer());
+  const pngBuffer = await sharp(sourceBuffer, { animated: false })
+    .rotate()
+    .png()
+    .toBuffer();
+
+  return `data:image/png;base64,${pngBuffer.toString("base64")}`;
 }
 
 function text(value: string, x: number, y: number, size: number, weight = 700, fill = "#171717", anchor: "start" | "middle" = "start") {

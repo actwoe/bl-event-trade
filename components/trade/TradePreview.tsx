@@ -289,20 +289,20 @@ function PreviewCard({ card, showMeta }: PreviewCardProps) {
   const quantity = getCardQuantity(card);
 
   return (
-    <article className="rounded-2xl bg-white">
-      <div className="relative w-full overflow-hidden rounded-xl bg-neutral-50">
+    <article className="overflow-hidden rounded-2xl bg-white">
+      <div className="relative bg-white px-1 pt-0">
         <img
           src={card.imageUrl}
           alt={card.memo || card.workTitle}
           loading="eager"
           decoding="async"
-          className={`${card.imageRatio === 'photocard' ? 'aspect-[55/85]' : 'aspect-square'} block w-full bg-neutral-50 object-contain`}
+          className={`${card.imageRatio === 'photocard' ? 'aspect-[55/85]' : 'aspect-square'} w-full rounded-xl bg-white object-contain`}
         />
 
         <QuantityBadge quantity={quantity} />
       </div>
 
-      <div className="px-0.5 pb-1 pt-1 text-center">
+      <div className="-mt-1 px-1.5 pb-1 pt-0">
         <p className="line-clamp-1 text-center text-[10px] font-black leading-4 text-neutral-950">
           {card.workTitle || '작품명'}
         </p>

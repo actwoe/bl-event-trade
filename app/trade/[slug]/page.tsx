@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { TradeBuilder } from '@/components/trade/TradeBuilder';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
@@ -45,24 +46,21 @@ function getSafeImageRatio(value?: string | null): TradeImageRatio {
   return value === 'photocard' ? 'photocard' : 'square';
 }
 
-export default async function TradePage({ params }: TradePageProps) {
-  const { slug } = await params;
+const getTradePageData = unstable_cache(
+  async (slug: string) => {
+    const { data: collectionData, error: collectionError } = await supabase
+      .from('trade_collections')
+      .select('id, slug, title, description')
+      .eq('slug', slug)
+      .eq('is_public', true)
+      .single();
 
-  const { data: collectionData, error: collectionError } = await supabase
-    .from('trade_collections')
-    .select('id, slug, title, description')
-    .eq('slug', slug)
-    .eq('is_public', true)
-    .single();
+    if (collectionError || !collectionData) {
+      return null;
+    }
 
-  if (collectionError || !collectionData) {
-    notFound();
-  }
-
-  const collectionRow = collectionData as TradeCollectionRow;
-
-  const [{ data: itemData, error: itemError }, { data: referenceData, error: referenceError }] =
-    await Promise.all([
+    const collectionRow = collectionData as TradeCollectionRow;
+    const [itemsResult, referencesResult] = await Promise.all([
       supabase
         .from('trade_items')
         .select(
@@ -78,6 +76,28 @@ export default async function TradePage({ params }: TradePageProps) {
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true }),
     ]);
+
+    return {
+      collectionRow,
+      itemData: itemsResult.data,
+      itemError: itemsResult.error,
+      referenceData: referencesResult.data,
+      referenceError: referencesResult.error,
+    };
+  },
+  ['trade-page-data'],
+  { revalidate: 300 },
+);
+
+export default async function TradePage({ params }: TradePageProps) {
+  const { slug } = await params;
+  const result = await getTradePageData(slug);
+
+  if (!result) {
+    notFound();
+  }
+
+  const { collectionRow, itemData, itemError, referenceData, referenceError } = result;
 
   if (itemError) {
     console.error(itemError);

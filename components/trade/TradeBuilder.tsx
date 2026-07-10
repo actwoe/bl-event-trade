@@ -263,58 +263,6 @@ export function TradeBuilder({
   const previewAreaRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    const imageUrls = Array.from(
-      new Set(
-        [...registeredItems.map((item) => item.imageUrl), ...referenceImages.map((image) => image.imageUrl)].filter(Boolean),
-      ),
-    );
-
-    async function preloadImages() {
-      const concurrency = 4;
-      let index = 0;
-
-      async function worker() {
-        while (!cancelled) {
-          const currentIndex = index;
-          index += 1;
-
-          if (currentIndex >= imageUrls.length) return;
-
-          await new Promise<void>((resolve) => {
-            const image = new Image();
-            const finish = () => resolve();
-            image.decoding = "async";
-            image.onload = finish;
-            image.onerror = finish;
-            image.src = imageUrls[currentIndex];
-          });
-        }
-      }
-
-      await Promise.all(Array.from({ length: concurrency }, () => worker()));
-    }
-
-    const startPreload = () => {
-      void preloadImages();
-    };
-
-    const idleCallback = window.requestIdleCallback?.(startPreload, { timeout: 1200 });
-    const timeoutId = idleCallback ? null : window.setTimeout(startPreload, 250);
-
-    return () => {
-      cancelled = true;
-
-      if (idleCallback) {
-        window.cancelIdleCallback?.(idleCallback);
-      }
-
-      if (timeoutId !== null) {
-        window.clearTimeout(timeoutId);
-      }
-    };
-  }, [registeredItems, referenceImages]);
 
   const workTitleOptions = useMemo(() => {
     const titles = registeredItems
@@ -686,13 +634,17 @@ export function TradeBuilder({
 
       if (!response.ok) {
         let message = `PNG 생성 실패 (${response.status})`;
-        try {
-          const payload = (await response.json()) as { error?: string };
-          if (payload.error) message = payload.error;
-        } catch {
-          const text = await response.text();
-          if (text) message = text;
+        const responseText = await response.text();
+
+        if (responseText) {
+          try {
+            const payload = JSON.parse(responseText) as { error?: string };
+            if (payload.error) message = payload.error;
+          } catch {
+            message = responseText;
+          }
         }
+
         throw new Error(message);
       }
 
@@ -1431,19 +1383,19 @@ function RegisteredItemCard({
           <img
             src={item.imageUrl}
             alt={item.itemName}
-            loading="eager"
+            loading="lazy"
             decoding="async"
-            className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
+            className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain`}
           />
 
           <QuantityBadge quantity={quantity} />
         </div>
 
         <div className="p-2">
-          <p className="line-clamp-1 text-[11px] font-black text-neutral-950">
+          <p className="line-clamp-1 text-center text-[11px] font-black text-neutral-950">
             {item.workTitle}
           </p>
-          <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">
+          <p className="mt-0.5 line-clamp-1 text-center text-[10px] text-neutral-500">
             {metaLabel}
           </p>
         </div>
