@@ -617,21 +617,31 @@ export function TradeBuilder({
 
           <div className="mt-6 space-y-3">
             <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-              <button
-                type="button"
-                onClick={() => setIsProfileOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between gap-3 text-left"
-                aria-expanded={isProfileOpen}
-              >
-                <div>
+              <div className="flex items-start justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsProfileOpen((prev) => !prev)}
+                  className="min-w-0 flex-1 text-left"
+                  aria-expanded={isProfileOpen}
+                >
                   <p className="text-sm font-black text-neutral-950">
                     닉네임 / SNS ID
                   </p>
                   <p className="mt-1 text-xs text-neutral-400">
                     필요할 때만 입력하시면 됩니다.
                   </p>
-                </div>
-              </button>
+                </button>
+
+                {isProfileOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsProfileOpen(false)}
+                    className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-neutral-500 ring-1 ring-neutral-200"
+                  >
+                    접기
+                  </button>
+                ) : null}
+              </div>
 
               {isProfileOpen ? (
                 <div className="mt-4 grid grid-cols-2 gap-3">
@@ -667,21 +677,31 @@ export function TradeBuilder({
             </section>
 
             <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-              <button
-                type="button"
-                onClick={() => setIsConditionsOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between gap-3 text-left"
-                aria-expanded={isConditionsOpen}
-              >
-                <div>
+              <div className="flex items-start justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsConditionsOpen((prev) => !prev)}
+                  className="min-w-0 flex-1 text-left"
+                  aria-expanded={isConditionsOpen}
+                >
                   <p className="text-sm font-black text-neutral-950">
                     거래 조건 선택
                   </p>
                   <p className="mt-1 text-xs text-neutral-400">
                     원하는 교환 조건을 선택할 수 있습니다
                   </p>
-                </div>
-              </button>
+                </button>
+
+                {isConditionsOpen ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsConditionsOpen(false)}
+                    className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-neutral-500 ring-1 ring-neutral-200"
+                  >
+                    접기
+                  </button>
+                ) : null}
+              </div>
 
               {isConditionsOpen ? (
                 <div className="mt-4 grid grid-cols-2 gap-2">
@@ -1210,7 +1230,7 @@ function RegisteredItemCard({
         />
 
         {selected ? (
-          <span className="absolute right-1.5 top-1.5 rounded-full bg-neutral-950 px-2 py-1 text-[10px] font-black leading-none text-white">
+          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-neutral-950 text-[10px] font-black leading-none text-white">
             ×{quantity}
           </span>
         ) : null}

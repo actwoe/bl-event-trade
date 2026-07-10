@@ -96,7 +96,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
               </div>
 
               {memoChips.length > 0 ? (
-                <div className="flex max-w-[210px] shrink-0 flex-wrap justify-end gap-1.5">
+                <div className="flex max-h-[52px] max-w-[210px] shrink-0 flex-wrap justify-end gap-1.5 overflow-hidden">
                   {memoChips.map((chip) => (
                     <span
                       key={chip}
@@ -226,11 +226,19 @@ function SideBlock({ title, emoji, cards, hasDivider = false }: SideBlockProps) 
         <span className="text-xs font-black text-neutral-950">{title}</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
-        {cards.map((card) => (
-          <PreviewCard key={card.id} card={card} />
-        ))}
-      </div>
+      {cards.length === 1 ? (
+        <div className="flex justify-center">
+          <div className="w-[calc(50%-0.25rem)]">
+            <PreviewCard card={cards[0]} />
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+          {cards.map((card) => (
+            <PreviewCard key={card.id} card={card} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -249,13 +257,13 @@ function PreviewCard({ card }: PreviewCardProps) {
         />
 
         {quantity > 1 ? (
-          <span className="absolute right-2 top-1.5 rounded-full bg-neutral-950 px-1.5 py-0.5 text-[9px] font-black leading-none text-white shadow-sm">
+          <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-950 text-[9px] font-black leading-none text-white shadow-sm">
             ×{quantity}
           </span>
         ) : null}
       </div>
 
-      <div className="px-1.5 pb-1 pt-0">
+      <div className="-mt-1 px-1.5 pb-1 pt-0">
         <p className="line-clamp-1 text-[10px] font-black leading-4 text-neutral-950">
           {card.workTitle || '작품명'}
         </p>
