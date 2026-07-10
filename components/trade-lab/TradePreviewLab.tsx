@@ -182,8 +182,14 @@ function TradeColumns({
   return (
     <div>
       <div className="grid grid-cols-2 gap-3">
-        <TradeSideHeader title="있어요" emoji="🙋🏻‍♀️" />
-        <TradeSideHeader title="구해요" emoji="❤️" />
+        <TradeSideHeader
+          title="있어요 (Have)"
+          iconSrc="/trade-icons/have.png"
+        />
+        <TradeSideHeader
+          title="구해요 (Want)"
+          iconSrc="/trade-icons/want.png"
+        />
       </div>
 
       {grouped ? (
@@ -202,18 +208,21 @@ function TradeColumns({
   );
 }
 
-function TradeSideHeader({ title, emoji }: { title: string; emoji: string }) {
+function TradeSideHeader({
+  title,
+  iconSrc,
+}: {
+  title: string;
+  iconSrc: string;
+}) {
   return (
     <div className="flex min-h-8 items-center justify-center gap-1.5 rounded-xl bg-neutral-200 px-3 py-2 text-neutral-700">
-      <span
-        className="text-[12px] leading-none"
-        style={{
-          fontFamily:
-            "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif",
-        }}
-      >
-        {emoji}
-      </span>
+      <img
+        src={iconSrc}
+        alt=""
+        aria-hidden="true"
+        className="h-4 w-4 shrink-0 object-contain"
+      />
       <span className="text-[12px] font-black leading-none">{title}</span>
     </div>
   );

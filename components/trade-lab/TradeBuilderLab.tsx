@@ -148,7 +148,9 @@ function loadCanvasImage(source: string) {
   if (cachedImage) return cachedImage;
 
   const resolvedSource =
-    source.startsWith("data:") || source.startsWith("blob:")
+    source.startsWith("data:") ||
+    source.startsWith("blob:") ||
+    source.startsWith("/")
       ? source
       : `/api/image-proxy?url=${encodeURIComponent(source)}`;
 
@@ -196,9 +198,18 @@ async function renderBoardToPngBlob(
   const cardGap = 10;
   const rowGap = 18;
   const grouped = board.categoryDisplayMode !== "simple";
-  const cardsWithImages = await Promise.all(
-    board.cards.map(async (card) => ({ card, image: await loadCanvasImage(card.imageUrl) })),
-  );
+  const [cardsWithImages, sideIcons] = await Promise.all([
+    Promise.all(
+      board.cards.map(async (card) => ({
+        card,
+        image: await loadCanvasImage(card.imageUrl),
+      })),
+    ),
+    Promise.all([
+      loadCanvasImage("/trade-icons/have.png"),
+      loadCanvasImage("/trade-icons/want.png"),
+    ]),
+  ]);
 
   const getGroups = () => {
     const groups: Array<{ key: string; label: string }> = [];
@@ -277,7 +288,6 @@ async function renderBoardToPngBlob(
   context.fillRect(20, headerBottom - 26, 520, 26);
 
   const koreanFont = "'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif";
-  const emojiFont = "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
 
   context.fillStyle = "#a3a3a3";
   context.font = `900 9px ${koreanFont}`;
@@ -335,18 +345,23 @@ async function renderBoardToPngBlob(
     context.fill();
 
     const centerX = sideLeft[side] + sideWidth / 2;
-    const emoji = side === "have" ? "🙋" : "❤";
-    const label = side === "have" ? "있어요" : "구해요";
-    context.font = `12px ${emojiFont}`;
-    const emojiWidth = context.measureText(emoji).width;
+    const icon = side === "have" ? sideIcons[0] : sideIcons[1];
+    const label = side === "have" ? "있어요 (Have)" : "구해요 (Want)";
+    const iconSize = 14;
     context.font = `900 11px ${koreanFont}`;
     const labelWidth = context.measureText(label).width;
-    const totalWidth = emojiWidth + 5 + labelWidth;
+    const totalWidth = iconSize + 5 + labelWidth;
+    const startX = centerX - totalWidth / 2;
+    drawContainedImage(
+      context,
+      icon,
+      startX,
+      sideHeaderY + (22 - iconSize) / 2,
+      iconSize,
+      iconSize,
+    );
     context.fillStyle = "#404040";
-    context.font = `12px ${emojiFont}`;
-    context.fillText(emoji, centerX - totalWidth / 2, sideHeaderY + 15);
-    context.font = `900 11px ${koreanFont}`;
-    context.fillText(label, centerX - totalWidth / 2 + emojiWidth + 5, sideHeaderY + 15);
+    context.fillText(label, startX + iconSize + 5, sideHeaderY + 15);
   }
 
   const imageMap = new Map(cardsWithImages.map(({ card, image }) => [card.id, image]));
@@ -1015,8 +1030,8 @@ export function TradeBuilderLab({
               </p>
             ) : (
               <p className="mt-2 text-sm leading-6 text-neutral-500">
-                등록된 굿즈 이미지를 선택해 있어요 / 구해요 팝업 & 콜카 굿즈
-                교환판을 만들 수 있습니다.
+                등록된 굿즈 이미지를 선택해 있어요 (Have) / 구해요 (Want) 팝업 &
+                콜카 굿즈 교환판을 만들 수 있습니다.
               </p>
             )}
           </div>
@@ -1184,15 +1199,15 @@ export function TradeBuilderLab({
 
             <div className="mt-4 grid grid-cols-2 gap-3">
               <AddSideButton
-                title="있어요"
-                emoji="🙋🏻‍♀️"
+                title="있어요 (Have)"
+                iconSrc="/trade-icons/have.png"
                 count={haveCardCount}
                 onClick={() => openAddModal("have")}
               />
 
               <AddSideButton
-                title="구해요"
-                emoji="❤️"
+                title="구해요 (Want)"
+                iconSrc="/trade-icons/want.png"
                 count={wantCardCount}
                 onClick={() => openAddModal("want")}
               />
@@ -1326,7 +1341,7 @@ export function TradeBuilderLab({
 
 type AddSideButtonProps = {
   title: string;
-  emoji: string;
+  iconSrc: string;
   count: number;
   onClick: () => void;
 };
@@ -1377,7 +1392,7 @@ function ExportPreviewModal({ imageUrl, onClose }: ExportPreviewModalProps) {
   );
 }
 
-function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
+function AddSideButton({ title, iconSrc, count, onClick }: AddSideButtonProps) {
   return (
     <button
       type="button"
@@ -1387,9 +1402,12 @@ function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
     >
       <div className="flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1.5">
-          <span className="text-sm" aria-hidden="true">
-            {emoji}
-          </span>
+          <img
+            src={iconSrc}
+            alt=""
+            aria-hidden="true"
+            className="h-5 w-5 shrink-0 object-contain"
+          />
           <span className="text-sm font-black text-neutral-950">{title}</span>
         </span>
 
@@ -1442,7 +1460,7 @@ function AddItemModal({
   onDecreaseItem,
   onUpload,
 }: AddItemModalProps) {
-  const sideLabel = side === "have" ? "있어요" : "구해요";
+  const sideLabel = side === "have" ? "있어요 (Have)" : "구해요 (Want)";
   const canUseBenefitSubcategoryFilter =
     (selectedCategory === ALL_CATEGORIES_VALUE ||
       selectedCategory === "benefit") &&
@@ -1957,10 +1975,10 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
                 })
               }
               className="min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
-              aria-label="있어요 또는 구해요"
+              aria-label="있어요 (Have) 또는 구해요 (Want)"
             >
-              <option value="have">있어요</option>
-              <option value="want">구해요</option>
+              <option value="have">있어요 (Have)</option>
+              <option value="want">구해요 (Want)</option>
             </select>
 
             <select
