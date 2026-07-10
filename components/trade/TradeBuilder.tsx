@@ -189,10 +189,10 @@ async function renderBoardToPngBlob(
 ) {
   const width = 560;
   const scale = 2000 / width;
-  const sideWidth = 244;
-  const sideLeft = { have: 28, want: 288 } as const;
-  const cardWidth = 112;
-  const cardGap = 12;
+  const sideWidth = 232;
+  const sideLeft = { have: 36, want: 292 } as const;
+  const cardWidth = 106;
+  const cardGap = 10;
   const rowGap = 18;
   const grouped = board.categoryDisplayMode !== "simple";
   const cardsWithImages = await Promise.all(
@@ -391,13 +391,15 @@ async function renderBoardToPngBlob(
   if (grouped) {
     for (const group of getGroups()) {
       context.fillStyle = "#171717";
-      context.font = "900 10px Arial, 'Apple SD Gothic Neo', sans-serif";
-      context.fillText(group.label, 28, y + 11);
+      context.font = `900 10px ${koreanFont}`;
+      context.fillText(group.label, 36, y + 11);
+      const groupLabelWidth = context.measureText(group.label).width;
+      const dividerStartX = Math.min(36 + groupLabelWidth + 12, 512);
       context.strokeStyle = "#d4d4d4";
       context.lineWidth = 1;
       context.beginPath();
-      context.moveTo(80, y + 7);
-      context.lineTo(532, y + 7);
+      context.moveTo(dividerStartX, y + 7);
+      context.lineTo(524, y + 7);
       context.stroke();
       const gridY = y + 24;
       const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
@@ -1767,7 +1769,9 @@ type GoodsWorkReferenceProps = {
 
 function GoodsWorkReference({ referenceImages }: GoodsWorkReferenceProps) {
   return (
-    <details className="mb-4 border-b border-neutral-100 pb-4 pt-1">
+    <details
+      className="mb-4 border-b border-neutral-100 pb-4 pt-1"
+    >
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl bg-neutral-50 px-3 py-2.5 text-left ring-1 ring-neutral-200 [&::-webkit-details-marker]:hidden">
         <span className="flex min-w-0 items-center gap-1.5">
           <span aria-hidden="true" className="shrink-0 text-xs leading-none">
@@ -1790,7 +1794,7 @@ function GoodsWorkReference({ referenceImages }: GoodsWorkReferenceProps) {
               key={image.id}
               src={image.imageUrl}
               alt="굿즈 작품 확인용 공지 이미지"
-              loading="lazy"
+              loading="eager"
               decoding="async"
               className="w-full rounded-2xl bg-white object-contain ring-1 ring-neutral-200"
             />

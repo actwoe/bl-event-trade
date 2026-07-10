@@ -110,32 +110,39 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
     const grouped = board.categoryDisplayMode !== 'simple';
 
     return (
-      <div ref={ref} className="w-[560px] bg-white p-6 text-neutral-950">
+      <div
+        ref={ref}
+        className="w-[560px] bg-white p-6 text-neutral-950"
+        style={{
+          fontFamily:
+            "'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif",
+        }}
+      >
         <div className="overflow-hidden rounded-[30px] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.12)]">
-          <header className="bg-neutral-950 px-5 py-4 text-white">
+          <header className="bg-neutral-950 px-5 py-3 text-white">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/55">
                   Trade Board
                 </p>
 
-                <h1 className="mt-1 break-keep text-2xl font-black leading-tight tracking-tight text-white">
+                <h1 className="mt-0.5 break-keep text-[22px] font-black leading-tight tracking-tight text-white">
                   {collectionTitle}
                 </h1>
 
                 {profileText ? (
-                  <p className="mt-2 text-[12px] font-bold leading-5 text-white/70">
+                  <p className="mt-1.5 text-[11px] font-bold leading-4 text-white/70">
                     {profileText}
                   </p>
                 ) : null}
               </div>
 
               {memoChips.length > 0 ? (
-                <div className="flex max-h-[52px] max-w-[210px] shrink-0 flex-wrap justify-end gap-1.5 overflow-hidden">
+                <div className="flex max-h-[44px] max-w-[220px] shrink-0 flex-wrap justify-end gap-1 overflow-hidden">
                   {memoChips.map((chip) => (
                     <span
                       key={chip}
-                      className="rounded-full bg-white px-3 py-1.5 text-[10px] font-black leading-none text-neutral-950"
+                      className="rounded-full bg-white px-2.5 py-1 text-[9px] font-black leading-none text-neutral-950"
                     >
                       {chip}
                     </span>
@@ -145,7 +152,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
             </div>
           </header>
 
-          <section className="px-4 py-4">
+          <section className="px-6 py-4">
             {hasCards ? (
               <TradeColumns cards={board.cards} grouped={grouped} />
             ) : (
@@ -198,7 +205,15 @@ function TradeColumns({
 function TradeSideHeader({ title, emoji }: { title: string; emoji: string }) {
   return (
     <div className="flex min-h-8 items-center justify-center gap-1.5 rounded-xl bg-neutral-200 px-3 py-2 text-neutral-700">
-      <span className="text-[12px] leading-none">{emoji}</span>
+      <span
+        className="text-[12px] leading-none"
+        style={{
+          fontFamily:
+            "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif",
+        }}
+      >
+        {emoji}
+      </span>
       <span className="text-[12px] font-black leading-none">{title}</span>
     </div>
   );
@@ -234,11 +249,11 @@ function GroupedTradeRows({
             key={group.key}
             className="block w-full [break-inside:avoid] [-webkit-column-break-inside:avoid]"
           >
-            <div className="mb-2 flex min-h-5 w-full items-center gap-2">
-              <h2 className="shrink-0 text-[10px] font-black leading-5 text-neutral-700">
+            <div className="mb-2 grid min-h-5 w-full grid-cols-[max-content_minmax(0,1fr)] items-center gap-3">
+              <h2 className="max-w-[220px] truncate text-[10px] font-black leading-5 text-neutral-700">
                 {group.label}
               </h2>
-              <div className="h-px min-w-0 flex-1 bg-neutral-300" />
+              <div className="h-px w-full bg-neutral-300" />
             </div>
 
             <div className="grid grid-cols-2">
