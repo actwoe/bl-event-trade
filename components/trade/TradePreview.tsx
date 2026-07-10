@@ -6,6 +6,7 @@ import {
   TradeBoard,
   TradeCard,
 } from '@/lib/trade-types';
+import { QuantityBadge } from './QuantityBadge';
 
 type TradePreviewProps = {
   board: TradeBoard;
@@ -298,11 +299,7 @@ function PreviewCard({ card, showMeta }: PreviewCardProps) {
           className="aspect-[3/4] w-full rounded-xl bg-white object-contain"
         />
 
-        {quantity > 1 ? (
-          <span className="absolute right-2 top-4 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white shadow-sm">
-            ×{quantity}
-          </span>
-        ) : null}
+        <QuantityBadge quantity={quantity} />
       </div>
 
       <div className="-mt-1 px-1.5 pb-1 pt-0">

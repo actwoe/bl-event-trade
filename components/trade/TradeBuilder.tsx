@@ -17,6 +17,7 @@ import {
   TradeSide,
 } from "@/lib/trade-types";
 import { TradePreview } from "./TradePreview";
+import { QuantityBadge } from "./QuantityBadge";
 
 type TradeBuilderProps = {
   collection: TradeCollectionSummary;
@@ -26,6 +27,8 @@ type TradeBuilderProps = {
 
 const PREVIEW_WIDTH = 560;
 const EXPORT_IMAGE_WIDTH = 1200;
+const MAX_CANVAS_DIMENSION = 4096;
+const MAX_CANVAS_PIXELS = 16_777_216;
 const ALL_WORKS_VALUE = "all";
 const ALL_CATEGORIES_VALUE = "all";
 const ALL_BENEFIT_SUBCATEGORIES_VALUE = "all";
@@ -47,6 +50,98 @@ const TRADE_CONDITIONS = [
   "양도 가능",
   "미세 하자 있음",
 ];
+
+function getExportPixelRatio(element: HTMLElement) {
+  const targetRatio = EXPORT_IMAGE_WIDTH / PREVIEW_WIDTH;
+  const width = PREVIEW_WIDTH;
+  const height = element.scrollHeight || element.offsetHeight || width;
+
+  const ratioByWidth = MAX_CANVAS_DIMENSION / width;
+  const ratioByHeight = MAX_CANVAS_DIMENSION / height;
+  const ratioByArea = Math.sqrt(MAX_CANVAS_PIXELS / (width * height));
+
+  return Math.min(targetRatio, ratioByWidth, ratioByHeight, ratioByArea);
+}
+
+async function capturePreviewPng(element: HTMLElement) {
+  const pixelRatio = getExportPixelRatio(element);
+  const options = {
+    pixelRatio,
+    backgroundColor: "#ffffff",
+    cacheBust: false,
+    includeQueryParams: true,
+  } as const;
+
+  let dataUrl = await toPng(element, options);
+  let previousLength = 0;
+  let retries = 0;
+
+  while (dataUrl.length !== previousLength && retries < 5) {
+    previousLength = dataUrl.length;
+    dataUrl = await toPng(element, options);
+    retries += 1;
+  }
+
+  if (dataUrl.length < 100) {
+    throw new Error("Empty PNG export");
+  }
+
+  return dataUrl;
+}
+
+async function dataUrlToPngFile(dataUrl: string, filename: string) {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+
+  return new File([blob], filename, { type: "image/png" });
+}
+
+function prefersTouchSaveFlow() {
+  const isMobileUa = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const isIpadDesktopUa =
+    navigator.maxTouchPoints > 1 && /Macintosh/i.test(navigator.userAgent);
+
+  return (
+    isMobileUa ||
+    isIpadDesktopUa ||
+    (navigator.maxTouchPoints > 0 && window.innerWidth < 1024)
+  );
+}
+
+async function savePngDataUrl(
+  dataUrl: string,
+  filename: string,
+  onShowPreview: (previewUrl: string) => void,
+) {
+  const file = await dataUrlToPngFile(dataUrl, filename);
+
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: filename,
+      });
+      return;
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return;
+      }
+    }
+  }
+
+  if (prefersTouchSaveFlow()) {
+    onShowPreview(dataUrl);
+    return;
+  }
+
+  const link = document.createElement("a");
+  link.download = filename;
+  link.href = dataUrl;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
 
 function createInitialBoard(): TradeBoard {
   return {
@@ -212,6 +307,7 @@ export function TradeBuilder({
     useState<BenefitSubcategoryFilterValue>(ALL_BENEFIT_SUBCATEGORIES_VALUE);
   const [addModalSide, setAddModalSide] = useState<TradeSide | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
   const [previewScale, setPreviewScale] = useState(0.6);
   const [previewHeight, setPreviewHeight] = useState(1000);
 
@@ -587,6 +683,16 @@ export function TradeBuilder({
 
       if (!source || source.startsWith("data:")) return source;
 
+      if (source.startsWith("blob:")) {
+        const response = await fetch(source);
+
+        if (!response.ok) {
+          throw new Error(`Blob image request failed: ${response.status}`);
+        }
+
+        return blobToDataUrl(await response.blob());
+      }
+
       if (image.complete && image.naturalWidth > 0) {
         try {
           const canvas = document.createElement("canvas");
@@ -654,20 +760,13 @@ export function TradeBuilder({
         );
       });
 
-      const dataUrl = await toPng(previewElement, {
-        pixelRatio: EXPORT_IMAGE_WIDTH / PREVIEW_WIDTH,
-        backgroundColor: "#ffffff",
-        cacheBust: false,
-        includeQueryParams: true,
-      });
+      const dataUrl = await capturePreviewPng(previewElement);
 
-      const link = document.createElement("a");
-      link.download = `${collection.slug}-trade-board.png`;
-      link.href = dataUrl;
-      link.rel = "noopener";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      await savePngDataUrl(
+        dataUrl,
+        `${collection.slug}-trade-board.png`,
+        setExportPreviewUrl,
+      );
     } catch (error) {
       console.error("교환판 PNG 저장에 실패했습니다.", error);
       window.alert("이미지 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
@@ -1029,6 +1128,13 @@ export function TradeBuilder({
           onUpload={(files) => addUploadedCards(addModalSide, files)}
         />
       ) : null}
+
+      {exportPreviewUrl ? (
+        <ExportPreviewModal
+          imageUrl={exportPreviewUrl}
+          onClose={() => setExportPreviewUrl(null)}
+        />
+      ) : null}
     </section>
   );
 }
@@ -1039,6 +1145,52 @@ type AddSideButtonProps = {
   count: number;
   onClick: () => void;
 };
+
+type ExportPreviewModalProps = {
+  imageUrl: string;
+  onClose: () => void;
+};
+
+function ExportPreviewModal({ imageUrl, onClose }: ExportPreviewModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 bg-neutral-950/70 px-4 py-5">
+      <div className="mx-auto flex h-full w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-xl sm:max-w-lg">
+        <header className="shrink-0 border-b border-neutral-100 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-400">
+                Save Image
+              </p>
+              <h2 className="mt-1 text-xl font-black text-neutral-950">
+                교환판 이미지 저장
+              </h2>
+              <p className="mt-2 text-xs leading-5 text-neutral-500">
+                아래 이미지를 길게 눌러 사진 앱에 저장하거나 공유해 주세요.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xl font-black text-neutral-500"
+              aria-label="닫기"
+            >
+              ×
+            </button>
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <img
+            src={imageUrl}
+            alt="저장할 교환판 이미지"
+            className="w-full rounded-2xl border border-neutral-200 bg-white"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
   return (
@@ -1347,30 +1499,35 @@ function RegisteredItemCard({
           : "overflow-hidden rounded-2xl border border-neutral-300 bg-neutral-50 text-left shadow-sm"
       }
     >
-      <div className="relative border-b border-neutral-200 bg-neutral-100">
-        <img
-          src={item.imageUrl}
-          alt={item.itemName}
-          className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
-        />
+      <button
+        type="button"
+        onClick={onIncrease}
+        className="w-full text-left"
+        aria-label={`${item.workTitle} 수량 늘리기`}
+      >
+        <div className="relative border-b border-neutral-200 bg-neutral-100">
+          <img
+            src={item.imageUrl}
+            alt={item.itemName}
+            className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
+          />
 
-        {quantity > 1 ? (
-          <span className="absolute right-2 top-3 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white shadow-sm">
-            ×{quantity}
-          </span>
-        ) : null}
-      </div>
+          <QuantityBadge quantity={quantity} />
+        </div>
 
-      <div className="p-2">
-        <p className="line-clamp-1 text-[11px] font-black text-neutral-950">
-          {item.workTitle}
-        </p>
-        <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">
-          {metaLabel}
-        </p>
+        <div className="p-2">
+          <p className="line-clamp-1 text-[11px] font-black text-neutral-950">
+            {item.workTitle}
+          </p>
+          <p className="mt-0.5 line-clamp-1 text-[10px] text-neutral-500">
+            {metaLabel}
+          </p>
+        </div>
+      </button>
 
+      <div className="px-2 pb-2">
         {selected ? (
-          <div className="mt-2 flex items-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
+          <div className="flex items-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
             <button
               type="button"
               onClick={onDecrease}
@@ -1395,7 +1552,7 @@ function RegisteredItemCard({
           <button
             type="button"
             onClick={onIncrease}
-            className="mt-2 flex h-8 w-full items-center justify-center rounded-lg bg-neutral-950 text-sm font-black text-white"
+            className="flex h-8 w-full items-center justify-center rounded-lg bg-neutral-950 text-sm font-black text-white"
             aria-label="수량 늘리기"
           >
             +
@@ -1437,12 +1594,6 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
           alt=""
           className="h-full w-full object-contain p-1"
         />
-
-        {quantity > 1 ? (
-          <span className="absolute right-1.5 top-2 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white shadow-sm">
-            ×{quantity}
-          </span>
-        ) : null}
       </div>
 
       <div className="min-w-0 space-y-2">

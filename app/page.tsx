@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { CollectionCard } from '@/components/home/CollectionCard';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
 
 type TradeCollectionRow = {
@@ -172,45 +173,14 @@ export default async function HomePage() {
                 const periodLabel = getEventPeriodLabel(collection);
 
                 return (
-                  <Link
+                  <CollectionCard
                     key={collection.id}
                     href={`/trade/${collection.slug}`}
-                    className="group overflow-hidden rounded-2xl border border-neutral-200/70 bg-white transition hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
-                  >
-                    <div className="relative aspect-[32/45] bg-neutral-50">
-                      {thumbnailUrl ? (
-                        <img
-                          src={thumbnailUrl}
-                          alt={collection.title}
-                          className={`h-full w-full object-cover transition group-hover:scale-[1.02] ${
-                            ended ? 'grayscale opacity-60' : ''
-                          }`}
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center px-3 text-center text-xs font-bold leading-5 text-neutral-400">
-                          썸네일 없음
-                        </div>
-                      )}
-
-                      {ended ? (
-                        <span className="absolute left-2 top-2 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-bold text-white">
-                          종료
-                        </span>
-                      ) : null}
-                    </div>
-
-                    <div className="p-3">
-                      <h3 className="line-clamp-2 break-keep text-sm font-bold leading-5 text-neutral-900">
-                        {collection.title}
-                      </h3>
-
-                      {periodLabel ? (
-                        <p className="mt-1 line-clamp-2 text-[11px] font-medium leading-5 text-neutral-400">
-                          {periodLabel}
-                        </p>
-                      ) : null}
-                    </div>
-                  </Link>
+                    title={collection.title}
+                    periodLabel={periodLabel}
+                    thumbnailUrl={thumbnailUrl}
+                    ended={ended}
+                  />
                 );
               })}
             </div>
