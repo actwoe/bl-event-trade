@@ -29,6 +29,9 @@ export function CollectionCard({
     <Link
       href={href}
       prefetch
+      onPointerEnter={() => router.prefetch(href)}
+      onPointerDown={() => router.prefetch(href)}
+      onFocus={() => router.prefetch(href)}
       className="group block w-full touch-manipulation overflow-hidden rounded-2xl border border-neutral-200/70 bg-white transition active:scale-[0.98] active:border-neutral-300 hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
       aria-label={`${title} 교환판 만들기`}
     >
@@ -37,6 +40,9 @@ export function CollectionCard({
           <img
             src={thumbnailUrl}
             alt=""
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
             className={`h-full w-full object-cover transition group-hover:scale-[1.02] ${
               ended ? 'grayscale opacity-60' : ''
             }`}

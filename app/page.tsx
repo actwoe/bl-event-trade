@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { CollectionCard } from '@/components/home/CollectionCard';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
 
+
+export const revalidate = 300;
+
 type TradeCollectionRow = {
   id: string;
   slug: string;

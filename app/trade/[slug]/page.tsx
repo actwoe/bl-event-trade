@@ -9,6 +9,8 @@ import {
   TradeReferenceImage,
 } from '@/lib/trade-types';
 
+export const revalidate = 300;
+
 type TradePageProps = {
   params: Promise<{
     slug: string;

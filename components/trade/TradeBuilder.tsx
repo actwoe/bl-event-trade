@@ -34,23 +34,6 @@ const ALL_CATEGORIES_VALUE = "all";
 const ALL_BENEFIT_SUBCATEGORIES_VALUE = "all";
 const NO_BENEFIT_SUBCATEGORY_VALUE = "__none__";
 
-function getDisplayImageUrl(source: string) {
-  if (!source || source.startsWith("data:") || source.startsWith("blob:")) {
-    return source;
-  }
-
-  if (typeof window !== "undefined") {
-    try {
-      const url = new URL(source, window.location.href);
-      if (url.origin === window.location.origin) return url.href;
-    } catch {
-      return source;
-    }
-  }
-
-  return `/api/image-proxy?url=${encodeURIComponent(source)}`;
-}
-
 type CategoryFilterValue = TradeCategory | typeof ALL_CATEGORIES_VALUE;
 type BenefitSubcategoryFilterValue = string;
 
@@ -330,6 +313,59 @@ export function TradeBuilder({
 
   const previewAreaRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const imageUrls = Array.from(
+      new Set(
+        [...registeredItems.map((item) => item.imageUrl), ...referenceImages.map((image) => image.imageUrl)].filter(Boolean),
+      ),
+    );
+
+    async function preloadImages() {
+      const concurrency = 4;
+      let index = 0;
+
+      async function worker() {
+        while (!cancelled) {
+          const currentIndex = index;
+          index += 1;
+
+          if (currentIndex >= imageUrls.length) return;
+
+          await new Promise<void>((resolve) => {
+            const image = new Image();
+            const finish = () => resolve();
+            image.decoding = "async";
+            image.onload = finish;
+            image.onerror = finish;
+            image.src = imageUrls[currentIndex];
+          });
+        }
+      }
+
+      await Promise.all(Array.from({ length: concurrency }, () => worker()));
+    }
+
+    const startPreload = () => {
+      void preloadImages();
+    };
+
+    const idleCallback = window.requestIdleCallback?.(startPreload, { timeout: 1200 });
+    const timeoutId = idleCallback ? null : window.setTimeout(startPreload, 250);
+
+    return () => {
+      cancelled = true;
+
+      if (idleCallback) {
+        window.cancelIdleCallback?.(idleCallback);
+      }
+
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [registeredItems, referenceImages]);
 
   const workTitleOptions = useMemo(() => {
     const titles = registeredItems
@@ -669,42 +705,91 @@ export function TradeBuilder({
     if (!previewElement) return;
 
     const waitForImage = (image: HTMLImageElement) =>
-      new Promise<void>((resolve, reject) => {
+      new Promise<void>((resolve) => {
         if (image.complete && image.naturalWidth > 0) {
           resolve();
           return;
         }
 
-        const cleanup = () => {
+        const finish = () => {
           window.clearTimeout(timeoutId);
-          image.removeEventListener("load", handleLoad);
-          image.removeEventListener("error", handleError);
-        };
-        const handleLoad = () => {
-          cleanup();
+          image.removeEventListener("load", finish);
+          image.removeEventListener("error", finish);
           resolve();
         };
-        const handleError = () => {
-          cleanup();
-          reject(new Error(`Image load failed: ${image.currentSrc || image.src}`));
-        };
-        const timeoutId = window.setTimeout(() => {
-          cleanup();
-          reject(new Error(`Image load timed out: ${image.currentSrc || image.src}`));
-        }, 20000);
+        const timeoutId = window.setTimeout(finish, 15000);
 
-        image.addEventListener("load", handleLoad, { once: true });
-        image.addEventListener("error", handleError, { once: true });
+        image.addEventListener("load", finish, { once: true });
+        image.addEventListener("error", finish, { once: true });
       });
+
+    const blobToDataUrl = (blob: Blob) =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+
+    const imageToDataUrl = async (image: HTMLImageElement) => {
+      const source = image.currentSrc || image.src;
+
+      if (!source || source.startsWith("data:")) return source;
+
+      const requestUrl = source.startsWith("blob:")
+        ? source
+        : `/api/image-proxy?url=${encodeURIComponent(source)}`;
+      const response = await fetch(requestUrl, {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+
+      if (!response.ok) {
+        throw new Error(`Image request failed: ${response.status}`);
+      }
+
+      return blobToDataUrl(await response.blob());
+    };
+
+    const originalImages = Array.from(
+      previewElement.querySelectorAll<HTMLImageElement>("img"),
+    );
+    const originalSources = originalImages.map((image) => ({
+      image,
+      src: image.getAttribute("src"),
+      crossOrigin: image.getAttribute("crossorigin"),
+      referrerPolicy: image.getAttribute("referrerpolicy"),
+    }));
 
     try {
       setIsExporting(true);
+
       await document.fonts?.ready;
 
-      const images = Array.from(
-        previewElement.querySelectorAll<HTMLImageElement>("img"),
+      const imageResults = await Promise.allSettled(
+        originalImages.map(async (image) => {
+          const dataUrl = await imageToDataUrl(image);
+
+          if (!dataUrl) {
+            throw new Error("빈 이미지 주소입니다.");
+          }
+
+          image.removeAttribute("crossorigin");
+          image.removeAttribute("referrerpolicy");
+          image.src = dataUrl;
+          await waitForImage(image);
+
+          if (!image.complete || image.naturalWidth <= 0) {
+            throw new Error("이미지를 불러오지 못했습니다.");
+          }
+        }),
       );
-      await Promise.all(images.map(waitForImage));
+      const failedImages = imageResults.filter((result) => result.status === "rejected");
+
+      if (failedImages.length > 0) {
+        console.error("PNG에 포함하지 못한 이미지가 있습니다.", failedImages);
+        throw new Error("PNG 이미지 변환 실패");
+      }
 
       await new Promise<void>((resolve) => {
         requestAnimationFrame(() =>
@@ -713,6 +798,7 @@ export function TradeBuilder({
       });
 
       const dataUrl = await capturePreviewPng(previewElement);
+
       await savePngDataUrl(
         dataUrl,
         `${collection.slug}-trade-board.png`,
@@ -720,10 +806,28 @@ export function TradeBuilder({
       );
     } catch (error) {
       console.error("교환판 PNG 저장에 실패했습니다.", error);
-      window.alert(
-        "굿즈 이미지를 불러오지 못해 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-      );
+      window.alert("이미지 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
+      for (const original of originalSources) {
+        if (original.src === null) {
+          original.image.removeAttribute("src");
+        } else {
+          original.image.setAttribute("src", original.src);
+        }
+
+        if (original.crossOrigin === null) {
+          original.image.removeAttribute("crossorigin");
+        } else {
+          original.image.setAttribute("crossorigin", original.crossOrigin);
+        }
+
+        if (original.referrerPolicy === null) {
+          original.image.removeAttribute("referrerpolicy");
+        } else {
+          original.image.setAttribute("referrerpolicy", original.referrerPolicy);
+        }
+      }
+
       setIsExporting(false);
     }
   }
@@ -1394,6 +1498,8 @@ function GoodsWorkReference({ referenceImages }: GoodsWorkReferenceProps) {
               key={image.id}
               src={image.imageUrl}
               alt="굿즈 작품 확인용 공지 이미지"
+              loading="lazy"
+              decoding="async"
               className="w-full rounded-2xl bg-white object-contain ring-1 ring-neutral-200"
             />
           ))}
@@ -1440,9 +1546,11 @@ function RegisteredItemCard({
       >
         <div className="relative border-b border-neutral-200 bg-neutral-100">
           <img
-            src={getDisplayImageUrl(item.imageUrl)}
+            src={item.imageUrl}
             alt={item.itemName}
-            className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain`}
+            loading="eager"
+            decoding="async"
+            className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
           />
 
           <QuantityBadge quantity={quantity} />
@@ -1523,11 +1631,10 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
     <div className="grid grid-cols-[64px_1fr] gap-3 rounded-xl bg-neutral-50 p-3">
       <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-white">
         <img
-          src={getDisplayImageUrl(card.imageUrl)}
+          src={card.imageUrl}
           alt=""
-          className="h-full w-full object-contain"
+          className="h-full w-full object-contain p-1"
         />
-        <QuantityBadge quantity={quantity} />
       </div>
 
       <div className="min-w-0 space-y-2">
