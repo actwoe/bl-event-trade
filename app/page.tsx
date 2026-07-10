@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { CollectionCard } from '@/components/home/CollectionCard';
+import { UserAuthLinks } from '@/components/auth/UserAuthLinks';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
 
 
@@ -149,6 +150,8 @@ export default async function HomePage() {
           <p className="mt-2 text-sm font-semibold leading-6 text-neutral-700">
             어떤 행사의 굿즈를 교환할까요?
           </p>
+
+          <UserAuthLinks className="mt-4" />
         </header>
 
         <div className="bg-white p-5">
