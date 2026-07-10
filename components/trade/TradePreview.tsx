@@ -13,10 +13,12 @@ type TradePreviewProps = {
   collectionTitle: string;
 };
 
-type SideBlockProps = {
+type SideColumnProps = {
   title: string;
   emoji: string;
+  side: 'have' | 'want';
   cards: TradeCard[];
+  grouped: boolean;
   hasDivider?: boolean;
 };
 
@@ -60,6 +62,52 @@ function getCardMetaLabel(card: TradeCard) {
   return categoryLabel;
 }
 
+type CardGroup = {
+  key: string;
+  label: string;
+  cards: TradeCard[];
+};
+
+function getCardGroups(cards: TradeCard[]): CardGroup[] {
+  const groups: CardGroup[] = [];
+
+  for (const category of TRADE_CATEGORIES) {
+    const categoryCards = cards.filter((card) => card.category === category.id);
+
+    if (categoryCards.length === 0) continue;
+
+    if (category.id !== 'benefit') {
+      groups.push({
+        key: category.id,
+        label: category.label,
+        cards: categoryCards,
+      });
+      continue;
+    }
+
+    const benefitGroups = new Map<string, TradeCard[]>();
+
+    for (const card of categoryCards) {
+      const subcategory =
+        'benefitSubcategory' in card &&
+        typeof card.benefitSubcategory === 'string'
+          ? card.benefitSubcategory.trim()
+          : '';
+      const label = subcategory || category.label;
+      const key = subcategory ? `benefit:${subcategory}` : 'benefit';
+      const currentCards = benefitGroups.get(key) ?? [];
+      currentCards.push(card);
+      benefitGroups.set(key, currentCards);
+
+      if (!groups.some((group) => group.key === key)) {
+        groups.push({ key, label, cards: currentCards });
+      }
+    }
+  }
+
+  return groups;
+}
+
 export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
   function TradePreview({ board, collectionTitle }, ref) {
     const hasCards = board.cards.length > 0;
@@ -67,7 +115,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
     const contact = board.contact.trim();
     const memoChips = getMemoChips(board.memo);
     const profileText = [nickname, contact].filter(Boolean).join(' · ');
-    const useSimpleMode = board.categoryDisplayMode === 'simple';
+    const grouped = board.categoryDisplayMode !== 'simple';
 
     return (
       <div ref={ref} className="w-[560px] bg-white p-6 text-neutral-950">
@@ -105,13 +153,25 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
             </div>
           </header>
 
-          <section className="space-y-3 px-4 py-4">
+          <section className="px-4 py-4">
             {hasCards ? (
-              useSimpleMode ? (
-                <SimpleSection cards={board.cards} />
-              ) : (
-                <GroupedSection cards={board.cards} />
-              )
+              <div className="grid grid-cols-2">
+                <SideColumn
+                  title="있어요"
+                  emoji="🙋🏻‍♀️"
+                  side="have"
+                  cards={board.cards}
+                  grouped={grouped}
+                />
+                <SideColumn
+                  title="구해요"
+                  emoji="❤️"
+                  side="want"
+                  cards={board.cards}
+                  grouped={grouped}
+                  hasDivider
+                />
+              </div>
             ) : (
               <div className="rounded-[28px] border-2 border-dashed border-neutral-200 px-6 py-16 text-center">
                 <p className="text-lg font-black text-neutral-300">
@@ -126,72 +186,63 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
   },
 );
 
-function GroupedSection({ cards }: { cards: TradeCard[] }) {
-  const haveCards = cards.filter((card) => card.side === 'have');
-  const wantCards = cards.filter((card) => card.side === 'want');
-
-  return (
-    <section className="bg-white px-1 py-1.5">
-      <div className="grid grid-cols-2">
-        <GroupedSideColumn
-          title="있어요"
-          emoji="🙋🏻‍♀️"
-          cards={haveCards}
-          hasDivider={false}
-        />
-        <GroupedSideColumn
-          title="구해요"
-          emoji="❤️"
-          cards={wantCards}
-          hasDivider={true}
-        />
-      </div>
-    </section>
-  );
-}
-
-function GroupedSideColumn({
+function SideColumn({
   title,
   emoji,
+  side,
   cards,
+  grouped,
   hasDivider = false,
-}: SideBlockProps) {
-  const populatedCategories = TRADE_CATEGORIES.map((category) => ({
-    ...category,
-    cards: cards.filter((card) => card.category === category.id),
-  })).filter((category) => category.cards.length > 0);
+}: SideColumnProps) {
+  const sideCards = cards.filter((card) => card.side === side);
+  const cardGroups = getCardGroups(sideCards);
 
   return (
-    <div
+    <section
       className={
         hasDivider
           ? 'min-w-0 border-l border-neutral-200 pl-3'
           : 'min-w-0 pr-3'
       }
     >
-      <div className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-neutral-950 px-3 py-2.5 text-white">
-        <span className="text-sm">{emoji}</span>
-        <span className="text-sm font-black">{title}</span>
+      <div className="mb-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-neutral-200 px-3 py-3 text-neutral-800 shadow-[0_4px_12px_rgba(15,23,42,0.14)]">
+        <span className="text-sm leading-none">{emoji}</span>
+        <span className="text-sm font-black leading-none">{title}</span>
       </div>
 
-      <div className="space-y-3">
-        {populatedCategories.map((category) => (
-          <section key={category.id}>
-            <div className="mb-1.5 flex items-center gap-2">
-              <h2 className="shrink-0 text-[11px] font-black text-neutral-700">
-                {category.label}
-              </h2>
-              <div className="h-px flex-1 bg-neutral-200" />
-            </div>
-            <CardGrid cards={category.cards} />
-          </section>
-        ))}
-      </div>
-    </div>
+      {grouped ? (
+        <div className="flex flex-col gap-4">
+          {cardGroups.map((group) => (
+            <section
+              key={group.key}
+              className="block w-full [break-inside:avoid] [-webkit-column-break-inside:avoid]"
+            >
+              <div className="mb-2 flex min-h-5 w-full items-center gap-2">
+                <h2 className="shrink-0 text-[10px] font-black leading-5 text-neutral-700">
+                  {group.label}
+                </h2>
+                <div className="h-px min-w-0 flex-1 bg-neutral-200" />
+              </div>
+              <CardGrid cards={group.cards} />
+            </section>
+          ))}
+        </div>
+      ) : (
+        <CardGrid cards={sideCards} />
+      )}
+    </section>
   );
 }
 
 function CardGrid({ cards }: { cards: TradeCard[] }) {
+  if (cards.length === 0) {
+    return (
+      <div className="flex min-h-20 items-center justify-center rounded-xl bg-neutral-50 px-3 text-center text-[10px] font-bold text-neutral-300">
+        선택된 굿즈가 없습니다
+      </div>
+    );
+  }
+
   if (cards.length === 1) {
     return (
       <div className="flex justify-center">
@@ -211,50 +262,6 @@ function CardGrid({ cards }: { cards: TradeCard[] }) {
   );
 }
 
-function SimpleSection({ cards }: { cards: TradeCard[] }) {
-  const haveCards = cards.filter((card) => card.side === 'have');
-  const wantCards = cards.filter((card) => card.side === 'want');
-
-  return (
-    <section className="bg-white px-1 py-1.5">
-      <div className="grid grid-cols-2">
-        <SideBlock
-          title="있어요"
-          emoji="🙋🏻‍♀️"
-          cards={haveCards}
-          hasDivider={false}
-        />
-
-        <SideBlock
-          title="구해요"
-          emoji="❤️"
-          cards={wantCards}
-          hasDivider={true}
-        />
-      </div>
-    </section>
-  );
-}
-
-function SideBlock({ title, emoji, cards, hasDivider = false }: SideBlockProps) {
-  return (
-    <div
-      className={
-        hasDivider
-          ? 'min-w-0 border-l border-neutral-200 pl-3'
-          : 'min-w-0 pr-3'
-      }
-    >
-      <div className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-neutral-950 px-3 py-2.5 text-white">
-        <span className="text-sm">{emoji}</span>
-        <span className="text-sm font-black">{title}</span>
-      </div>
-
-      <CardGrid cards={cards} />
-    </div>
-  );
-}
-
 function PreviewCard({ card }: PreviewCardProps) {
   const metaLabel = getCardMetaLabel(card);
   const quantity = getCardQuantity(card);
@@ -265,11 +272,13 @@ function PreviewCard({ card }: PreviewCardProps) {
         <img
           src={card.imageUrl}
           alt={card.memo || card.workTitle}
+          crossOrigin="anonymous"
+          referrerPolicy="no-referrer"
           className="aspect-[3/4] w-full rounded-xl bg-white object-contain"
         />
 
         {quantity > 1 ? (
-          <span className="absolute right-3 top-3 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white">
+          <span className="absolute right-3 top-3 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white">
             ×{quantity}
           </span>
         ) : null}
