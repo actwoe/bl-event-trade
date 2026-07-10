@@ -131,19 +131,30 @@ function drawCenteredText(
   context.restore();
 }
 
-async function loadCanvasImage(source: string) {
+const canvasImageCache = new Map<string, Promise<HTMLImageElement>>();
+
+function loadCanvasImage(source: string) {
+  const cachedImage = canvasImageCache.get(source);
+  if (cachedImage) return cachedImage;
+
   const resolvedSource =
     source.startsWith("data:") || source.startsWith("blob:")
       ? source
       : `/api/image-proxy?url=${encodeURIComponent(source)}`;
 
-  return await new Promise<HTMLImageElement>((resolve, reject) => {
+  const imagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.decoding = "async";
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
+    image.onerror = () => {
+      canvasImageCache.delete(source);
+      reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
+    };
     image.src = resolvedSource;
   });
+
+  canvasImageCache.set(source, imagePromise);
+  return imagePromise;
 }
 
 function drawContainedImage(
@@ -166,8 +177,9 @@ async function renderBoardToPngBlob(
   board: TradeBoard,
   collectionTitle: string,
 ) {
-  const scale = 2;
   const width = 560;
+  const outputWidth = 2000;
+  const scale = outputWidth / width;
   const sideWidth = 244;
   const sideLeft = { have: 28, want: 288 } as const;
   const cardWidth = 112;
@@ -201,7 +213,7 @@ async function renderBoardToPngBlob(
   };
 
   const cardHeight = (card: TradeCard, showMeta: boolean) =>
-    (card.imageRatio === "photocard" ? 170 : 112) + 24 + (showMeta ? 16 : 0);
+    (card.imageRatio === "photocard" ? 170 : 112) + 30 + (showMeta ? 16 : 0);
 
   const gridHeight = (cards: TradeCard[], showMeta: boolean) => {
     if (cards.length === 0) return 0;
@@ -230,8 +242,8 @@ async function renderBoardToPngBlob(
   const height = Math.max(320, contentHeight + 24);
 
   const canvas = document.createElement("canvas");
-  canvas.width = width * scale;
-  canvas.height = height * scale;
+  canvas.width = outputWidth;
+  canvas.height = Math.ceil(height * scale);
   const context = canvas.getContext("2d");
   if (!context) throw new Error("이미지 생성 도구를 사용할 수 없습니다.");
   context.scale(scale, scale);
@@ -303,9 +315,9 @@ async function renderBoardToPngBlob(
       drawCenteredText(context, `×${quantity}`, x + cardWidth - 12, y + 17, 14, "900 7px Arial, sans-serif", "#ffffff");
     }
 
-    drawCenteredText(context, card.workTitle || "작품명", x + cardWidth / 2, y + imageHeight + 17, cardWidth, "800 11px Arial, 'Apple SD Gothic Neo', sans-serif", "#171717");
+    drawCenteredText(context, card.workTitle || "작품명", x + cardWidth / 2, y + imageHeight + 22, cardWidth, "800 11px Arial, 'Apple SD Gothic Neo', sans-serif", "#171717");
     if (showMeta) {
-      drawCenteredText(context, getCardMetaLabel(card), x + cardWidth / 2, y + imageHeight + 32, cardWidth, "500 9px Arial, 'Apple SD Gothic Neo', sans-serif", "#737373");
+      drawCenteredText(context, getCardMetaLabel(card), x + cardWidth / 2, y + imageHeight + 38, cardWidth, "500 9px Arial, 'Apple SD Gothic Neo', sans-serif", "#737373");
     }
   };
 
@@ -325,12 +337,17 @@ async function renderBoardToPngBlob(
       context.fillStyle = "#171717";
       context.font = "900 10px Arial, 'Apple SD Gothic Neo', sans-serif";
       context.fillText(group.label, 28, y + 11);
-      context.strokeStyle = "#d4d4d4";
-      context.lineWidth = 1;
-      context.beginPath();
-      context.moveTo(80, y + 7);
-      context.lineTo(532, y + 7);
-      context.stroke();
+
+      const categoryLabelWidth = context.measureText(group.label).width;
+      const separatorStartX = Math.min(520, 28 + categoryLabelWidth + 12);
+      if (separatorStartX < 532) {
+        context.strokeStyle = "#d4d4d4";
+        context.lineWidth = 1;
+        context.beginPath();
+        context.moveTo(separatorStartX, y + 8);
+        context.lineTo(532, y + 8);
+        context.stroke();
+      }
       const gridY = y + 24;
       const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
       const want = board.cards.filter((card) => card.side === "want" && cardGroupKey(card) === group.key);
@@ -660,6 +677,12 @@ export function TradeBuilder({
       memo: selectedConditions.join(" · "),
     }));
   }, [selectedConditions]);
+
+  useEffect(() => {
+    void Promise.allSettled(
+      board.cards.map((card) => loadCanvasImage(card.imageUrl)),
+    );
+  }, [board.cards]);
 
   useEffect(() => {
     function updatePreviewSize() {

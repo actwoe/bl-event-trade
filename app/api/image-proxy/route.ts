@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 86_400;
 
 function isAllowedImageUrl(url: URL) {
   if (url.protocol !== "https:") return false;
@@ -40,7 +41,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const response = await fetch(imageUrl, {
-      cache: "no-store",
+      cache: "force-cache",
+      next: { revalidate: 86_400 },
       headers: { Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8" },
     });
 
@@ -60,7 +62,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400",
+        "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000",
         "Access-Control-Allow-Origin": "*",
       },
     });

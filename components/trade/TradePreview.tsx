@@ -110,7 +110,10 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
     const grouped = board.categoryDisplayMode !== 'simple';
 
     return (
-      <div ref={ref} className="w-[560px] bg-white p-6 text-neutral-950">
+      <div
+        ref={ref}
+        className="w-[560px] min-w-[560px] bg-white p-6 text-neutral-950"
+      >
         <div className="overflow-hidden rounded-[30px] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.12)]">
           <header className="bg-neutral-950 px-5 py-4 text-white">
             <div className="flex items-start justify-between gap-4">
@@ -234,11 +237,11 @@ function GroupedTradeRows({
             key={group.key}
             className="block w-full [break-inside:avoid] [-webkit-column-break-inside:avoid]"
           >
-            <div className="mb-2 flex min-h-5 w-full items-center gap-2">
-              <h2 className="shrink-0 text-[10px] font-black leading-5 text-neutral-700">
+            <div className="mb-2.5 grid min-h-5 w-full grid-cols-[max-content_1fr] items-center gap-3">
+              <h2 className="max-w-[180px] break-keep text-[10px] font-black leading-5 text-neutral-700">
                 {group.label}
               </h2>
-              <div className="h-px min-w-0 flex-1 bg-neutral-300" />
+              <div className="h-px min-w-0 bg-neutral-300" />
             </div>
 
             <div className="grid grid-cols-2">
@@ -302,7 +305,7 @@ function PreviewCard({ card, showMeta }: PreviewCardProps) {
         <QuantityBadge quantity={quantity} />
       </div>
 
-      <div className="-mt-1 px-1.5 pb-1 pt-0">
+      <div className="mt-1.5 px-1.5 pb-1 pt-0">
         <p className="line-clamp-1 text-center text-[10px] font-black leading-4 text-neutral-950">
           {card.workTitle || '작품명'}
         </p>
