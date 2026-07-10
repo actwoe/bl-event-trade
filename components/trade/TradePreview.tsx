@@ -13,14 +13,17 @@ type TradePreviewProps = {
   collectionTitle: string;
 };
 
-type CategorySectionProps = {
-  category: TradeCategory;
-  cards: TradeCard[];
-};
-
 type SideBlockProps = {
   title: string;
   emoji: string;
+  cards: TradeCard[];
+  hasDivider?: boolean;
+};
+
+type GroupedSideBlockProps = {
+  title: string;
+  emoji: string;
+  side: 'have' | 'want';
   cards: TradeCard[];
   hasDivider?: boolean;
 };
@@ -115,13 +118,7 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
               useSimpleMode ? (
                 <SimpleSection cards={board.cards} />
               ) : (
-                TRADE_CATEGORIES.map((category) => (
-                  <CategorySection
-                    key={category.id}
-                    category={category.id}
-                    cards={board.cards}
-                  />
-                ))
+                <GroupedSection cards={board.cards} />
               )
             ) : (
               <div className="rounded-[28px] border-2 border-dashed border-neutral-200 px-6 py-16 text-center">
@@ -137,53 +134,89 @@ export const TradePreview = forwardRef<HTMLDivElement, TradePreviewProps>(
   },
 );
 
-function CategorySection({ category, cards }: CategorySectionProps) {
-  const categoryOption = TRADE_CATEGORIES.find(
-    (option) => option.id === category,
-  );
-  const categoryLabel = categoryOption?.label ?? category;
-
-  const haveCards = cards.filter(
-    (card) => card.category === category && card.side === 'have',
-  );
-
-  const wantCards = cards.filter(
-    (card) => card.category === category && card.side === 'want',
-  );
-
-  if (haveCards.length === 0 && wantCards.length === 0) {
-    return null;
-  }
-
+function GroupedSection({ cards }: { cards: TradeCard[] }) {
   return (
     <section className="bg-white px-1 py-1.5">
-      <div className="mb-2 flex items-center gap-3 px-1">
-        <h2 className="shrink-0 text-[12px] font-black text-neutral-950">
-          {categoryLabel}
-        </h2>
-        <div className="h-px flex-1 bg-neutral-200" />
-      </div>
-
       <div className="grid grid-cols-2">
-        {haveCards.length > 0 ? (
-          <SideBlock
-            title="있어요"
-            emoji="🙋🏻‍♀️"
-            cards={haveCards}
-            hasDivider={false}
-          />
-        ) : null}
+        <GroupedSideBlock
+          title="있어요"
+          emoji="🙋🏻‍♀️"
+          side="have"
+          cards={cards}
+          hasDivider={false}
+        />
 
-        {wantCards.length > 0 ? (
-          <SideBlock
-            title="구해요"
-            emoji="❤️"
-            cards={wantCards}
-            hasDivider={haveCards.length > 0}
-          />
-        ) : null}
+        <GroupedSideBlock
+          title="구해요"
+          emoji="❤️"
+          side="want"
+          cards={cards}
+          hasDivider
+        />
       </div>
     </section>
+  );
+}
+
+function GroupedSideBlock({
+  title,
+  emoji,
+  side,
+  cards,
+  hasDivider = false,
+}: GroupedSideBlockProps) {
+  const sideCards = cards.filter((card) => card.side === side);
+
+  return (
+    <div
+      className={
+        hasDivider
+          ? 'min-w-0 border-l border-neutral-200 pl-3'
+          : 'min-w-0 pr-3'
+      }
+    >
+      <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1.5">
+        <span className="text-xs">{emoji}</span>
+        <span className="text-xs font-black text-neutral-950">{title}</span>
+      </div>
+
+      <div className="space-y-4">
+        {TRADE_CATEGORIES.map((category) => {
+          const categoryCards = sideCards.filter(
+            (card) => card.category === category.id,
+          );
+
+          if (categoryCards.length === 0) {
+            return null;
+          }
+
+          return (
+            <section key={category.id}>
+              <div className="mb-1.5 flex items-center gap-2">
+                <h2 className="shrink-0 text-[11px] font-black text-neutral-700">
+                  {category.label}
+                </h2>
+                <div className="h-px flex-1 bg-neutral-200" />
+              </div>
+
+              {categoryCards.length === 1 ? (
+                <div className="flex justify-center">
+                  <div className="w-[calc(50%-0.25rem)]">
+                    <PreviewCard card={categoryCards[0]} />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+                  {categoryCards.map((card) => (
+                    <PreviewCard key={card.id} card={card} />
+                  ))}
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -257,7 +290,7 @@ function PreviewCard({ card }: PreviewCardProps) {
         />
 
         {quantity > 1 ? (
-          <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-950 text-[9px] font-black leading-none text-white shadow-sm">
+          <span className="absolute right-2.5 top-2.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-neutral-950 text-[7px] font-black leading-none text-white shadow-sm">
             ×{quantity}
           </span>
         ) : null}

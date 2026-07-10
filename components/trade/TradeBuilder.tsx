@@ -1229,8 +1229,8 @@ function RegisteredItemCard({
           className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain p-1.5`}
         />
 
-        {selected ? (
-          <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-neutral-950 text-[10px] font-black leading-none text-white">
+        {quantity > 1 ? (
+          <span className="absolute right-2.5 top-2.5 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[8px] font-black leading-none text-white">
             ×{quantity}
           </span>
         ) : null}
@@ -1314,7 +1314,7 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
         />
 
         {quantity > 1 ? (
-          <span className="absolute right-1 top-1 rounded-full bg-neutral-950 px-1.5 py-0.5 text-[10px] font-black text-white">
+          <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-neutral-950 text-[8px] font-black leading-none text-white">
             ×{quantity}
           </span>
         ) : null}
