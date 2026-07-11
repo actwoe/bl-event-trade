@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
 
 type AdminState = 'checking' | 'admin' | 'not-admin' | 'signed-out';
+type EventStatus = 'scheduled' | 'ongoing' | 'ended';
 
 type TradeCollectionRow = {
   id: string;
@@ -61,12 +62,24 @@ function getKoreaTodayDateString() {
   return `${year}-${month}-${day}`;
 }
 
-function isEventEnded(row: TradeCollectionRow) {
-  if (!row.event_end_date) {
-    return false;
+function getEventStatus(row: TradeCollectionRow): EventStatus {
+  const today = getKoreaTodayDateString();
+
+  if (row.event_end_date && row.event_end_date < today) {
+    return 'ended';
   }
 
-  return row.event_end_date < getKoreaTodayDateString();
+  if (row.event_start_date && row.event_start_date > today) {
+    return 'scheduled';
+  }
+
+  return 'ongoing';
+}
+
+function getEventStatusLabel(status: EventStatus) {
+  if (status === 'scheduled') return '예정';
+  if (status === 'ended') return '종료';
+  return '진행중';
 }
 
 function formatDate(value: string | null) {
@@ -83,18 +96,18 @@ function formatDate(value: string | null) {
 
 function getEventPeriodLabel(row: TradeCollectionRow) {
   if (row.event_start_date && row.event_end_date) {
-    return `${formatDate(row.event_start_date)} - ${formatDate(row.event_end_date)}`;
+    return `${formatDate(row.event_start_date)} – ${formatDate(row.event_end_date)}`;
   }
 
   if (row.event_start_date) {
-    return `${formatDate(row.event_start_date)} 시작`;
+    return `${formatDate(row.event_start_date)}부터`;
   }
 
   if (row.event_end_date) {
-    return `${formatDate(row.event_end_date)} 종료`;
+    return `${formatDate(row.event_end_date)}까지`;
   }
 
-  return row.description ?? '';
+  return '행사 기간 미정';
 }
 
 function sortEvents(rows: TradeCollectionRow[]) {
@@ -121,7 +134,6 @@ export default function AdminEventsPage() {
 
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
-  const [periodNote, setPeriodNote] = useState('');
   const [eventStartDate, setEventStartDate] = useState('');
   const [eventEndDate, setEventEndDate] = useState('');
   const [sortOrder, setSortOrder] = useState('0');
@@ -232,6 +244,11 @@ export default function AdminEventsPage() {
       return;
     }
 
+    if (eventStartDate && eventEndDate && eventEndDate < eventStartDate) {
+      setMessage('종료일은 시작일보다 빠를 수 없습니다.');
+      return;
+    }
+
     try {
       setIsSubmittingEvent(true);
       setMessage('');
@@ -266,7 +283,6 @@ export default function AdminEventsPage() {
         .insert({
           title: title.trim(),
           slug: normalizedSlug,
-          description: periodNote.trim() || null,
           event_start_date: eventStartDate || null,
           event_end_date: eventEndDate || null,
           thumbnail_path: thumbnailPath,
@@ -283,7 +299,6 @@ export default function AdminEventsPage() {
 
       setTitle('');
       setSlug('');
-      setPeriodNote('');
       setEventStartDate('');
       setEventEndDate('');
       setSortOrder('0');
@@ -486,17 +501,6 @@ export default function AdminEventsPage() {
             </div>
 
             <label className="block">
-              <span className="text-sm font-bold text-neutral-800">행사 기간 메모</span>
-
-              <input
-                value={periodNote}
-                onChange={(event) => setPeriodNote(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="선택 입력"
-              />
-            </label>
-
-            <label className="block">
               <span className="text-sm font-bold text-neutral-800">Slug</span>
 
               <input
@@ -610,7 +614,9 @@ export default function AdminEventsPage() {
               {events.map((row) => {
                 const thumbnailUrl = getTradeAssetUrl(row.thumbnail_path ?? '');
                 const isDeleting = isDeletingEventId === row.id;
-                const ended = isEventEnded(row);
+                const status = getEventStatus(row);
+                const ended = status === 'ended';
+                const statusLabel = getEventStatusLabel(status);
 
                 return (
                   <article
@@ -631,11 +637,17 @@ export default function AdminEventsPage() {
                           </div>
                         )}
 
-                        {ended ? (
-                          <span className="absolute left-2 top-2 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black text-white">
-                            종료
-                          </span>
-                        ) : null}
+                        <span
+                          className={`absolute left-2 top-2 rounded-full px-2.5 py-1 text-[10px] font-black ${
+                            status === 'ended'
+                              ? 'bg-neutral-950 text-white'
+                              : status === 'scheduled'
+                                ? 'bg-violet-100 text-violet-700'
+                                : 'bg-emerald-100 text-emerald-700'
+                          }`}
+                        >
+                          {statusLabel}
+                        </span>
                       </div>
                     </Link>
 
@@ -645,7 +657,10 @@ export default function AdminEventsPage() {
                           <p className="line-clamp-2 text-sm font-black leading-5 text-neutral-950">
                             {row.title}
                           </p>
-                          <p className="mt-1 truncate text-[10px] text-neutral-500">
+                          <p className="mt-1.5 line-clamp-2 text-xs font-bold leading-5 text-neutral-500">
+                            {getEventPeriodLabel(row)}
+                          </p>
+                          <p className="mt-1 truncate text-[10px] text-neutral-400">
                             /trade/{row.slug}
                           </p>
                         </div>
@@ -661,12 +676,8 @@ export default function AdminEventsPage() {
                         </span>
                       </div>
 
-                      <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-neutral-500">
-                        {getEventPeriodLabel(row) || '행사 기간이 없습니다.'}
-                      </p>
-
-                      <p className="mt-1 text-[10px] font-bold text-neutral-400">
-                        {isEventEnded(row) ? '종료 · ' : ''}정렬 {row.sort_order ?? 0}
+                      <p className="mt-2 text-[10px] font-bold text-neutral-400">
+                        {statusLabel} · 정렬 {row.sort_order ?? 0}
                       </p>
 
                       <div className="mt-3 grid grid-cols-3 gap-1.5">

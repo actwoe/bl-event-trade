@@ -213,7 +213,6 @@ export default function AdminEventManagePage() {
 
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
-  const [periodNote, setPeriodNote] = useState('');
   const [eventStartDate, setEventStartDate] = useState('');
   const [eventEndDate, setEventEndDate] = useState('');
   const [isPublic, setIsPublic] = useState(true);
@@ -426,7 +425,6 @@ export default function AdminEventManagePage() {
       setEventData(typedEvent);
       setTitle(typedEvent.title);
       setSlug(typedEvent.slug);
-      setPeriodNote(typedEvent.description ?? '');
       setEventStartDate(typedEvent.event_start_date ?? '');
       setEventEndDate(typedEvent.event_end_date ?? '');
       setIsPublic(typedEvent.is_public);
@@ -656,6 +654,11 @@ export default function AdminEventManagePage() {
       return;
     }
 
+    if (eventStartDate && eventEndDate && eventEndDate < eventStartDate) {
+      setMessage('종료일은 시작일보다 빠를 수 없습니다.');
+      return;
+    }
+
     try {
       setIsSubmittingEvent(true);
       setMessage('');
@@ -690,7 +693,6 @@ export default function AdminEventManagePage() {
         .update({
           title: title.trim(),
           slug: normalizedSlug,
-          description: periodNote.trim() || null,
           event_start_date: eventStartDate || null,
           event_end_date: eventEndDate || null,
           thumbnail_path: nextThumbnailPath,
@@ -722,7 +724,6 @@ export default function AdminEventManagePage() {
         setEventData(refreshedEvent);
         setTitle(refreshedEvent.title);
         setSlug(refreshedEvent.slug);
-        setPeriodNote(refreshedEvent.description ?? '');
         setEventStartDate(refreshedEvent.event_start_date ?? '');
         setEventEndDate(refreshedEvent.event_end_date ?? '');
         setIsPublic(refreshedEvent.is_public);
@@ -1628,17 +1629,6 @@ export default function AdminEventManagePage() {
                 />
               </label>
             </div>
-
-            <label className="block">
-              <span className="text-sm font-bold text-neutral-800">행사 기간 메모</span>
-
-              <input
-                value={periodNote}
-                onChange={(event) => setPeriodNote(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="선택 입력"
-              />
-            </label>
 
             <label className="block">
               <span className="text-sm font-bold text-neutral-800">Slug</span>
