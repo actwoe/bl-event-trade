@@ -21,6 +21,9 @@ type EventCollectionBrowserProps = {
   today: string;
 };
 
+const INITIAL_VISIBLE_COUNT = 6;
+const LOAD_MORE_COUNT = 6;
+
 const FILTERS: Array<{ id: EventFilter; label: string }> = [
   { id: 'all', label: '전체' },
   { id: 'scheduled', label: '예정' },
@@ -138,6 +141,7 @@ export function EventCollectionBrowser({
   today,
 }: EventCollectionBrowserProps) {
   const [filter, setFilter] = useState<EventFilter>('all');
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
 
   const counts = useMemo(() => {
     return collections.reduce(
@@ -156,7 +160,7 @@ export function EventCollectionBrowser({
     );
   }, [collections, today]);
 
-  const visibleCollections = useMemo(() => {
+  const filteredCollections = useMemo(() => {
     const filtered =
       filter === 'all'
         ? collections
@@ -166,6 +170,21 @@ export function EventCollectionBrowser({
 
     return sortCollections(filtered, today);
   }, [collections, filter, today]);
+
+  const visibleCollections = filteredCollections.slice(0, visibleCount);
+  const remainingCount = Math.max(
+    filteredCollections.length - visibleCollections.length,
+    0,
+  );
+
+  function changeFilter(nextFilter: EventFilter) {
+    setFilter(nextFilter);
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
+  }
+
+  function showMoreCollections() {
+    setVisibleCount((current) => current + LOAD_MORE_COUNT);
+  }
 
   return (
     <section>
@@ -181,7 +200,7 @@ export function EventCollectionBrowser({
           </div>
 
           <div
-            className="grid w-full grid-cols-4 gap-1 rounded-xl bg-neutral-100 p-1 sm:w-auto sm:shrink-0"
+            className="grid w-full grid-cols-4 gap-2 sm:w-auto sm:min-w-[292px] sm:shrink-0"
             role="tablist"
             aria-label="행사 상태 필터"
           >
@@ -194,14 +213,23 @@ export function EventCollectionBrowser({
                   type="button"
                   role="tab"
                   aria-selected={selected}
-                  onClick={() => setFilter(item.id)}
+                  onClick={() => changeFilter(item.id)}
                   className={
                     selected
-                      ? 'rounded-lg bg-neutral-950 px-2.5 py-2 text-[11px] font-black text-white shadow-sm'
-                      : 'rounded-lg px-2.5 py-2 text-[11px] font-bold text-neutral-500 transition hover:bg-white hover:text-neutral-950'
+                      ? 'flex min-h-10 items-center justify-center gap-1 rounded-full border border-neutral-950 bg-neutral-950 px-2.5 py-2 text-[11px] font-black text-white shadow-sm'
+                      : 'flex min-h-10 items-center justify-center gap-1 rounded-full border border-neutral-200 bg-white px-2.5 py-2 text-[11px] font-bold text-neutral-500 transition hover:border-neutral-400 hover:text-neutral-950'
                   }
                 >
-                  {item.label}
+                  <span>{item.label}</span>
+                  <span
+                    className={
+                      selected
+                        ? 'inline-flex min-w-4 items-center justify-center rounded-full bg-white/16 px-1 text-[9px] leading-4 text-white'
+                        : 'inline-flex min-w-4 items-center justify-center rounded-full bg-neutral-100 px-1 text-[9px] leading-4 text-neutral-400'
+                    }
+                  >
+                    {counts[item.id]}
+                  </span>
                 </button>
               );
             })}
@@ -209,23 +237,43 @@ export function EventCollectionBrowser({
         </div>
       </div>
 
-      {visibleCollections.length > 0 ? (
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          {visibleCollections.map((collection) => {
-            const status = getEventStatus(collection, today);
+      {filteredCollections.length > 0 ? (
+        <>
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            {visibleCollections.map((collection) => {
+              const status = getEventStatus(collection, today);
 
-            return (
-              <CollectionCard
-                key={collection.id}
-                href={`/trade/${collection.slug}`}
-                title={collection.title}
-                periodLabel={getEventPeriodLabel(collection)}
-                thumbnailUrl={collection.thumbnailUrl}
-                ended={status === 'ended'}
-              />
-            );
-          })}
-        </div>
+              return (
+                <CollectionCard
+                  key={collection.id}
+                  href={`/trade/${collection.slug}`}
+                  title={collection.title}
+                  periodLabel={getEventPeriodLabel(collection)}
+                  thumbnailUrl={collection.thumbnailUrl}
+                  ended={status === 'ended'}
+                />
+              );
+            })}
+          </div>
+
+          {remainingCount > 0 ? (
+            <div className="mt-5 border-t border-neutral-100 pt-5">
+              <button
+                type="button"
+                onClick={showMoreCollections}
+                className="flex w-full items-center justify-center gap-2 rounded-full border border-neutral-200 bg-white px-5 py-3 text-sm font-black text-neutral-700 transition hover:border-neutral-400 hover:text-neutral-950"
+              >
+                <span>행사 더보기</span>
+                <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-bold text-neutral-400">
+                  {Math.min(LOAD_MORE_COUNT, remainingCount)}개
+                </span>
+              </button>
+              <p className="mt-2 text-center text-[11px] font-semibold text-neutral-400">
+                전체 {filteredCollections.length}개 중 {visibleCollections.length}개 표시
+              </p>
+            </div>
+          ) : null}
+        </>
       ) : (
         <div className="mt-5 rounded-2xl border border-dashed border-neutral-200 bg-neutral-50/70 px-4 py-10 text-center">
           <p className="text-sm font-bold text-neutral-400">
