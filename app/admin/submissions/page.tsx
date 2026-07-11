@@ -139,6 +139,8 @@ export default function AdminSubmissionsPage() {
     }
 
     loadPage();
+    // 관리자 확인 후 최초 한 번만 제보 목록을 불러옵니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadSubmissions() {

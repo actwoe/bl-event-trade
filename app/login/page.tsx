@@ -101,7 +101,7 @@ export default function LoginPage() {
           </Link>
           <h1 className="mt-6 text-2xl font-black text-neutral-950">로그인</h1>
           <p className="mt-2 text-sm leading-6 text-neutral-600">
-            저장한 교환판을 불러오고 계속 수정할 수 있습니다.
+            로그인 시 기존에 만든 교환판을 불러와 편리하게 수정할 수 있습니다.
           </p>
         </header>
 

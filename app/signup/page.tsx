@@ -102,9 +102,13 @@ export default function SignupPage() {
             ← 메인으로
           </Link>
           <h1 className="mt-6 text-2xl font-black text-neutral-950">회원가입</h1>
-          <p className="mt-2 text-sm leading-6 text-neutral-600">
-            계정당 교환판 그룹을 최대 3개까지 저장할 수 있습니다.
-          </p>
+          <div className="mt-2 space-y-1 text-sm leading-6 text-neutral-600">
+            <p>회원가입을 하지 않아도 교환판을 만들 수 있습니다.</p>
+            <p>
+              회원가입 시 교환판 그룹을 최대 3개까지 저장하고 편리하게
+              불러와 수정할 수 있습니다.
+            </p>
+          </div>
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-4 p-5">

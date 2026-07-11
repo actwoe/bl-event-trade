@@ -38,6 +38,7 @@ type BenefitSubcategoryFilterValue = string;
 type QuantityTradeCard = TradeCard & {
   quantity?: number;
   registeredItemId?: string;
+  registeredSortOrder?: number;
 };
 
 type UploadedCardMetadata = {
@@ -144,26 +145,53 @@ function drawCenteredText(
 
 const canvasImageCache = new Map<string, Promise<HTMLImageElement>>();
 
+function loadImageElement(source: string, useCors: boolean) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+
+    if (useCors) {
+      image.crossOrigin = "anonymous";
+    }
+
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
+    image.src = source;
+  });
+}
+
+function isLocalCanvasImageSource(source: string) {
+  return (
+    source.startsWith("data:") ||
+    source.startsWith("blob:") ||
+    source.startsWith("/")
+  );
+}
+
+async function loadCanvasImageWithoutCache(source: string) {
+  if (isLocalCanvasImageSource(source)) {
+    return loadImageElement(source, false);
+  }
+
+  try {
+    // Supabase Storage가 CORS를 허용하면 Vercel Function을 거치지 않고 직접 사용합니다.
+    return await loadImageElement(source, true);
+  } catch {
+    // 직접 로드가 막힌 환경에서만 서버 프록시를 한 번 사용합니다.
+    return loadImageElement(
+      `/api/image-proxy?url=${encodeURIComponent(source)}`,
+      false,
+    );
+  }
+}
+
 function loadCanvasImage(source: string) {
   const cachedImage = canvasImageCache.get(source);
   if (cachedImage) return cachedImage;
 
-  const resolvedSource =
-    source.startsWith("data:") ||
-    source.startsWith("blob:") ||
-    source.startsWith("/")
-      ? source
-      : `/api/image-proxy?url=${encodeURIComponent(source)}`;
-
-  const imagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.decoding = "async";
-    image.onload = () => resolve(image);
-    image.onerror = () => {
-      canvasImageCache.delete(source);
-      reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
-    };
-    image.src = resolvedSource;
+  const imagePromise = loadCanvasImageWithoutCache(source).catch((error) => {
+    canvasImageCache.delete(source);
+    throw error;
   });
 
   canvasImageCache.set(source, imagePromise);
@@ -243,8 +271,13 @@ async function renderBoardToPngBlob(
       : card.category;
   };
 
+  const getCardImageHeight = (card: TradeCard) =>
+    card.imageRatio === "photocard"
+      ? Math.round((cardWidth * 85) / 55)
+      : cardWidth;
+
   const cardHeight = (card: TradeCard, showMeta: boolean) =>
-    (card.imageRatio === "photocard" ? 170 : 112) + 24 + (showMeta ? 16 : 0);
+    getCardImageHeight(card) + 24 + (showMeta ? 16 : 0);
 
   const gridHeight = (cards: TradeCard[], showMeta: boolean) => {
     if (cards.length === 0) return 0;
@@ -265,12 +298,12 @@ async function renderBoardToPngBlob(
     for (const group of getGroups()) {
       const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
       const want = board.cards.filter((card) => card.side === "want" && cardGroupKey(card) === group.key);
-      contentHeight += 25 + Math.max(gridHeight(have, false), gridHeight(want, false), 112) + 24;
+      contentHeight += 25 + Math.max(gridHeight(have, false), gridHeight(want, false), cardWidth) + 24;
     }
   } else {
     const have = board.cards.filter((card) => card.side === "have");
     const want = board.cards.filter((card) => card.side === "want");
-    contentHeight += Math.max(gridHeight(have, true), gridHeight(want, true), 112) + 24;
+    contentHeight += Math.max(gridHeight(have, true), gridHeight(want, true), cardWidth) + 24;
   }
   const height = Math.max(300, contentHeight + 24);
 
@@ -377,9 +410,9 @@ async function renderBoardToPngBlob(
   const imageMap = new Map(cardsWithImages.map(({ card, image }) => [card.id, image]));
 
   const drawCard = (card: TradeCard, x: number, y: number, showMeta: boolean) => {
-    const imageHeight = card.imageRatio === "photocard" ? 170 : 112;
+    const imageHeight = getCardImageHeight(card);
     roundedRect(context, x, y, cardWidth, imageHeight, 12);
-    context.fillStyle = "#f5f5f5";
+    context.fillStyle = "#ffffff";
     context.fill();
     context.save();
     roundedRect(context, x, y, cardWidth, imageHeight, 12);
@@ -609,6 +642,64 @@ function sortRegisteredItems(items: RegisteredTradeItem[]) {
 
     return a.sortOrder - b.sortOrder;
   });
+}
+
+function getTradeSideSortIndex(side: TradeSide) {
+  return side === "have" ? 0 : 1;
+}
+
+function compareTradeCards(a: TradeCard, b: TradeCard) {
+  const aCard = a as QuantityTradeCard;
+  const bCard = b as QuantityTradeCard;
+  const sideDiff =
+    getTradeSideSortIndex(a.side) - getTradeSideSortIndex(b.side);
+
+  if (sideDiff !== 0) {
+    return sideDiff;
+  }
+
+  const categoryDiff =
+    getCategorySortIndex(a.category) - getCategorySortIndex(b.category);
+
+  if (categoryDiff !== 0) {
+    return categoryDiff;
+  }
+
+  if (a.category === "benefit" && b.category === "benefit") {
+    const subcategoryDiff = getBenefitSubcategoryLabel(
+      a.benefitSubcategory,
+    ).localeCompare(getBenefitSubcategoryLabel(b.benefitSubcategory), "ko-KR", {
+      numeric: true,
+      sensitivity: "base",
+    });
+
+    if (subcategoryDiff !== 0) {
+      return subcategoryDiff;
+    }
+  }
+
+  const titleDiff = a.workTitle.localeCompare(b.workTitle, "ko-KR", {
+    numeric: true,
+    sensitivity: "base",
+  });
+
+  if (titleDiff !== 0) {
+    return titleDiff;
+  }
+
+  const sortOrderDiff =
+    (aCard.registeredSortOrder ?? Number.MAX_SAFE_INTEGER) -
+    (bCard.registeredSortOrder ?? Number.MAX_SAFE_INTEGER);
+
+  if (sortOrderDiff !== 0) {
+    return sortOrderDiff;
+  }
+
+  return a.id.localeCompare(b.id);
+}
+
+function sortTradeCards(cards: TradeCard[]) {
+  return [...cards].sort(compareTradeCards);
 }
 
 export function TradeBuilderLab({
@@ -870,20 +961,23 @@ export function TradeBuilderLab({
       if (existingCard) {
         return {
           ...prev,
-          cards: prev.cards.map((card) =>
-            card.id === existingCard.id
-              ? {
-                  ...card,
-                  category: item.category,
-                  imageUrl: item.imageUrl,
-                  workTitle: item.workTitle,
-                  memo: item.itemName,
-                  imageRatio: getItemImageRatio(item),
-                  benefitSubcategory: item.benefitSubcategory ?? null,
-                  quantity: safeQuantity,
-                  registeredItemId: item.id,
-                }
-              : card,
+          cards: sortTradeCards(
+            prev.cards.map((card) =>
+              card.id === existingCard.id
+                ? {
+                    ...card,
+                    category: item.category,
+                    imageUrl: item.imageUrl,
+                    workTitle: item.workTitle,
+                    memo: item.itemName,
+                    imageRatio: getItemImageRatio(item),
+                    benefitSubcategory: item.benefitSubcategory ?? null,
+                    quantity: safeQuantity,
+                    registeredItemId: item.id,
+                    registeredSortOrder: item.sortOrder,
+                  }
+                : card,
+            ),
           ),
         };
       }
@@ -899,11 +993,12 @@ export function TradeBuilderLab({
         benefitSubcategory: item.benefitSubcategory ?? null,
         quantity: safeQuantity,
         registeredItemId: item.id,
+        registeredSortOrder: item.sortOrder,
       };
 
       return {
         ...prev,
-        cards: [...prev.cards, newCard],
+        cards: sortTradeCards([...prev.cards, newCard]),
       };
     });
   }
@@ -947,21 +1042,24 @@ export function TradeBuilderLab({
             ? metadata.benefitSubcategory
             : null,
         quantity: 1,
+        registeredSortOrder: Number.MAX_SAFE_INTEGER,
       }));
 
     if (newCards.length === 0) return;
 
     setBoard((prev) => ({
       ...prev,
-      cards: [...prev.cards, ...newCards],
+      cards: sortTradeCards([...prev.cards, ...newCards]),
     }));
   }
 
   function updateCard(cardId: string, patch: Partial<QuantityTradeCard>) {
     setBoard((prev) => ({
       ...prev,
-      cards: prev.cards.map((card) =>
-        card.id === cardId ? { ...card, ...patch } : card,
+      cards: sortTradeCards(
+        prev.cards.map((card) =>
+          card.id === cardId ? { ...card, ...patch } : card,
+        ),
       ),
     }));
   }
@@ -1900,13 +1998,13 @@ function RegisteredItemCard({
       }
     >
       <div className="w-full text-left">
-        <div className="relative border-b border-neutral-200 bg-neutral-100">
+        <div className="relative overflow-hidden border-b border-neutral-200 bg-white leading-none">
           <img
             src={item.imageUrl}
             alt={item.itemName}
             loading="lazy"
             decoding="async"
-            className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain`}
+            className={`${getImageRatioClass(imageRatio)} block w-full bg-white object-contain align-top`}
           />
 
           <QuantityBadge quantity={quantity} />

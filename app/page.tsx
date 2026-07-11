@@ -1,9 +1,8 @@
 import Link from 'next/link';
-import {
-  EventCollectionBrowser,
-  type HomeTradeCollection,
-} from '@/components/home/EventCollectionBrowser';
+import { EventCollectionBrowser } from '@/components/home/EventCollectionBrowser';
 import { UserAuthLinks } from '@/components/auth/UserAuthLinks';
+import { getKoreaTodayDateString } from '@/lib/event-status';
+import type { HomeTradeCollection } from '@/lib/home-trade-types';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
 
 export const revalidate = 300;
@@ -18,53 +17,20 @@ type TradeCollectionRow = {
   sort_order: number | null;
 };
 
-function getKoreaTodayDateString() {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-
-  const parts = formatter.formatToParts(new Date());
-  const year = parts.find((part) => part.type === 'year')?.value ?? '';
-  const month = parts.find((part) => part.type === 'month')?.value ?? '';
-  const day = parts.find((part) => part.type === 'day')?.value ?? '';
-
-  return `${year}-${month}-${day}`;
-}
-
 async function loadCollections() {
   const { data, error } = await supabase
     .from('trade_collections')
     .select(
       'id, slug, title, thumbnail_path, event_start_date, event_end_date, sort_order',
     )
-    .eq('is_public', true)
-    .order('sort_order', { ascending: true })
-    .order('published_at', { ascending: false, nullsFirst: false });
+    .eq('is_public', true);
 
   if (error) {
-    console.error(error);
-    return {
-      collections: [] as TradeCollectionRow[],
-      error:
-        '교환판 목록을 불러오지 못했습니다. Supabase 테이블, RLS 정책, 환경변수를 확인해 주세요.',
-    };
+    throw error;
   }
 
-  return {
-    collections: (data ?? []) as TradeCollectionRow[],
-    error: '',
-  };
-}
-
-export default async function HomePage() {
-  const { collections, error } = await loadCollections();
-  const today = getKoreaTodayDateString();
-
-  const browserCollections: HomeTradeCollection[] = collections.map(
-    (collection) => ({
+  return ((data ?? []) as TradeCollectionRow[]).map(
+    (collection): HomeTradeCollection => ({
       id: collection.id,
       slug: collection.slug,
       title: collection.title,
@@ -76,6 +42,21 @@ export default async function HomePage() {
       sortOrder: collection.sort_order ?? 0,
     }),
   );
+}
+
+export default async function HomePage() {
+  const today = getKoreaTodayDateString();
+
+  let collections: HomeTradeCollection[] = [];
+  let error = '';
+
+  try {
+    collections = await loadCollections();
+  } catch (loadError) {
+    console.error(loadError);
+    error =
+      '교환판 목록을 불러오지 못했습니다. Supabase 테이블, RLS 정책, 환경변수를 확인해 주세요.';
+  }
 
   return (
     <main className="w-full bg-neutral-100 px-4 pb-5 pt-5 sm:pb-6 sm:pt-6">
@@ -111,10 +92,7 @@ export default async function HomePage() {
               {error}
             </p>
           ) : (
-            <EventCollectionBrowser
-              collections={browserCollections}
-              today={today}
-            />
+            <EventCollectionBrowser collections={collections} today={today} />
           )}
         </div>
       </section>

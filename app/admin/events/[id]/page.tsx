@@ -440,6 +440,8 @@ export default function AdminEventManagePage() {
     }
 
     loadPageData();
+    // 각 로더는 행사 ID가 바뀔 때만 한 번 실행합니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
   useEffect(() => {

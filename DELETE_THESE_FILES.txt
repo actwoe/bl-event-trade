@@ -1,0 +1,9 @@
+프로젝트에서 아래 파일을 삭제해 주세요.
+
+app/api/trade-board-image/route.ts
+app/api/trade-board-image/route.tsx
+app/api/trade-collections/route.ts
+lib/trade-collection-feed.ts
+
+로컬에 .env.local.backup 파일이 있다면 Git과 무관하게 삭제해 주세요.
+이 파일은 환경변수 백업 파일이므로 패치 ZIP에는 포함하지 않았습니다.

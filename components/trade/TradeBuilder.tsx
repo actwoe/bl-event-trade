@@ -149,24 +149,53 @@ function drawCenteredText(
 
 const canvasImageCache = new Map<string, Promise<HTMLImageElement>>();
 
+function loadImageElement(source: string, useCors: boolean) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+
+    if (useCors) {
+      image.crossOrigin = "anonymous";
+    }
+
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
+    image.src = source;
+  });
+}
+
+function isLocalCanvasImageSource(source: string) {
+  return (
+    source.startsWith("data:") ||
+    source.startsWith("blob:") ||
+    source.startsWith("/")
+  );
+}
+
+async function loadCanvasImageWithoutCache(source: string) {
+  if (isLocalCanvasImageSource(source)) {
+    return loadImageElement(source, false);
+  }
+
+  try {
+    // Supabase Storage가 CORS를 허용하면 Vercel Function을 거치지 않고 직접 사용합니다.
+    return await loadImageElement(source, true);
+  } catch {
+    // 직접 로드가 막힌 환경에서만 서버 프록시를 한 번 사용합니다.
+    return loadImageElement(
+      `/api/image-proxy?url=${encodeURIComponent(source)}`,
+      false,
+    );
+  }
+}
+
 function loadCanvasImage(source: string) {
   const cachedImage = canvasImageCache.get(source);
   if (cachedImage) return cachedImage;
 
-  const resolvedSource =
-    source.startsWith("data:") || source.startsWith("blob:")
-      ? source
-      : `/api/image-proxy?url=${encodeURIComponent(source)}`;
-
-  const imagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.decoding = "async";
-    image.onload = () => resolve(image);
-    image.onerror = () => {
-      canvasImageCache.delete(source);
-      reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
-    };
-    image.src = resolvedSource;
+  const imagePromise = loadCanvasImageWithoutCache(source).catch((error) => {
+    canvasImageCache.delete(source);
+    throw error;
   });
 
   canvasImageCache.set(source, imagePromise);
@@ -912,33 +941,6 @@ export function TradeBuilder({
   }, [board.cards]);
 
   useEffect(() => {
-    if (
-      selectedCategory !== ALL_CATEGORIES_VALUE &&
-      selectedCategory !== "benefit" &&
-      selectedBenefitSubcategory !== ALL_BENEFIT_SUBCATEGORIES_VALUE
-    ) {
-      setSelectedBenefitSubcategory(ALL_BENEFIT_SUBCATEGORIES_VALUE);
-    }
-  }, [selectedCategory, selectedBenefitSubcategory]);
-
-  useEffect(() => {
-    if (
-      selectedBenefitSubcategory !== ALL_BENEFIT_SUBCATEGORIES_VALUE &&
-      selectedBenefitSubcategory !== NO_BENEFIT_SUBCATEGORY_VALUE &&
-      !benefitSubcategoryOptions.includes(selectedBenefitSubcategory)
-    ) {
-      setSelectedBenefitSubcategory(ALL_BENEFIT_SUBCATEGORIES_VALUE);
-    }
-  }, [benefitSubcategoryOptions, selectedBenefitSubcategory]);
-
-  useEffect(() => {
-    setBoard((prev) => ({
-      ...prev,
-      memo: selectedConditions.join(" · "),
-    }));
-  }, [selectedConditions]);
-
-  useEffect(() => {
     function updatePreviewSize() {
       const area = previewAreaRef.current;
       const preview = previewRef.current;
@@ -992,13 +994,12 @@ export function TradeBuilder({
   }
 
   function toggleCondition(condition: string) {
-    setSelectedConditions((prev) => {
-      if (prev.includes(condition)) {
-        return prev.filter((item) => item !== condition);
-      }
+    const nextConditions = selectedConditions.includes(condition)
+      ? selectedConditions.filter((item) => item !== condition)
+      : [...selectedConditions, condition];
 
-      return [...prev, condition];
-    });
+    setSelectedConditions(nextConditions);
+    updateBoardField("memo", nextConditions.join(" · "));
   }
 
   function updateCategoryDisplayMode(mode: TradeCategoryDisplayMode) {

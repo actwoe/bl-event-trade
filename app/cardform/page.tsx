@@ -214,21 +214,6 @@ export default function CardFormPage() {
   }, [collectionId]);
 
   useEffect(() => {
-    if (category !== "benefit") {
-      setBenefitSubcategory("");
-      return;
-    }
-
-    setBenefitSubcategory((prev) => {
-      if (prev && benefitSubcategories.includes(prev)) {
-        return prev;
-      }
-
-      return benefitSubcategories[0] ?? "";
-    });
-  }, [category, benefitSubcategories]);
-
-  useEffect(() => {
     return () => {
       if (imagePreviewUrl) {
         URL.revokeObjectURL(imagePreviewUrl);
@@ -241,7 +226,16 @@ export default function CardFormPage() {
 
     if (nextCategory !== "benefit") {
       setBenefitSubcategory("");
+      return;
     }
+
+    setBenefitSubcategory((current) => {
+      if (current && benefitSubcategories.includes(current)) {
+        return current;
+      }
+
+      return benefitSubcategories[0] ?? "";
+    });
   }
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {

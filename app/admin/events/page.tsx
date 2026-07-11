@@ -4,9 +4,15 @@ import Link from 'next/link';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
+import {
+  compareEventsByStatus,
+  getEventPeriodLabel,
+  getEventStatus,
+  getEventStatusLabel,
+  getKoreaTodayDateString,
+} from '@/lib/event-status';
 
 type AdminState = 'checking' | 'admin' | 'not-admin' | 'signed-out';
-type EventStatus = 'scheduled' | 'ongoing' | 'ended';
 
 type TradeCollectionRow = {
   id: string;
@@ -46,83 +52,27 @@ function getFileExtension(file: File) {
 }
 
 
-function getKoreaTodayDateString() {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-
-  const parts = formatter.formatToParts(new Date());
-  const year = parts.find((part) => part.type === 'year')?.value ?? '';
-  const month = parts.find((part) => part.type === 'month')?.value ?? '';
-  const day = parts.find((part) => part.type === 'day')?.value ?? '';
-
-  return `${year}-${month}-${day}`;
-}
-
-function getEventStatus(row: TradeCollectionRow): EventStatus {
-  const today = getKoreaTodayDateString();
-
-  if (row.event_end_date && row.event_end_date < today) {
-    return 'ended';
-  }
-
-  if (row.event_start_date && row.event_start_date > today) {
-    return 'scheduled';
-  }
-
-  return 'ongoing';
-}
-
-function getEventStatusLabel(status: EventStatus) {
-  if (status === 'scheduled') return '예정';
-  if (status === 'ended') return '종료';
-  return '진행중';
-}
-
-function formatDate(value: string | null) {
-  if (!value) return '';
-
-  const [year, month, day] = value.split('-');
-
-  if (!year || !month || !day) {
-    return value;
-  }
-
-  return `${year}.${month}.${day}`;
-}
-
-function getEventPeriodLabel(row: TradeCollectionRow) {
-  if (row.event_start_date && row.event_end_date) {
-    return `${formatDate(row.event_start_date)} – ${formatDate(row.event_end_date)}`;
-  }
-
-  if (row.event_start_date) {
-    return `${formatDate(row.event_start_date)}부터`;
-  }
-
-  if (row.event_end_date) {
-    return `${formatDate(row.event_end_date)}까지`;
-  }
-
-  return '행사 기간 미정';
-}
 
 function sortEvents(rows: TradeCollectionRow[]) {
-  return [...rows].sort((a, b) => {
-    const sortDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  const today = getKoreaTodayDateString();
 
-    if (sortDiff !== 0) {
-      return sortDiff;
-    }
-
-    return a.title.localeCompare(b.title, 'ko-KR', {
-      numeric: true,
-      sensitivity: 'base',
-    });
-  });
+  return [...rows].sort((a, b) =>
+    compareEventsByStatus(
+      {
+        title: a.title,
+        eventStartDate: a.event_start_date,
+        eventEndDate: a.event_end_date,
+        sortOrder: a.sort_order ?? 0,
+      },
+      {
+        title: b.title,
+        eventStartDate: b.event_start_date,
+        eventEndDate: b.event_end_date,
+        sortOrder: b.sort_order ?? 0,
+      },
+      today,
+    ),
+  );
 }
 
 export default function AdminEventsPage() {
@@ -614,7 +564,11 @@ export default function AdminEventsPage() {
               {events.map((row) => {
                 const thumbnailUrl = getTradeAssetUrl(row.thumbnail_path ?? '');
                 const isDeleting = isDeletingEventId === row.id;
-                const status = getEventStatus(row);
+                const status = getEventStatus(
+                    row.event_start_date,
+                    row.event_end_date,
+                    getKoreaTodayDateString(),
+                  );
                 const ended = status === 'ended';
                 const statusLabel = getEventStatusLabel(status);
 
@@ -658,7 +612,7 @@ export default function AdminEventsPage() {
                             {row.title}
                           </p>
                           <p className="mt-1.5 line-clamp-2 text-xs font-bold leading-5 text-neutral-500">
-                            {getEventPeriodLabel(row)}
+                            {getEventPeriodLabel(row.event_start_date, row.event_end_date)}
                           </p>
                           <p className="mt-1 truncate text-[10px] text-neutral-400">
                             /trade/{row.slug}
