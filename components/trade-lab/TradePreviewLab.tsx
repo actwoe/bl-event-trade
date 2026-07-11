@@ -114,8 +114,7 @@ export const TradePreviewLab = forwardRef<HTMLDivElement, TradePreviewLabProps>(
         ref={ref}
         className="w-[560px] bg-white p-6 text-neutral-950"
         style={{
-          fontFamily:
-            "'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif",
+          fontFamily: "'Pretendard', Arial, sans-serif",
         }}
       >
         <div className="overflow-hidden rounded-[30px] bg-white shadow-[0_10px_30px_rgba(15,23,42,0.12)]">

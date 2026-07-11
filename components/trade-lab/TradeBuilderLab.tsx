@@ -26,6 +26,7 @@ type TradeBuilderLabProps = {
 };
 
 const PREVIEW_WIDTH = 560;
+const TRADE_LAB_FONT_FAMILY = "'Pretendard', Arial, sans-serif";
 const ALL_WORKS_VALUE = "all";
 const ALL_CATEGORIES_VALUE = "all";
 const ALL_BENEFIT_SUBCATEGORIES_VALUE = "all";
@@ -186,10 +187,19 @@ function drawContainedImage(
   context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
 }
 
+async function ensureTradeLabFontReady() {
+  if (typeof document === "undefined" || !("fonts" in document)) return;
+
+  await document.fonts.load(`900 22px ${TRADE_LAB_FONT_FAMILY}`);
+  await document.fonts.ready;
+}
+
 async function renderBoardToPngBlob(
   board: TradeBoard,
   collectionTitle: string,
 ) {
+  await ensureTradeLabFontReady();
+
   const width = 560;
   const scale = 2000 / width;
   const sideWidth = 232;
@@ -287,7 +297,7 @@ async function renderBoardToPngBlob(
   context.fill();
   context.fillRect(20, headerBottom - 26, 520, 26);
 
-  const koreanFont = "'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif";
+  const koreanFont = TRADE_LAB_FONT_FAMILY;
 
   context.fillStyle = "#a3a3a3";
   context.font = `900 9px ${koreanFont}`;
@@ -1000,7 +1010,10 @@ export function TradeBuilderLab({
   const scaledPreviewHeight = Math.ceil(previewHeight * previewScale);
 
   return (
-    <section className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
+    <section
+      className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6"
+      style={{ fontFamily: TRADE_LAB_FONT_FAMILY }}
+    >
       <div className="mx-auto flex w-full max-w-md flex-col gap-5 sm:max-w-lg">
         <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200/70 bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
           <div className="-mx-5 -mt-5 border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] px-5 pb-5 pt-5">
@@ -1199,14 +1212,16 @@ export function TradeBuilderLab({
 
             <div className="mt-4 grid grid-cols-2 gap-3">
               <AddSideButton
-                title="있어요 (Have)"
+                koreanTitle="있어요"
+                englishTitle="Have"
                 iconSrc="/trade-icons/have.png"
                 count={haveCardCount}
                 onClick={() => openAddModal("have")}
               />
 
               <AddSideButton
-                title="구해요 (Want)"
+                koreanTitle="구해요"
+                englishTitle="Want"
                 iconSrc="/trade-icons/want.png"
                 count={wantCardCount}
                 onClick={() => openAddModal("want")}
@@ -1340,7 +1355,8 @@ export function TradeBuilderLab({
 }
 
 type AddSideButtonProps = {
-  title: string;
+  koreanTitle: string;
+  englishTitle: string;
   iconSrc: string;
   count: number;
   onClick: () => void;
@@ -1392,25 +1408,36 @@ function ExportPreviewModal({ imageUrl, onClose }: ExportPreviewModalProps) {
   );
 }
 
-function AddSideButton({ title, iconSrc, count, onClick }: AddSideButtonProps) {
+function AddSideButton({
+  koreanTitle,
+  englishTitle,
+  iconSrc,
+  count,
+  onClick,
+}: AddSideButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={`${title} 이미지 추가${count > 0 ? `, 현재 ${count}개 선택됨` : ""}`}
-      className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-left transition hover:border-neutral-950 hover:bg-white"
+      aria-label={`${koreanTitle} (${englishTitle}) 이미지 추가${count > 0 ? `, 현재 ${count}개 선택됨` : ""}`}
+      className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-3 text-left transition hover:border-neutral-950 hover:bg-white"
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <img
-            src={iconSrc}
-            alt=""
-            aria-hidden="true"
-            className="h-5 w-5 shrink-0 object-contain"
-          />
-          <span className="text-sm font-black text-neutral-950">{title}</span>
+      <div className="flex items-center gap-2">
+        <img
+          src={iconSrc}
+          alt=""
+          aria-hidden="true"
+          className="h-6 w-6 shrink-0 object-contain"
+        />
+        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-neutral-400">
+          {englishTitle}
         </span>
+      </div>
 
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="whitespace-nowrap text-sm font-black text-neutral-950">
+          {koreanTitle}
+        </span>
         <span className="shrink-0 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black text-white">
           + 추가
         </span>
@@ -1460,7 +1487,9 @@ function AddItemModal({
   onDecreaseItem,
   onUpload,
 }: AddItemModalProps) {
-  const sideLabel = side === "have" ? "있어요 (Have)" : "구해요 (Want)";
+  const sideKoreanLabel = side === "have" ? "있어요" : "구해요";
+  const sideEnglishLabel = side === "have" ? "Have" : "Want";
+  const sideLabel = `${sideKoreanLabel} (${sideEnglishLabel})`;
   const canUseBenefitSubcategoryFilter =
     (selectedCategory === ALL_CATEGORIES_VALUE ||
       selectedCategory === "benefit") &&
@@ -1502,11 +1531,11 @@ function AddItemModal({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-400">
-                Add Item
+                Add Item · {sideEnglishLabel}
               </p>
 
               <h2 className="mt-1 text-2xl font-black text-neutral-950">
-                {sideLabel} 이미지 추가
+                {sideKoreanLabel} 이미지 추가
               </h2>
             </div>
 
