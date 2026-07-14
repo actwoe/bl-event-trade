@@ -3,6 +3,11 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { TRADE_CATEGORIES, TradeBoard, TradeCard } from "@/lib/trade-types";
 import { QuantityBadge } from "@/components/trade/QuantityBadge";
+import { sortTradeCardsBySideAndGroup } from "@/lib/trade-card-order";
+import {
+  getPreviewColumnsPerSide,
+  getSharedPreviewGroupOrder,
+} from "@/lib/trade-preview-layout";
 
 type UiLabPreviewProps = {
   board: TradeBoard;
@@ -18,7 +23,6 @@ type CardGroup = {
   key: string;
   label: string;
   cards: TradeCard[];
-  sortOrder: number;
 };
 
 function formatEventPeriod(start?: string | null, end?: string | null) {
@@ -60,16 +64,10 @@ function getCardMetaLabel(card: TradeCard) {
     : categoryLabel;
 }
 
-function getRegisteredSortOrder(card: TradeCard) {
-  const value = (card as TradeCard & { registeredSortOrder?: number })
-    .registeredSortOrder;
-  return typeof value === "number" ? value : Number.MAX_SAFE_INTEGER;
-}
-
 function getCardGroups(cards: TradeCard[]): CardGroup[] {
   const groups: CardGroup[] = [];
 
-  for (const card of cards) {
+  for (const card of sortTradeCardsBySideAndGroup(cards)) {
     const label = getCardMetaLabel(card);
     const key =
       card.category === "benefit" ? `benefit:${label}` : card.category;
@@ -77,21 +75,12 @@ function getCardGroups(cards: TradeCard[]): CardGroup[] {
 
     if (existing) {
       existing.cards.push(card);
-      existing.sortOrder = Math.min(
-        existing.sortOrder,
-        getRegisteredSortOrder(card),
-      );
     } else {
-      groups.push({
-        key,
-        label,
-        cards: [card],
-        sortOrder: getRegisteredSortOrder(card),
-      });
+      groups.push({ key, label, cards: [card] });
     }
   }
 
-  return groups.sort((a, b) => a.sortOrder - b.sortOrder);
+  return groups;
 }
 
 export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
@@ -194,9 +183,9 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
 
             {hasCards ? (
               grouped ? (
-                <GroupedTradeRows cards={board.cards} />
+                <GroupedTradeRows cards={sortTradeCardsBySideAndGroup(board.cards)} />
               ) : (
-                <SimpleTradeRows cards={board.cards} />
+                <SimpleTradeRows cards={sortTradeCardsBySideAndGroup(board.cards)} />
               )
             ) : (
               <div className="border-2 border-dashed border-neutral-200 px-6 py-16 text-center">
@@ -252,25 +241,12 @@ function SideTitle({ title, count }: { title: string; count: number }) {
 }
 
 function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
-  const haveCards = cards.filter((card) => card.side === "have");
-  const wantCards = cards.filter((card) => card.side === "want");
+  const sortedCards = sortTradeCardsBySideAndGroup(cards);
+  const haveCards = sortedCards.filter((card) => card.side === "have");
+  const wantCards = sortedCards.filter((card) => card.side === "want");
   const haveGroups = getCardGroups(haveCards);
   const wantGroups = getCardGroups(wantCards);
-  const order: Array<{ key: string; label: string; sortOrder: number }> = [];
-
-  for (const group of [...haveGroups, ...wantGroups]) {
-    const existing = order.find((item) => item.key === group.key);
-    if (existing) {
-      existing.sortOrder = Math.min(existing.sortOrder, group.sortOrder);
-    } else {
-      order.push({
-        key: group.key,
-        label: group.label,
-        sortOrder: group.sortOrder,
-      });
-    }
-  }
-  order.sort((a, b) => a.sortOrder - b.sortOrder);
+  const order = getSharedPreviewGroupOrder(haveGroups, wantGroups);
 
   return (
     <div>
@@ -285,6 +261,10 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
             haveGroups.find((item) => item.key === group.key)?.cards ?? [];
           const want =
             wantGroups.find((item) => item.key === group.key)?.cards ?? [];
+          const columnsPerSide = getPreviewColumnsPerSide(
+            have.length,
+            want.length,
+          );
 
           return (
             <section key={group.key}>
@@ -300,14 +280,14 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
                 <div className="min-w-0 pr-2">
                   <CardGrid
                     cards={have}
-                    columns={4}
+                    columns={columnsPerSide}
                     showMeta={false}
                   />
                 </div>
                 <div className="min-w-0 border-l border-neutral-200 pl-2">
                   <CardGrid
                     cards={want}
-                    columns={4}
+                    columns={columnsPerSide}
                     showMeta={false}
                   />
                 </div>
@@ -321,24 +301,37 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
 }
 
 function SimpleTradeRows({ cards }: { cards: TradeCard[] }) {
-  const haveCards = cards.filter((card) => card.side === "have");
-  const wantCards = cards.filter((card) => card.side === "want");
+  const sortedCards = sortTradeCardsBySideAndGroup(cards);
+  const haveCards = sortedCards.filter((card) => card.side === "have");
+  const wantCards = sortedCards.filter((card) => card.side === "want");
+  const columnsPerSide = getPreviewColumnsPerSide(
+    haveCards.length,
+    wantCards.length,
+  );
 
   return (
-    <div className="space-y-7">
-      <section>
+    <div>
+      <div className="grid grid-cols-2 gap-6">
         <SideTitle title="있어요 (Have)" count={haveCards.length} />
-        <div className="pt-4">
-          <CardGrid cards={haveCards} columns={8} showMeta />
-        </div>
-      </section>
-
-      <section>
         <SideTitle title="구해요 (Want)" count={wantCards.length} />
-        <div className="pt-4">
-          <CardGrid cards={wantCards} columns={8} showMeta />
+      </div>
+
+      <div className="mt-5 grid grid-cols-2">
+        <div className="min-w-0 pr-2">
+          <CardGrid
+            cards={haveCards}
+            columns={columnsPerSide}
+            showMeta
+          />
         </div>
-      </section>
+        <div className="min-w-0 border-l border-neutral-200 pl-2">
+          <CardGrid
+            cards={wantCards}
+            columns={columnsPerSide}
+            showMeta
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -349,7 +342,7 @@ function CardGrid({
   showMeta,
 }: {
   cards: TradeCard[];
-  columns: 2 | 3 | 4 | 6 | 8;
+  columns: 1 | 2 | 3 | 4 | 6 | 8;
   showMeta: boolean;
 }) {
   if (cards.length === 0) {
@@ -362,14 +355,16 @@ function CardGrid({
 
   const gridClass =
     columns === 8
-      ? "grid-cols-8 gap-x-2 gap-y-2"
+      ? "grid-cols-8 gap-x-3 gap-y-2"
       : columns === 6
-        ? "grid-cols-6 gap-x-2 gap-y-2"
+        ? "grid-cols-6 gap-x-3 gap-y-2"
         : columns === 4
-          ? "grid-cols-4 gap-x-2 gap-y-2"
+          ? "grid-cols-4 gap-x-3 gap-y-2"
           : columns === 3
-            ? "grid-cols-3 gap-x-2 gap-y-2"
-            : "grid-cols-2 gap-x-2 gap-y-2";
+            ? "grid-cols-3 gap-x-3 gap-y-2"
+            : columns === 2
+              ? "grid-cols-2 gap-x-3 gap-y-2"
+              : "grid-cols-1 gap-x-3 gap-y-2";
 
   return (
     <div className={`grid ${gridClass}`}>
