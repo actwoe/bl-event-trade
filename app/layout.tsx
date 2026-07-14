@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import { SiteFooter } from '@/components/shared/SiteFooter';
 import { SiteHeader } from '@/components/shared/SiteHeader';
 
 export const metadata: Metadata = {
@@ -18,7 +17,6 @@ export default function RootLayout({
       <body className="min-h-screen bg-neutral-100 text-neutral-950 antialiased">
         <SiteHeader />
         {children}
-        <SiteFooter />
       </body>
     </html>
   );

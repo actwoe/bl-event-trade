@@ -14,6 +14,7 @@ type TradeCollectionRow = {
   thumbnail_path: string | null;
   event_start_date: string | null;
   event_end_date: string | null;
+  event_location: string | null;
   sort_order: number | null;
 };
 
@@ -21,7 +22,7 @@ async function loadCollections() {
   const { data, error } = await supabase
     .from('trade_collections')
     .select(
-      'id, slug, title, thumbnail_path, event_start_date, event_end_date, sort_order',
+      'id, slug, title, thumbnail_path, event_start_date, event_end_date, event_location, sort_order',
     )
     .eq('is_public', true);
 
@@ -39,6 +40,7 @@ async function loadCollections() {
         : '',
       eventStartDate: collection.event_start_date,
       eventEndDate: collection.event_end_date,
+      location: collection.event_location,
       sortOrder: collection.sort_order ?? 0,
     }),
   );
@@ -59,8 +61,8 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="w-full bg-neutral-100 px-4 pb-5 pt-5 sm:pb-6 sm:pt-6">
-      <section className="mx-auto w-full max-w-md overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)] sm:max-w-lg">
+    <main className="flex h-[100dvh] w-full items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
+      <section className="flex h-full max-h-[860px] w-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
         <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] p-5">
           <div className="flex justify-end">
             <Link
@@ -86,7 +88,7 @@ export default async function HomePage() {
           </div>
         </header>
 
-        <div className="bg-white p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white p-5">
           {error ? (
             <p className="rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-600">
               {error}

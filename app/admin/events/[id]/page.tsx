@@ -19,6 +19,7 @@ type TradeCollectionRow = {
   description: string | null;
   event_start_date: string | null;
   event_end_date: string | null;
+  event_location: string | null;
   thumbnail_path: string;
   status_label: string | null;
   is_public: boolean;
@@ -215,6 +216,7 @@ export default function AdminEventManagePage() {
   const [slug, setSlug] = useState('');
   const [eventStartDate, setEventStartDate] = useState('');
   const [eventEndDate, setEventEndDate] = useState('');
+  const [eventLocation, setEventLocation] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [sortOrder, setSortOrder] = useState('0');
 
@@ -409,7 +411,7 @@ export default function AdminEventManagePage() {
       const { data, error } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, event_start_date, event_end_date, thumbnail_path, status_label, is_public, sort_order',
+          'id, slug, title, description, event_start_date, event_end_date, event_location, thumbnail_path, status_label, is_public, sort_order',
         )
         .eq('id', eventId)
         .single();
@@ -427,6 +429,7 @@ export default function AdminEventManagePage() {
       setSlug(typedEvent.slug);
       setEventStartDate(typedEvent.event_start_date ?? '');
       setEventEndDate(typedEvent.event_end_date ?? '');
+      setEventLocation(typedEvent.event_location ?? '');
       setIsPublic(typedEvent.is_public);
       setSortOrder(String(typedEvent.sort_order ?? 0));
       setThumbnailPreviewUrl(getTradeAssetUrl(typedEvent.thumbnail_path));
@@ -697,6 +700,7 @@ export default function AdminEventManagePage() {
           slug: normalizedSlug,
           event_start_date: eventStartDate || null,
           event_end_date: eventEndDate || null,
+          event_location: eventLocation.trim() || null,
           thumbnail_path: nextThumbnailPath,
           status_label: null,
           is_public: isPublic,
@@ -715,7 +719,7 @@ export default function AdminEventManagePage() {
       const { data } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, event_start_date, event_end_date, thumbnail_path, status_label, is_public, sort_order',
+          'id, slug, title, description, event_start_date, event_end_date, event_location, thumbnail_path, status_label, is_public, sort_order',
         )
         .eq('id', eventData.id)
         .single();
@@ -728,6 +732,7 @@ export default function AdminEventManagePage() {
         setSlug(refreshedEvent.slug);
         setEventStartDate(refreshedEvent.event_start_date ?? '');
         setEventEndDate(refreshedEvent.event_end_date ?? '');
+        setEventLocation(refreshedEvent.event_location ?? '');
         setIsPublic(refreshedEvent.is_public);
         setSortOrder(String(refreshedEvent.sort_order ?? 0));
         setThumbnailPreviewUrl(getTradeAssetUrl(refreshedEvent.thumbnail_path));
@@ -1631,6 +1636,16 @@ export default function AdminEventManagePage() {
                 />
               </label>
             </div>
+
+            <label className="block">
+              <span className="text-sm font-bold text-neutral-800">행사 장소</span>
+              <input
+                value={eventLocation}
+                onChange={(event) => setEventLocation(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                placeholder="예: 서울 · 더현대 서울 5F / 온라인"
+              />
+            </label>
 
             <label className="block">
               <span className="text-sm font-bold text-neutral-800">Slug</span>

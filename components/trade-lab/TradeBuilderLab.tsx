@@ -222,6 +222,16 @@ async function ensureTradeLabFontReady() {
   await document.fonts.ready;
 }
 
+function getTradeDateLabel() {
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(new Date())
+    .replace(/\s/g, "");
+}
+
 async function renderBoardToPngBlob(
   board: TradeBoard,
   collectionTitle: string,
@@ -298,14 +308,16 @@ async function renderBoardToPngBlob(
     for (const group of getGroups()) {
       const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
       const want = board.cards.filter((card) => card.side === "want" && cardGroupKey(card) === group.key);
-      contentHeight += 25 + Math.max(gridHeight(have, false), gridHeight(want, false), cardWidth) + 24;
+      contentHeight += 33 + Math.max(gridHeight(have, false), gridHeight(want, false), cardWidth) + 24;
     }
   } else {
     const have = board.cards.filter((card) => card.side === "have");
     const want = board.cards.filter((card) => card.side === "want");
     contentHeight += Math.max(gridHeight(have, true), gridHeight(want, true), cardWidth) + 24;
   }
-  const height = Math.max(300, contentHeight + 24);
+  const footerHeight = 84;
+  const height = Math.max(384, contentHeight + footerHeight + 56);
+  const footerTop = height - 20 - footerHeight;
 
   const canvas = document.createElement("canvas");
   canvas.width = width * scale;
@@ -338,13 +350,6 @@ async function renderBoardToPngBlob(
   context.fillStyle = "#ffffff";
   context.font = `900 22px ${koreanFont}`;
   context.fillText(collectionTitle, 40, 73);
-  const profile = [board.nickname, board.contact].filter(Boolean).join(" · ");
-  if (profile) {
-    context.fillStyle = "#d4d4d4";
-    context.font = `600 11px ${koreanFont}`;
-    context.fillText(profile, 40, 94);
-  }
-
   const conditionChips = board.memo
     .split(" · ")
     .map((value) => value.trim())
@@ -449,18 +454,37 @@ async function renderBoardToPngBlob(
   let y = contentStartY;
   if (grouped) {
     for (const group of getGroups()) {
-      context.fillStyle = "#171717";
+      if (y > contentStartY) {
+        context.strokeStyle = "#e5e5e5";
+        context.lineWidth = 1;
+        context.beginPath();
+        context.moveTo(36, y - 9);
+        context.lineTo(524, y - 9);
+        context.stroke();
+      }
+
       context.font = `900 10px ${koreanFont}`;
-      context.fillText(group.label, 36, y + 11);
-      const groupLabelWidth = context.measureText(group.label).width;
+      const groupLabelWidth = Math.min(context.measureText(group.label).width + 22, 180);
+      roundedRect(context, 36, y, groupLabelWidth, 22, 11);
+      context.fillStyle = "#e5e5e5";
+      context.fill();
+      drawCenteredText(
+        context,
+        group.label,
+        36 + groupLabelWidth / 2,
+        y + 15,
+        groupLabelWidth - 14,
+        `900 10px ${koreanFont}`,
+        "#404040",
+      );
       const dividerStartX = Math.min(36 + groupLabelWidth + 12, 512);
       context.strokeStyle = "#d4d4d4";
       context.lineWidth = 1;
       context.beginPath();
-      context.moveTo(dividerStartX, y + 7);
-      context.lineTo(524, y + 7);
+      context.moveTo(dividerStartX, y + 11);
+      context.lineTo(524, y + 11);
       context.stroke();
-      const gridY = y + 24;
+      const gridY = y + 32;
       const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
       const want = board.cards.filter((card) => card.side === "want" && cardGroupKey(card) === group.key);
       const haveHeight = drawGrid(have, "have", gridY, false);
@@ -487,6 +511,44 @@ async function renderBoardToPngBlob(
     y += groupHeight + 24;
   }
 
+
+  roundedRect(context, 20, footerTop, 520, footerHeight, 26);
+  context.fillStyle = "#0a0a0a";
+  context.fill();
+  context.fillRect(20, footerTop, 520, 26);
+
+  const footerNickname = board.nickname.trim() || "닉네임";
+  const footerContact = board.contact.trim() || "@계정";
+  const dateLabel = getTradeDateLabel();
+
+  context.fillStyle = "#ffffff";
+  context.font = `900 12px ${koreanFont}`;
+  context.fillText(footerNickname, 40, footerTop + 24);
+  context.fillStyle = "#a3a3a3";
+  context.font = `700 10px ${koreanFont}`;
+  context.fillText(footerContact, 40, footerTop + 41);
+
+  context.textAlign = "right";
+  context.fillStyle = "#a3a3a3";
+  context.font = `700 10px ${koreanFont}`;
+  context.fillText(`${dateLabel} 기준`, 520, footerTop + 28);
+  context.textAlign = "left";
+
+  context.strokeStyle = "rgba(255,255,255,0.10)";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(40, footerTop + 50);
+  context.lineTo(520, footerTop + 50);
+  context.stroke();
+
+  context.fillStyle = "#737373";
+  context.font = `500 8px ${koreanFont}`;
+  context.fillText(
+    "업로드된 모든 이미지의 저작권은 각 플랫폼과 작가님께 있습니다.",
+    40,
+    footerTop + 66,
+  );
+  context.fillText("제작 NP @ru1ned1over", 40, footerTop + 78);
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {

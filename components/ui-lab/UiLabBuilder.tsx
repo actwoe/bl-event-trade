@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
 import Link from "next/link";
@@ -16,22 +17,16 @@ import {
   TradeImageRatio,
   TradeSide,
 } from "@/lib/trade-types";
-import { UiLabPreview } from "@/components/ui-lab/UiLabPreview";
-import { QuantityBadge } from "./QuantityBadge";
-import { supabase } from "@/lib/supabase";
-import {
-  MAX_TRADE_GROUPS,
-  parseSavedTradeGroupBoard,
-  SavedTradeGroupBoard,
-} from "@/lib/trade-groups";
+import { UiLabPreview } from "./UiLabPreview";
+import { QuantityBadge } from "@/components/trade/QuantityBadge";
 
-type TradeBuilderProps = {
-  collection: TradeCollectionSummary;
+type UiLabBuilderProps = {
+  collection: TradeCollectionSummary & {
+    eventStartDate?: string | null;
+    eventEndDate?: string | null;
+  };
   registeredItems: RegisteredTradeItem[];
   referenceImages: TradeReferenceImage[];
-  initialGroupId?: string;
-  embedded?: boolean;
-  onSavedGroupChange?: (group: { id: string; name: string }) => void;
 };
 
 const TRADE_LAB_FONT_FAMILY = "'Pretendard', Arial, sans-serif";
@@ -42,11 +37,11 @@ const NO_BENEFIT_SUBCATEGORY_VALUE = "__none__";
 
 type CategoryFilterValue = TradeCategory | typeof ALL_CATEGORIES_VALUE;
 type BenefitSubcategoryFilterValue = string;
-type UserAuthState = "checking" | "signed-in" | "signed-out";
 
 type QuantityTradeCard = TradeCard & {
   quantity?: number;
   registeredItemId?: string;
+  registeredSortOrder?: number;
 };
 
 type UploadedCardMetadata = {
@@ -142,7 +137,6 @@ async function savePngBlob(
   onShowPreview(previewUrl);
 }
 
-
 function roundedRect(
   context: CanvasRenderingContext2D,
   x: number,
@@ -172,7 +166,10 @@ function drawCenteredText(
   context.textBaseline = "alphabetic";
 
   let nextValue = value;
-  while (nextValue.length > 1 && context.measureText(nextValue).width > maxWidth) {
+  while (
+    nextValue.length > 1 &&
+    context.measureText(nextValue).width > maxWidth
+  ) {
     nextValue = nextValue.slice(0, -1);
   }
   if (nextValue !== value) nextValue = `${nextValue.slice(0, -1)}…`;
@@ -229,7 +226,6 @@ function drawTwoLineCenteredText(
   context.restore();
 }
 
-
 const canvasImageCache = new Map<string, Promise<HTMLImageElement>>();
 
 function loadImageElement(source: string, useCors: boolean) {
@@ -242,7 +238,8 @@ function loadImageElement(source: string, useCors: boolean) {
 
     image.decoding = "async";
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
+    image.onerror = () =>
+      reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
     image.src = source;
   });
 }
@@ -285,7 +282,6 @@ function loadCanvasImage(source: string) {
   return imagePromise;
 }
 
-
 function drawContainedImage(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
@@ -294,7 +290,10 @@ function drawContainedImage(
   width: number,
   height: number,
 ) {
-  const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+  const scale = Math.min(
+    width / image.naturalWidth,
+    height / image.naturalHeight,
+  );
   const drawWidth = image.naturalWidth * scale;
   const drawHeight = image.naturalHeight * scale;
   const drawX = x + (width - drawWidth) / 2;
@@ -319,10 +318,10 @@ async function renderBoardToPngBlob(
 
   const width = 840;
   const scale = 2000 / width;
-  const sideWidth = 370;
-  const sideLeft = { have: 28, want: 442 } as const;
-  const cardWidth = 118;
-  const cardGap = 8;
+  const sideWidth = 372;
+  const sideLeft = { have: 36, want: 432 } as const;
+  const cardWidth = 112;
+  const cardGap = 12;
   const rowGap = 18;
   const grouped = board.categoryDisplayMode !== "simple";
   const [cardsWithImages, sideIcons] = await Promise.all([
@@ -384,7 +383,7 @@ async function renderBoardToPngBlob(
 
   const headerBottom = 112;
   const sideHeaderY = 124;
-  const contentStartY = 168;
+  const contentStartY = 172;
   let contentHeight = contentStartY;
   if (grouped) {
     for (const group of getGroups()) {
@@ -395,8 +394,9 @@ async function renderBoardToPngBlob(
         (card) => card.side === "want" && cardGroupKey(card) === group.key,
       );
       contentHeight +=
-        62 +
-        Math.max(gridHeight(have, false), gridHeight(want, false), cardWidth);
+        25 +
+        Math.max(gridHeight(have, false), gridHeight(want, false), cardWidth) +
+        24;
     }
   } else {
     const have = board.cards.filter((card) => card.side === "have");
@@ -414,13 +414,8 @@ async function renderBoardToPngBlob(
     contentHeight +=
       34 + gridHeightFour(have) + 34 + 34 + gridHeightFour(want) + 24;
   }
-  const footerTopGap = 18;
-  const copyrightFooterHeight = 48;
-  const outerBottomPadding = 20;
-  const height = Math.max(
-    300,
-    contentHeight + footerTopGap + copyrightFooterHeight + outerBottomPadding,
-  );
+  const copyrightFooterHeight = 52;
+  const height = Math.max(300, contentHeight + copyrightFooterHeight);
 
   const canvas = document.createElement("canvas");
   canvas.width = width * scale;
@@ -472,20 +467,21 @@ async function renderBoardToPngBlob(
     const rows: Array<Array<{ text: string; width: number }>> = [[]];
     let rowWidth = 0;
     for (const chip of conditionChips) {
-      const chipWidth = Math.min(context.measureText(chip).width + 20, 150);
+      const chipWidth = Math.min(context.measureText(chip).width + 20, 112);
       const nextWidth = rowWidth + (rows[rows.length - 1].length ? 6 : 0) + chipWidth;
-      if (nextWidth > 500 && rows.length < 2) {
+      if (nextWidth > 360 && rows.length < 2) {
         rows.push([]);
         rowWidth = 0;
       }
+      if (rows.length > 2) break;
       rows[rows.length - 1].push({ text: chip, width: chipWidth });
       rowWidth += (rows[rows.length - 1].length > 1 ? 6 : 0) + chipWidth;
     }
 
-    const chipHeight = 26;
-    const chipRowGap = 4;
-    const totalHeight = rows.length * chipHeight + (rows.length - 1) * chipRowGap;
-    let chipY = headerBottom - 10 - totalHeight;
+    const chipHeight = 30;
+    const rowGap = 5;
+    const totalHeight = rows.length * chipHeight + (rows.length - 1) * rowGap;
+    let chipY = headerBottom - 12 - totalHeight;
 
     for (const row of rows.slice(0, 2)) {
       let chipRight = 804;
@@ -493,18 +489,18 @@ async function renderBoardToPngBlob(
         roundedRect(context, chipRight - chip.width, chipY, chip.width, chipHeight, 12);
         context.fillStyle = "#ffffff";
         context.fill();
-        drawCenteredText(
+        drawTwoLineCenteredText(
           context,
           chip.text,
           chipRight - chip.width / 2,
-          chipY + 17,
-          chip.width - 12,
-          `800 8px ${koreanFont}`,
+          chipY + chipHeight - 7,
+          chip.width - 14,
+          `800 9px ${koreanFont}`,
           "#171717",
         );
         chipRight -= chip.width + 6;
       }
-      chipY += chipHeight + chipRowGap;
+      chipY += chipHeight + rowGap;
     }
     context.restore();
   }
@@ -563,16 +559,16 @@ async function renderBoardToPngBlob(
     const quantity = getCardQuantity(card);
     if (quantity > 1) {
       context.beginPath();
-      context.arc(x + cardWidth - 17, y + 17, 11, 0, Math.PI * 2);
+      context.arc(x + cardWidth - 12, y + 14, 8, 0, Math.PI * 2);
       context.fillStyle = "#171717";
       context.fill();
       drawCenteredText(
         context,
         `×${quantity}`,
-        x + cardWidth - 17,
-        y + 20,
-        20,
-        "900 9px Arial, sans-serif",
+        x + cardWidth - 12,
+        y + 17,
+        14,
+        "900 7px Arial, sans-serif",
         "#ffffff",
       );
     }
@@ -627,17 +623,17 @@ async function renderBoardToPngBlob(
   if (grouped) {
     for (const group of getGroups()) {
       context.fillStyle = "#7C5CFC";
-      roundedRect(context, 28, y + 1, 4, 16, 2);
+      roundedRect(context, 36, y + 1, 4, 16, 2);
       context.fill();
       context.fillStyle = "#262626";
       context.font = `900 11px ${koreanFont}`;
-      context.fillText(group.label, 40, y + 13);
+      context.fillText(group.label, 48, y + 13);
       const groupLabelWidth = context.measureText(group.label).width;
       context.strokeStyle = "#e5e5e5";
       context.lineWidth = 1;
       context.beginPath();
-      context.moveTo(Math.min(52 + groupLabelWidth, 790), y + 9);
-      context.lineTo(812, y + 9);
+      context.moveTo(Math.min(60 + groupLabelWidth, 780), y + 9);
+      context.lineTo(804, y + 9);
       context.stroke();
 
       const gridY = y + 28;
@@ -694,7 +690,7 @@ async function renderBoardToPngBlob(
     const drawGridSix = (cards: TradeCard[], startY: number) => {
       let rowY = startY;
       const simpleGap = 8;
-      const simpleLeft = 46;
+      const simpleLeft = 48;
       for (let index = 0; index < cards.length; index += 6) {
         const rowCards = cards.slice(index, index + 6);
         rowCards.forEach((card, col) =>
@@ -721,20 +717,24 @@ async function renderBoardToPngBlob(
     y += drawGridSix(want, y) + 24;
   }
 
-  const footerTop = height - outerBottomPadding - copyrightFooterHeight;
   context.fillStyle = "#F7F7FA";
-  context.fillRect(20, footerTop, 800, copyrightFooterHeight);
-  context.strokeStyle = "#e5e5e5";
+  context.fillRect(
+    20,
+    height - copyrightFooterHeight - 20,
+    800,
+    copyrightFooterHeight,
+  );
+  context.strokeStyle = "#f5f5f5";
   context.beginPath();
-  context.moveTo(20, footerTop);
-  context.lineTo(820, footerTop);
+  context.moveTo(20, height - copyrightFooterHeight - 20);
+  context.lineTo(820, height - copyrightFooterHeight - 20);
   context.stroke();
   drawCenteredText(
     context,
     "업로드된 모든 이미지의 저작권은 각 플랫폼과 작가님께 있습니다.",
     width / 2,
-    footerTop + 20,
-    600,
+    height - 43,
+    490,
     `500 8px ${koreanFont}`,
     "#a3a3a3",
   );
@@ -742,8 +742,8 @@ async function renderBoardToPngBlob(
     context,
     "제작 NP @ru1ned1over",
     width / 2,
-    footerTop + 35,
-    600,
+    height - 28,
+    490,
     `700 8px ${koreanFont}`,
     "#737373",
   );
@@ -763,90 +763,6 @@ function createInitialBoard(): TradeBoard {
     memo: "",
     cards: [],
     categoryDisplayMode: "grouped",
-  };
-}
-
-function createSavedTradeGroupBoard(
-  board: TradeBoard,
-  selectedConditions: string[],
-) {
-  let skippedUploadCount = 0;
-
-  const cards: SavedTradeGroupBoard["cards"] = board.cards.flatMap((card) => {
-    const quantityCard = card as QuantityTradeCard;
-
-    if (!quantityCard.registeredItemId) {
-      skippedUploadCount += 1;
-      return [];
-    }
-
-    return [
-      {
-        itemId: quantityCard.registeredItemId,
-        side: card.side,
-        quantity: getCardQuantity(card),
-        category: card.category,
-        workTitle: card.workTitle,
-        memo: card.memo,
-        imageRatio: card.imageRatio === "photocard" ? "photocard" : "square",
-        benefitSubcategory: card.benefitSubcategory ?? null,
-      },
-    ];
-  });
-
-  const boardData: SavedTradeGroupBoard = {
-    version: 1,
-    nickname: board.nickname,
-    contact: board.contact,
-    selectedConditions,
-    categoryDisplayMode:
-      board.categoryDisplayMode === "simple" ? "simple" : "grouped",
-    cards,
-  };
-
-  return { boardData, skippedUploadCount };
-}
-
-function restoreSavedTradeGroupBoard(
-  boardData: SavedTradeGroupBoard,
-  registeredItems: RegisteredTradeItem[],
-) {
-  const itemMap = new Map(registeredItems.map((item) => [item.id, item]));
-
-  const cards: QuantityTradeCard[] = boardData.cards.flatMap((savedCard) => {
-    const item = itemMap.get(savedCard.itemId);
-
-    if (!item) {
-      return [];
-    }
-
-    return [
-      {
-        id: nanoid(),
-        side: savedCard.side,
-        category: savedCard.category,
-        imageUrl: item.imageUrl,
-        workTitle: savedCard.workTitle || item.workTitle,
-        memo: savedCard.memo || item.itemName,
-        imageRatio: savedCard.imageRatio,
-        benefitSubcategory:
-          savedCard.benefitSubcategory ?? item.benefitSubcategory ?? null,
-        quantity: savedCard.quantity,
-        registeredItemId: item.id,
-      },
-    ];
-  });
-
-  return {
-    board: {
-      nickname: boardData.nickname,
-      contact: boardData.contact,
-      memo: boardData.selectedConditions.join(" · "),
-      cards,
-      categoryDisplayMode: boardData.categoryDisplayMode,
-    } satisfies TradeBoard,
-    selectedConditions: boardData.selectedConditions,
-    missingCardCount: boardData.cards.length - cards.length,
   };
 }
 
@@ -988,14 +904,70 @@ function sortRegisteredItems(items: RegisteredTradeItem[]) {
   });
 }
 
-export function TradeBuilder({
+function getTradeSideSortIndex(side: TradeSide) {
+  return side === "have" ? 0 : 1;
+}
+
+function compareTradeCards(a: TradeCard, b: TradeCard) {
+  const aCard = a as QuantityTradeCard;
+  const bCard = b as QuantityTradeCard;
+  const sideDiff =
+    getTradeSideSortIndex(a.side) - getTradeSideSortIndex(b.side);
+
+  if (sideDiff !== 0) {
+    return sideDiff;
+  }
+
+  const categoryDiff =
+    getCategorySortIndex(a.category) - getCategorySortIndex(b.category);
+
+  if (categoryDiff !== 0) {
+    return categoryDiff;
+  }
+
+  const sortOrderDiff =
+    (aCard.registeredSortOrder ?? Number.MAX_SAFE_INTEGER) -
+    (bCard.registeredSortOrder ?? Number.MAX_SAFE_INTEGER);
+
+  // 관리자에서 등록한 특전 순서를 작품명이나 선택 순서보다 우선합니다.
+  if (sortOrderDiff !== 0) {
+    return sortOrderDiff;
+  }
+
+  if (a.category === "benefit" && b.category === "benefit") {
+    const subcategoryDiff = getBenefitSubcategoryLabel(
+      a.benefitSubcategory,
+    ).localeCompare(getBenefitSubcategoryLabel(b.benefitSubcategory), "ko-KR", {
+      numeric: true,
+      sensitivity: "base",
+    });
+
+    if (subcategoryDiff !== 0) {
+      return subcategoryDiff;
+    }
+  }
+
+  const titleDiff = a.workTitle.localeCompare(b.workTitle, "ko-KR", {
+    numeric: true,
+    sensitivity: "base",
+  });
+
+  if (titleDiff !== 0) {
+    return titleDiff;
+  }
+
+  return a.id.localeCompare(b.id);
+}
+
+function sortTradeCards(cards: TradeCard[]) {
+  return [...cards].sort(compareTradeCards);
+}
+
+export function UiLabBuilder({
   collection,
   registeredItems,
   referenceImages,
-  initialGroupId,
-  embedded = false,
-  onSavedGroupChange,
-}: TradeBuilderProps) {
+}: UiLabBuilderProps) {
   const [board, setBoard] = useState<TradeBoard>(() => createInitialBoard());
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -1009,16 +981,6 @@ export function TradeBuilder({
   const [isExporting, setIsExporting] = useState(false);
   const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
-  const [userAuthState, setUserAuthState] =
-    useState<UserAuthState>("checking");
-  const [currentUserId, setCurrentUserId] = useState("");
-  const [savedGroupCount, setSavedGroupCount] = useState(0);
-  const [activeGroupId, setActiveGroupId] = useState("");
-  const [groupName, setGroupName] = useState("");
-  const [groupSaveMessage, setGroupSaveMessage] = useState("");
-  const [isSavingGroup, setIsSavingGroup] = useState(false);
-  const [isLoadingGroup, setIsLoadingGroup] = useState(false);
-
 
 
   const workTitleOptions = useMemo(() => {
@@ -1046,7 +1008,6 @@ export function TradeBuilder({
       );
     });
   }, [registeredItems]);
-
 
   const filteredItems = useMemo(() => {
     const nextItems = registeredItems.filter((item) => {
@@ -1108,108 +1069,6 @@ export function TradeBuilder({
     return board.cards.length > 0;
   }, [board.cards]);
 
-  const directUploadCardCount = useMemo(() => {
-    return board.cards.filter(
-      (card) => !(card as QuantityTradeCard).registeredItemId,
-    ).length;
-  }, [board.cards]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadUserAndSavedGroup() {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const user = sessionData.session?.user;
-
-      if (!isMounted) return;
-
-      if (!user) {
-        setUserAuthState("signed-out");
-        setCurrentUserId("");
-        return;
-      }
-
-      setUserAuthState("signed-in");
-      setCurrentUserId(user.id);
-
-      const { count, error: countError } = await supabase
-        .from("trade_groups")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id);
-
-      if (!isMounted) return;
-
-      if (countError) {
-        console.error(countError);
-        setGroupSaveMessage(
-          "저장 기능을 확인할 수 없습니다. Supabase SQL 적용 여부를 확인해 주세요.",
-        );
-      } else {
-        setSavedGroupCount(count ?? 0);
-      }
-
-      const groupId = initialGroupId ?? new URLSearchParams(window.location.search).get("group");
-      if (!groupId) return;
-
-      setIsLoadingGroup(true);
-
-      const { data: groupData, error: groupError } = await supabase
-        .from("trade_groups")
-        .select("id, collection_id, name, board_data")
-        .eq("id", groupId)
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      if (!isMounted) return;
-
-      setIsLoadingGroup(false);
-
-      if (groupError || !groupData) {
-        if (groupError) console.error(groupError);
-        setGroupSaveMessage("저장한 교환판을 불러오지 못했습니다.");
-        return;
-      }
-
-      if (groupData.collection_id !== collection.id) {
-        setGroupSaveMessage(
-          "이 저장 그룹은 다른 행사 교환판입니다. 내 교환판에서 다시 열어 주세요.",
-        );
-        return;
-      }
-
-      const parsedBoard = parseSavedTradeGroupBoard(groupData.board_data);
-
-      if (!parsedBoard) {
-        setGroupSaveMessage("저장된 교환판 데이터 형식을 확인할 수 없습니다.");
-        return;
-      }
-
-      const restored = restoreSavedTradeGroupBoard(
-        parsedBoard,
-        registeredItems,
-      );
-
-      setActiveGroupId(groupData.id);
-      setGroupName(groupData.name);
-      setSelectedConditions(restored.selectedConditions);
-      setBoard(restored.board);
-
-      if (restored.missingCardCount > 0) {
-        setGroupSaveMessage(
-          `현재 행사에서 삭제된 굿즈 ${restored.missingCardCount}개는 제외하고 불러왔습니다.`,
-        );
-      } else {
-        setGroupSaveMessage("저장한 교환판을 불러왔습니다.");
-      }
-    }
-
-    void loadUserAndSavedGroup();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [collection.id, initialGroupId, registeredItems]);
-
   useEffect(() => {
     if (board.cards.length === 0) return;
 
@@ -1223,6 +1082,33 @@ export function TradeBuilder({
     return () => window.clearTimeout(timer);
   }, [board.cards]);
 
+  useEffect(() => {
+    if (
+      selectedCategory !== ALL_CATEGORIES_VALUE &&
+      selectedCategory !== "benefit" &&
+      selectedBenefitSubcategory !== ALL_BENEFIT_SUBCATEGORIES_VALUE
+    ) {
+      setSelectedBenefitSubcategory(ALL_BENEFIT_SUBCATEGORIES_VALUE);
+    }
+  }, [selectedCategory, selectedBenefitSubcategory]);
+
+  useEffect(() => {
+    if (
+      selectedBenefitSubcategory !== ALL_BENEFIT_SUBCATEGORIES_VALUE &&
+      selectedBenefitSubcategory !== NO_BENEFIT_SUBCATEGORY_VALUE &&
+      !benefitSubcategoryOptions.includes(selectedBenefitSubcategory)
+    ) {
+      setSelectedBenefitSubcategory(ALL_BENEFIT_SUBCATEGORIES_VALUE);
+    }
+  }, [benefitSubcategoryOptions, selectedBenefitSubcategory]);
+
+  useEffect(() => {
+    setBoard((prev) => ({
+      ...prev,
+      memo: selectedConditions.join(" · "),
+    }));
+  }, [selectedConditions]);
+
 
   function updateBoardField<K extends keyof TradeBoard>(
     key: K,
@@ -1235,12 +1121,13 @@ export function TradeBuilder({
   }
 
   function toggleCondition(condition: string) {
-    const nextConditions = selectedConditions.includes(condition)
-      ? selectedConditions.filter((item) => item !== condition)
-      : [...selectedConditions, condition];
+    setSelectedConditions((prev) => {
+      if (prev.includes(condition)) {
+        return prev.filter((item) => item !== condition);
+      }
 
-    setSelectedConditions(nextConditions);
-    updateBoardField("memo", nextConditions.join(" · "));
+      return [...prev, condition];
+    });
   }
 
   function updateCategoryDisplayMode(mode: TradeCategoryDisplayMode) {
@@ -1288,20 +1175,23 @@ export function TradeBuilder({
       if (existingCard) {
         return {
           ...prev,
-          cards: prev.cards.map((card) =>
-            card.id === existingCard.id
-              ? {
-                  ...card,
-                  category: item.category,
-                  imageUrl: item.imageUrl,
-                  workTitle: item.workTitle,
-                  memo: item.itemName,
-                  imageRatio: getItemImageRatio(item),
-                  benefitSubcategory: item.benefitSubcategory ?? null,
-                  quantity: safeQuantity,
-                  registeredItemId: item.id,
-                }
-              : card,
+          cards: sortTradeCards(
+            prev.cards.map((card) =>
+              card.id === existingCard.id
+                ? {
+                    ...card,
+                    category: item.category,
+                    imageUrl: item.imageUrl,
+                    workTitle: item.workTitle,
+                    memo: item.itemName,
+                    imageRatio: getItemImageRatio(item),
+                    benefitSubcategory: item.benefitSubcategory ?? null,
+                    quantity: safeQuantity,
+                    registeredItemId: item.id,
+                    registeredSortOrder: item.sortOrder,
+                  }
+                : card,
+            ),
           ),
         };
       }
@@ -1317,11 +1207,12 @@ export function TradeBuilder({
         benefitSubcategory: item.benefitSubcategory ?? null,
         quantity: safeQuantity,
         registeredItemId: item.id,
+        registeredSortOrder: item.sortOrder,
       };
 
       return {
         ...prev,
-        cards: [...prev.cards, newCard],
+        cards: sortTradeCards([...prev.cards, newCard]),
       };
     });
   }
@@ -1361,25 +1252,26 @@ export function TradeBuilder({
         memo: "",
         imageRatio: "square",
         benefitSubcategory:
-          metadata.category === "benefit"
-            ? metadata.benefitSubcategory
-            : null,
+          metadata.category === "benefit" ? metadata.benefitSubcategory : null,
         quantity: 1,
+        registeredSortOrder: Number.MAX_SAFE_INTEGER,
       }));
 
     if (newCards.length === 0) return;
 
     setBoard((prev) => ({
       ...prev,
-      cards: [...prev.cards, ...newCards],
+      cards: sortTradeCards([...prev.cards, ...newCards]),
     }));
   }
 
   function updateCard(cardId: string, patch: Partial<QuantityTradeCard>) {
     setBoard((prev) => ({
       ...prev,
-      cards: prev.cards.map((card) =>
-        card.id === cardId ? { ...card, ...patch } : card,
+      cards: sortTradeCards(
+        prev.cards.map((card) =>
+          card.id === cardId ? { ...card, ...patch } : card,
+        ),
       ),
     }));
   }
@@ -1399,119 +1291,6 @@ export function TradeBuilder({
     setAddModalSide(null);
   }
 
-  async function saveTradeGroup() {
-    if (userAuthState !== "signed-in" || !currentUserId) {
-      setGroupSaveMessage("로그인 후 교환판을 저장할 수 있습니다.");
-      return;
-    }
-
-    const normalizedName = groupName.trim();
-
-    if (!normalizedName) {
-      setGroupSaveMessage("저장할 교환판 이름을 입력해 주세요.");
-      return;
-    }
-
-    if (normalizedName.length > 40) {
-      setGroupSaveMessage("교환판 이름은 40자 이하로 입력해 주세요.");
-      return;
-    }
-
-    if (!activeGroupId && savedGroupCount >= MAX_TRADE_GROUPS) {
-      setGroupSaveMessage(
-        `교환판 그룹은 최대 ${MAX_TRADE_GROUPS}개까지 저장할 수 있습니다.`,
-      );
-      return;
-    }
-
-    const { boardData, skippedUploadCount } = createSavedTradeGroupBoard(
-      board,
-      selectedConditions,
-    );
-
-    try {
-      setIsSavingGroup(true);
-      setGroupSaveMessage("");
-
-      if (activeGroupId) {
-        const { error } = await supabase
-          .from("trade_groups")
-          .update({
-            name: normalizedName,
-            board_data: boardData,
-          })
-          .eq("id", activeGroupId)
-          .eq("user_id", currentUserId);
-
-        if (error) throw error;
-
-        setGroupSaveMessage(
-          skippedUploadCount > 0
-            ? `교환판을 저장했습니다. 직접 추가 이미지 ${skippedUploadCount}개는 저장에서 제외되었습니다.`
-            : "교환판을 저장했습니다.",
-        );
-        onSavedGroupChange?.({ id: activeGroupId, name: normalizedName });
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("trade_groups")
-        .insert({
-          user_id: currentUserId,
-          collection_id: collection.id,
-          name: normalizedName,
-          board_data: boardData,
-        })
-        .select("id")
-        .single();
-
-      if (error) throw error;
-
-      setActiveGroupId(data.id);
-      setSavedGroupCount((current) => current + 1);
-      onSavedGroupChange?.({ id: data.id, name: normalizedName });
-
-      const nextUrl = new URL(window.location.href);
-      nextUrl.searchParams.set("group", data.id);
-      window.history.replaceState({}, "", nextUrl);
-
-      setGroupSaveMessage(
-        skippedUploadCount > 0
-          ? `새 교환판을 저장했습니다. 직접 추가 이미지 ${skippedUploadCount}개는 저장에서 제외되었습니다.`
-          : "새 교환판을 저장했습니다.",
-      );
-    } catch (error) {
-      console.error(error);
-      setGroupSaveMessage(
-        "교환판을 저장하지 못했습니다. 저장 그룹이 3개인지, Supabase SQL이 적용됐는지 확인해 주세요.",
-      );
-    } finally {
-      setIsSavingGroup(false);
-    }
-  }
-
-  function startNewTradeGroup() {
-    if (!activeGroupId) return;
-
-    if (savedGroupCount >= MAX_TRADE_GROUPS) {
-      setGroupSaveMessage(
-        `교환판 그룹은 최대 ${MAX_TRADE_GROUPS}개까지 저장할 수 있습니다.`,
-      );
-      return;
-    }
-
-    setActiveGroupId("");
-    setGroupName("");
-
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.delete("group");
-    window.history.replaceState({}, "", nextUrl);
-
-    setGroupSaveMessage(
-      "현재 교환판 내용은 유지됩니다. 새 이름을 입력한 뒤 새 그룹으로 저장해 주세요.",
-    );
-  }
-
   async function downloadImage() {
     if (!canDownload) return;
 
@@ -1528,7 +1307,8 @@ export function TradeBuilder({
       );
     } catch (error) {
       console.error("교환판 PNG 저장에 실패했습니다.", error);
-      const message = error instanceof Error ? error.message : "알 수 없는 오류";
+      const message =
+        error instanceof Error ? error.message : "알 수 없는 오류";
       window.alert(`이미지 저장에 실패했습니다.\n${message}`);
     } finally {
       setIsExporting(false);
@@ -1538,72 +1318,22 @@ export function TradeBuilder({
   function resetBoard() {
     setSelectedConditions([]);
     setBoard(createInitialBoard());
-    setGroupSaveMessage(
-      activeGroupId
-        ? "화면을 초기화했습니다. 저장 버튼을 누르면 현재 그룹에 반영됩니다."
-        : "",
-    );
   }
 
-
+  const formatEventDate = (value?: string | null) => {
+    if (!value) return "";
+    const [year, month, day] = value.split("-");
+    return year && month && day ? `${year}.${month}.${day}` : value;
+  };
   return (
     <section
-      className={
-        embedded
-          ? "w-full min-w-0 overflow-x-hidden"
-          : "w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6"
-      }
+      data-ui-lab-version="2026-07-11-b"
+      className="w-full bg-white"
+      style={{ fontFamily: TRADE_LAB_FONT_FAMILY }}
     >
-      <div
-        className={
-          embedded
-            ? "w-full min-w-0 overflow-x-hidden"
-            : "mx-auto flex w-full max-w-md flex-col gap-5 sm:max-w-lg"
-        }
-      >
-        <div
-          className={
-            embedded
-              ? "w-full min-w-0 overflow-x-hidden bg-white px-5 pb-5 pt-3"
-              : "w-full overflow-hidden rounded-[2rem] border border-neutral-200/70 bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.032)]"
-          }
-        >
-          {!embedded ? (
-          <div className="-mx-5 -mt-5 border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] px-5 pb-5 pt-5">
-            <div className="mb-6 flex items-center justify-between gap-3">
-              <Link
-                href="/"
-                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
-              >
-                ← 메인으로
-              </Link>
-
-              <Link
-                href="/cardform"
-                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
-              >
-                이미지 제보하기
-              </Link>
-            </div>
-
-            <h1 className="text-2xl font-black text-neutral-950">
-              {collection.title}
-            </h1>
-
-            {collection.description ? (
-              <p className="mt-2 text-sm leading-6 text-neutral-500">
-                {collection.description}
-              </p>
-            ) : (
-              <p className="mt-2 text-sm leading-6 text-neutral-500">
-                등록된 굿즈 이미지를 선택해 있어요 / 구해요 팝업 & 콜카 굿즈
-                교환판을 만들 수 있습니다.
-              </p>
-            )}
-          </div>
-          ) : null}
-
-          <div className={embedded ? "space-y-3" : "mt-6 space-y-3"}>
+      <div className="w-full">
+        <div className="w-full bg-white px-5 pb-5 pt-3">
+          <div className="space-y-3">
             <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <button
@@ -1711,15 +1441,15 @@ export function TradeBuilder({
                           onChange={() => toggleCondition(condition)}
                           className="h-4 w-4 accent-[#7C5CFC]"
                         />
-                        <span className="whitespace-nowrap leading-4">{condition}</span>
+                        <span className="whitespace-nowrap leading-4">
+                          {condition}
+                        </span>
                       </label>
                     );
                   })}
                 </div>
               ) : null}
             </section>
-
-            
           </div>
 
           <div className="mt-6 border-t border-neutral-100 pt-5">
@@ -1775,102 +1505,6 @@ export function TradeBuilder({
             </div>
           </div>
 
-          <section className="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-black text-neutral-950">
-                  내 교환판 저장
-                </p>
-                <p className="mt-1 text-xs leading-5 text-neutral-400">
-                  로그인하면 그룹을 최대 {MAX_TRADE_GROUPS}개까지 저장하고 다시 수정할 수 있습니다.
-                </p>
-              </div>
-
-              {userAuthState === "signed-in" ? (
-                <Link
-                  href="/my-trades"
-                  className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-neutral-500 ring-1 ring-neutral-200"
-                >
-                  {savedGroupCount}/{MAX_TRADE_GROUPS}
-                </Link>
-              ) : null}
-            </div>
-
-            {userAuthState === "checking" || isLoadingGroup ? (
-              <p className="mt-4 rounded-xl bg-white px-3 py-3 text-xs text-neutral-500 ring-1 ring-neutral-200">
-                계정과 저장 교환판을 확인하는 중입니다.
-              </p>
-            ) : userAuthState === "signed-out" ? (
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <Link
-                  href={`/login?next=${encodeURIComponent(`/trade/${collection.slug}`)}`}
-                  className="rounded-xl bg-neutral-950 px-3 py-3 text-center text-xs font-black text-white"
-                >
-                  로그인
-                </Link>
-                <Link
-                  href="/signup"
-                  className="rounded-xl border border-neutral-300 bg-white px-3 py-3 text-center text-xs font-black text-neutral-600"
-                >
-                  회원가입
-                </Link>
-              </div>
-            ) : (
-              <div className="mt-4">
-                <label className="block">
-                  <span className="text-[11px] font-black text-neutral-500">
-                    {activeGroupId ? "현재 그룹 이름" : "새 교환판 이름"}
-                  </span>
-                  <input
-                    value={groupName}
-                    onChange={(event) => setGroupName(event.target.value)}
-                    maxLength={40}
-                    className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-950"
-                    placeholder="예: 토요일 현장 교환"
-                  />
-                </label>
-
-                <button
-                  type="button"
-                  onClick={saveTradeGroup}
-                  disabled={isSavingGroup || (!activeGroupId && savedGroupCount >= MAX_TRADE_GROUPS)}
-                  className="mt-3 w-full rounded-xl bg-neutral-950 px-4 py-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
-                >
-                  {isSavingGroup
-                    ? "저장 중..."
-                    : activeGroupId
-                      ? "현재 그룹에 저장"
-                      : "새 그룹으로 저장"}
-                </button>
-
-                {activeGroupId ? (
-                  <button
-                    type="button"
-                    onClick={startNewTradeGroup}
-                    disabled={savedGroupCount >= MAX_TRADE_GROUPS}
-                    className="mt-2 w-full rounded-xl border border-neutral-300 bg-white px-4 py-3 text-xs font-black text-neutral-600 disabled:cursor-not-allowed disabled:border-neutral-200 disabled:bg-neutral-100 disabled:text-neutral-300"
-                  >
-                    {savedGroupCount >= MAX_TRADE_GROUPS
-                      ? `최대 ${MAX_TRADE_GROUPS}개 저장됨`
-                      : "현재 내용으로 새 그룹 만들기"}
-                  </button>
-                ) : null}
-
-                {directUploadCardCount > 0 ? (
-                  <p className="mt-2 text-[11px] leading-5 text-amber-700">
-                    직접 추가한 이미지 {directUploadCardCount}개는 현재 그룹 저장에서 제외됩니다. PNG 저장에는 그대로 포함됩니다.
-                  </p>
-                ) : null}
-              </div>
-            )}
-
-            {groupSaveMessage ? (
-              <p className="mt-3 rounded-xl bg-white px-3 py-3 text-xs leading-5 text-neutral-600 ring-1 ring-neutral-200">
-                {groupSaveMessage}
-              </p>
-            ) : null}
-          </section>
-
           <div className="mt-5">
             <button
               type="button"
@@ -1880,10 +1514,7 @@ export function TradeBuilder({
               초기화
             </button>
           </div>
-        </div>
-
-        <section className={embedded ? "mt-7 w-full min-w-0 overflow-hidden border-t border-neutral-200 pb-1 pt-5" : "w-full overflow-hidden rounded-[2rem] border border-neutral-200/80 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,0.045)]"}>
-          <div className={embedded ? "px-5" : ""}>
+          <section className="-mx-5 mt-7 border-t border-neutral-200 px-5 pb-1 pt-5">
           <div className="mb-3">
             <div className="text-sm font-black text-neutral-950">미리보기</div>
             <p className="mt-1 text-xs leading-5 text-neutral-400">
@@ -1892,8 +1523,30 @@ export function TradeBuilder({
           </div>
 
           <div className="mb-4 mt-3 grid grid-cols-2 rounded-full bg-neutral-100 p-1">
-            <button type="button" onClick={() => updateCategoryDisplayMode("grouped")} className={board.categoryDisplayMode !== "simple" ? "rounded-full bg-white px-3 py-2.5 text-xs font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200" : "rounded-full px-3 py-2.5 text-xs font-bold text-neutral-500"}>특전 구분</button>
-            <button type="button" onClick={() => updateCategoryDisplayMode("simple")} className={board.categoryDisplayMode === "simple" ? "rounded-full bg-white px-3 py-2.5 text-xs font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200" : "rounded-full px-3 py-2.5 text-xs font-bold text-neutral-500"}>구분 없이</button>
+            <button
+              type="button"
+              onClick={() => updateCategoryDisplayMode("grouped")}
+              aria-pressed={board.categoryDisplayMode !== "simple"}
+              className={
+                board.categoryDisplayMode !== "simple"
+                  ? "rounded-full bg-white px-3 py-2.5 text-xs font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200"
+                  : "rounded-full px-3 py-2.5 text-xs font-bold text-neutral-500"
+              }
+            >
+              특전 구분
+            </button>
+            <button
+              type="button"
+              onClick={() => updateCategoryDisplayMode("simple")}
+              aria-pressed={board.categoryDisplayMode === "simple"}
+              className={
+                board.categoryDisplayMode === "simple"
+                  ? "rounded-full bg-white px-3 py-2.5 text-xs font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200"
+                  : "rounded-full px-3 py-2.5 text-xs font-bold text-neutral-500"
+              }
+            >
+              구분 없이
+            </button>
           </div>
 
           <div className="w-full min-w-0 max-w-full overflow-hidden bg-white">
@@ -1906,19 +1559,32 @@ export function TradeBuilder({
               eventEndDate={collection.eventEndDate}
             />
           </div>
+
           <button
             type="button"
             onClick={downloadImage}
             disabled={!canDownload || isExporting}
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-[#7C5CFC] bg-[#F8F6FF] px-4 py-3 text-sm font-black text-[#7C5CFC] shadow-sm transition hover:bg-[#F1ECFF] disabled:cursor-not-allowed disabled:border-neutral-200 disabled:bg-neutral-100 disabled:text-neutral-400"
           >
-            {isExporting ? "저장 중..." : (<>
-              <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-none stroke-current" strokeWidth="1.9"><path d="M12 3v11m0 0 4-4m-4 4-4-4"/><path d="M5 17.5v2h14v-2"/></svg>
-              <span>PNG 저장</span>
-            </>)}
+            {isExporting ? (
+              "저장 중..."
+            ) : (
+              <>
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  className="h-5 w-5 fill-none stroke-current"
+                  strokeWidth="1.9"
+                >
+                  <path d="M12 3v11m0 0 4-4m-4 4-4-4" />
+                  <path d="M5 17.5v2h14v-2" />
+                </svg>
+                <span>PNG 저장</span>
+              </>
+            )}
           </button>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
 
       {addModalSide ? (
@@ -2014,7 +1680,6 @@ function ExportPreviewModal({ imageUrl, onClose }: ExportPreviewModalProps) {
   );
 }
 
-
 function AddSideButton({
   koreanTitle,
   englishTitle,
@@ -2040,9 +1705,14 @@ function AddSideButton({
           {englishTitle}
         </span>
       </div>
+
       <div className="mt-2 flex items-center justify-between gap-2">
-        <span className="whitespace-nowrap text-sm font-black text-neutral-950">{koreanTitle}</span>
-        <span className="shrink-0 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black text-white">+ 추가</span>
+        <span className="whitespace-nowrap text-sm font-black text-neutral-950">
+          {koreanTitle}
+        </span>
+        <span className="shrink-0 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black text-white">
+          + 추가
+        </span>
       </div>
     </button>
   );
@@ -2089,7 +1759,9 @@ function AddItemModal({
   onDecreaseItem,
   onUpload,
 }: AddItemModalProps) {
-  const sideLabel = side === "have" ? "있어요" : "구해요";
+  const sideKoreanLabel = side === "have" ? "있어요" : "구해요";
+  const sideEnglishLabel = side === "have" ? "Have" : "Want";
+  const sideLabel = `${sideKoreanLabel} (${sideEnglishLabel})`;
   const canUseBenefitSubcategoryFilter =
     (selectedCategory === ALL_CATEGORIES_VALUE ||
       selectedCategory === "benefit") &&
@@ -2097,12 +1769,15 @@ function AddItemModal({
   const initialUploadWorkTitle =
     selectedWorkTitle !== ALL_WORKS_VALUE
       ? selectedWorkTitle
-      : workTitleOptions[0] ?? "";
+      : (workTitleOptions[0] ?? "");
   const initialUploadCategory: TradeCategory =
     selectedCategory !== ALL_CATEGORIES_VALUE ? selectedCategory : "benefit";
-  const [uploadWorkTitle, setUploadWorkTitle] = useState(initialUploadWorkTitle);
-  const [uploadCategory, setUploadCategory] =
-    useState<TradeCategory>(initialUploadCategory);
+  const [uploadWorkTitle, setUploadWorkTitle] = useState(
+    initialUploadWorkTitle,
+  );
+  const [uploadCategory, setUploadCategory] = useState<TradeCategory>(
+    initialUploadCategory,
+  );
   const [uploadBenefitSubcategory, setUploadBenefitSubcategory] = useState(
     selectedBenefitSubcategory !== ALL_BENEFIT_SUBCATEGORIES_VALUE &&
       selectedBenefitSubcategory !== NO_BENEFIT_SUBCATEGORY_VALUE
@@ -2131,11 +1806,11 @@ function AddItemModal({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-400">
-                Add Item
+                Add {sideEnglishLabel} Item
               </p>
 
               <h2 className="mt-1 text-2xl font-black text-neutral-950">
-                {sideLabel} 이미지 추가
+                {sideKoreanLabel} 이미지 추가
               </h2>
             </div>
 
@@ -2207,12 +1882,6 @@ function AddItemModal({
               >
                 <option value={ALL_BENEFIT_SUBCATEGORIES_VALUE}>전체</option>
 
-                {hasBenefitItemsWithoutSubcategory ? (
-                  <option value={NO_BENEFIT_SUBCATEGORY_VALUE}>
-                    하위 분류 없음
-                  </option>
-                ) : null}
-
                 {benefitSubcategoryOptions.map((subcategory) => (
                   <option key={subcategory} value={subcategory}>
                     {subcategory}
@@ -2242,12 +1911,13 @@ function AddItemModal({
 
             <p className="mt-2 text-xs leading-5 text-neutral-500">
               직접 찍은 이미지를 교환판에 넣고 싶을 때 사용해 주세요.
-              파일명 대신 아래에서 선택한 작품명과 분류가 표시됩니다.
             </p>
 
             <div className="mt-4 grid grid-cols-2 gap-2">
               <label className="block min-w-0">
-                <span className="text-[11px] font-black text-neutral-500">작품명</span>
+                <span className="text-[11px] font-black text-neutral-500">
+                  작품명
+                </span>
                 <select
                   value={uploadWorkTitle}
                   onChange={(event) => {
@@ -2266,7 +1936,9 @@ function AddItemModal({
               </label>
 
               <label className="block min-w-0">
-                <span className="text-[11px] font-black text-neutral-500">굿즈 종류</span>
+                <span className="text-[11px] font-black text-neutral-500">
+                  굿즈 종류
+                </span>
                 <select
                   value={uploadCategory}
                   onChange={(event) => {
@@ -2297,7 +1969,6 @@ function AddItemModal({
                   }
                   className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-xs outline-none focus:border-neutral-950"
                 >
-                  <option value="">하위 분류 없음</option>
                   {uploadBenefitSubcategoryOptions.map((subcategory) => (
                     <option key={subcategory} value={subcategory}>
                       {subcategory}
@@ -2393,8 +2064,6 @@ function AddItemModal({
               선택한 조건에 등록된 이미지가 없습니다.
             </p>
           )}
-
-
         </div>
 
         <footer className="shrink-0 border-t border-neutral-100 p-4">
@@ -2500,13 +2169,13 @@ function RegisteredItemCard({
       }
     >
       <div className="w-full text-left">
-        <div className="relative border-b border-neutral-200 bg-neutral-50 p-2">
+        <div className="relative border-b border-neutral-200 bg-neutral-50 p-2 leading-none">
           <img
             src={item.imageUrl}
             alt={item.itemName}
             loading="lazy"
             decoding="async"
-            className={`${getImageRatioClass(imageRatio)} w-full rounded-xl bg-white object-contain`}
+            className={`${getImageRatioClass(imageRatio)} block w-full rounded-xl bg-white object-contain align-top`}
           />
 
           <QuantityBadge quantity={quantity} />
@@ -2604,10 +2273,10 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
                 })
               }
               className="min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
-              aria-label="있어요 또는 구해요"
+              aria-label="있어요 (Have) 또는 구해요 (Want)"
             >
-              <option value="have">있어요</option>
-              <option value="want">구해요</option>
+              <option value="have">있어요 (Have)</option>
+              <option value="want">구해요 (Want)</option>
             </select>
 
             <select

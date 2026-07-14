@@ -61,6 +61,9 @@ export type TradeCollectionSummary = {
   slug: string;
   title: string;
   description: string | null;
+  eventStartDate?: string | null;
+  eventEndDate?: string | null;
+  location?: string | null;
   thumbnailUrl?: string | null;
   themeThumbnailUrl?: string | null;
 };

@@ -1,63 +1,69 @@
-'use client';
+"use client";
 
-import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { MAX_TRADE_GROUPS, TradeGroupRow } from '@/lib/trade-groups';
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { AppBottomNav } from "@/components/ui/AppBottomNav";
+import { AppTopBar } from "@/components/ui/AppTopBar";
+import { TradeBuilder } from "@/components/trade/TradeBuilder";
+import { getTradeAssetUrl, supabase } from "@/lib/supabase";
+import { MAX_TRADE_GROUPS, TradeGroupRow } from "@/lib/trade-groups";
+import {
+  RegisteredTradeItem,
+  TradeCategory,
+  TradeCollectionSummary,
+  TradeImageRatio,
+  TradeReferenceImage,
+} from "@/lib/trade-types";
 
-type AuthState = 'checking' | 'signed-in' | 'signed-out';
+type AuthState = "checking" | "signed-in" | "signed-out";
 
-type CollectionInfo = {
+type CollectionRow = {
   id: string;
   slug: string;
   title: string;
+  description: string | null;
+  event_start_date: string | null;
+  event_end_date: string | null;
+  event_location: string | null;
 };
 
-function formatUpdatedAt(value: string) {
-  return new Intl.DateTimeFormat('ko-KR', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(value));
-}
+type TradeItemRow = {
+  id: string;
+  category: TradeCategory;
+  work_title: string;
+  item_name: string | null;
+  image_path: string;
+  sort_order: number | null;
+  image_ratio: TradeImageRatio | null;
+  benefit_subcategory: string | null;
+};
 
-function getGroupCardCounts(group: TradeGroupRow) {
-  const cards = Array.isArray(group.board_data?.cards)
-    ? group.board_data.cards
-    : [];
+type TradeReferenceImageRow = {
+  id: string;
+  image_path: string;
+  sort_order: number | null;
+};
 
-  return cards.reduce(
-    (counts, card) => {
-      const quantity =
-        Number.isFinite(card.quantity) && card.quantity > 0
-          ? Math.floor(card.quantity)
-          : 1;
+type EditorData = {
+  collection: TradeCollectionSummary;
+  registeredItems: RegisteredTradeItem[];
+  referenceImages: TradeReferenceImage[];
+};
 
-      if (card.side === 'have') {
-        counts.have += quantity;
-      } else if (card.side === 'want') {
-        counts.want += quantity;
-      }
-
-      return counts;
-    },
-    { have: 0, want: 0 },
-  );
+function getSafeImageRatio(value?: string | null): TradeImageRatio {
+  return value === "photocard" ? "photocard" : "square";
 }
 
 export default function MyTradesPage() {
   const router = useRouter();
-  const [authState, setAuthState] = useState<AuthState>('checking');
+  const [authState, setAuthState] = useState<AuthState>("checking");
   const [groups, setGroups] = useState<TradeGroupRow[]>([]);
-  const [collections, setCollections] = useState<Record<string, CollectionInfo>>({});
-  const [message, setMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState('');
-  const [currentUserId, setCurrentUserId] = useState('');
+  const [activeGroupId, setActiveGroupId] = useState("");
+  const [editorData, setEditorData] = useState<EditorData | null>(null);
+  const [isLoadingGroups, setIsLoadingGroups] = useState(true);
+  const [isLoadingEditor, setIsLoadingEditor] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -69,58 +75,42 @@ export default function MyTradesPage() {
       if (!isMounted) return;
 
       if (!user) {
-        setAuthState('signed-out');
-        setIsLoading(false);
+        setAuthState("signed-out");
+        setIsLoadingGroups(false);
         return;
       }
 
-      setAuthState('signed-in');
-      setCurrentUserId(user.id);
+      setAuthState("signed-in");
 
       const { data, error } = await supabase
-        .from('trade_groups')
-        .select('id, user_id, collection_id, name, board_data, created_at, updated_at')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false });
+        .from("trade_groups")
+        .select(
+          "id, user_id, collection_id, name, board_data, created_at, updated_at",
+        )
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true });
 
       if (!isMounted) return;
 
       if (error) {
         console.error(error);
-        setMessage('저장한 교환판을 불러오지 못했습니다. Supabase SQL과 RLS를 확인해 주세요.');
-        setIsLoading(false);
+        setMessage("저장한 교환판을 불러오지 못했습니다.");
+        setIsLoadingGroups(false);
         return;
       }
 
       const nextGroups = (data ?? []) as TradeGroupRow[];
       setGroups(nextGroups);
 
-      const collectionIds = Array.from(
-        new Set(nextGroups.map((group) => group.collection_id)),
+      const requestedGroupId = new URLSearchParams(window.location.search).get(
+        "group",
       );
+      const initialGroup =
+        nextGroups.find((group) => group.id === requestedGroupId) ??
+        nextGroups[0];
 
-      if (collectionIds.length > 0) {
-        const { data: collectionData, error: collectionError } = await supabase
-          .from('trade_collections')
-          .select('id, slug, title')
-          .in('id', collectionIds);
-
-        if (!isMounted) return;
-
-        if (collectionError) {
-          console.error(collectionError);
-        } else {
-          const map = Object.fromEntries(
-            ((collectionData ?? []) as CollectionInfo[]).map((collection) => [
-              collection.id,
-              collection,
-            ]),
-          );
-          setCollections(map);
-        }
-      }
-
-      setIsLoading(false);
+      setActiveGroupId(initialGroup?.id ?? "");
+      setIsLoadingGroups(false);
     }
 
     void loadGroups();
@@ -130,66 +120,154 @@ export default function MyTradesPage() {
     };
   }, []);
 
-  const canCreateGroup = groups.length < MAX_TRADE_GROUPS;
-
-  const sortedGroups = useMemo(
-    () => [...groups].sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
-    [groups],
+  const activeGroup = useMemo(
+    () => groups.find((group) => group.id === activeGroupId) ?? null,
+    [activeGroupId, groups],
   );
 
-  async function handleDelete(groupId: string) {
-    const target = groups.find((group) => group.id === groupId);
-    if (!target || !currentUserId) return;
 
-    const confirmed = window.confirm(`“${target.name}” 교환판을 삭제할까요?`);
-    if (!confirmed) return;
+  useEffect(() => {
+    let isMounted = true;
 
-    try {
-      setDeletingId(groupId);
-      setMessage('');
-
-      const { data, error } = await supabase
-        .from('trade_groups')
-        .delete()
-        .eq('id', groupId)
-        .eq('user_id', currentUserId)
-        .select('id')
-        .maybeSingle();
-
-      if (error || !data) {
-        if (error) console.error(error);
-        setMessage('교환판을 삭제하지 못했습니다.');
+    async function loadEditor() {
+      if (!activeGroup) {
+        setEditorData(null);
         return;
       }
 
-      setGroups((current) => current.filter((group) => group.id !== groupId));
-      setMessage('교환판을 삭제했습니다.');
-    } finally {
-      setDeletingId('');
+      setIsLoadingEditor(true);
+      setMessage("");
+
+      const [collectionResult, itemResult, referenceResult] = await Promise.all([
+        supabase
+          .from("trade_collections")
+          .select("id, slug, title, description, event_start_date, event_end_date, event_location")
+          .eq("id", activeGroup.collection_id)
+          .maybeSingle(),
+        supabase
+          .from("trade_items")
+          .select(
+            "id, category, work_title, item_name, image_path, sort_order, image_ratio, benefit_subcategory",
+          )
+          .eq("collection_id", activeGroup.collection_id)
+          .eq("is_visible", true)
+          .order("created_at", { ascending: true }),
+        supabase
+          .from("trade_reference_images")
+          .select("id, image_path, sort_order")
+          .eq("collection_id", activeGroup.collection_id)
+          .order("sort_order", { ascending: true })
+          .order("created_at", { ascending: true }),
+      ]);
+
+      if (!isMounted) return;
+
+      if (collectionResult.error || !collectionResult.data) {
+        if (collectionResult.error) console.error(collectionResult.error);
+        setEditorData(null);
+        setMessage("이 교환판의 행사 정보를 불러오지 못했습니다.");
+        setIsLoadingEditor(false);
+        return;
+      }
+
+      if (itemResult.error) console.error(itemResult.error);
+      if (referenceResult.error) console.error(referenceResult.error);
+
+      const collectionRow = collectionResult.data as CollectionRow;
+      const collection: TradeCollectionSummary = {
+        id: collectionRow.id,
+        slug: collectionRow.slug,
+        title: collectionRow.title,
+        description: collectionRow.description,
+        eventStartDate: collectionRow.event_start_date,
+        eventEndDate: collectionRow.event_end_date,
+        location: collectionRow.event_location,
+      };
+
+      const registeredItems: RegisteredTradeItem[] = (
+        (itemResult.data ?? []) as TradeItemRow[]
+      )
+        .filter((item) => item.image_path)
+        .map((item) => ({
+          id: item.id,
+          category: item.category,
+          workTitle: item.work_title,
+          itemName: item.item_name || "",
+          imageUrl: getTradeAssetUrl(item.image_path),
+          sortOrder: item.sort_order ?? 0,
+          imageRatio: getSafeImageRatio(item.image_ratio),
+          benefitSubcategory: item.benefit_subcategory ?? null,
+        }));
+
+      const referenceImages: TradeReferenceImage[] = (
+        (referenceResult.data ?? []) as TradeReferenceImageRow[]
+      )
+        .filter((image) => image.image_path)
+        .map((image) => ({
+          id: image.id,
+          imageUrl: getTradeAssetUrl(image.image_path),
+          sortOrder: image.sort_order ?? 0,
+        }));
+
+      setEditorData({ collection, registeredItems, referenceImages });
+      setIsLoadingEditor(false);
     }
+
+    void loadEditor();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeGroup]);
+
+  function selectGroup(groupId: string) {
+    if (groupId === activeGroupId) return;
+
+    setActiveGroupId(groupId);
+    setEditorData(null);
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("group", groupId);
+    window.history.replaceState({}, "", nextUrl);
+  }
+
+  function handleSavedGroupChange(group: { id: string; name: string }) {
+    setGroups((current) => {
+      const existing = current.find((item) => item.id === group.id);
+
+      if (existing) {
+        return current.map((item) =>
+          item.id === group.id ? { ...item, name: group.name } : item,
+        );
+      }
+
+      return current;
+    });
   }
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push('/');
+    router.push("/");
     router.refresh();
   }
 
-  if (authState === 'checking' || isLoading) {
+  if (authState === "checking" || isLoadingGroups) {
     return (
-      <main className="w-full bg-neutral-100 px-4 py-5 sm:py-6">
-        <section className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-5 text-sm text-neutral-500 sm:max-w-lg">
+      <main className="flex h-[100dvh] items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
+        <section className="w-full max-w-lg rounded-[28px] border border-neutral-200/70 bg-white p-6 text-sm text-neutral-500">
           저장한 교환판을 불러오는 중입니다.
         </section>
       </main>
     );
   }
 
-  if (authState === 'signed-out') {
+  if (authState === "signed-out") {
     return (
-      <main className="w-full bg-neutral-100 px-4 py-5 sm:py-6">
-        <section className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-5 sm:max-w-lg">
-          <h1 className="text-2xl font-black text-neutral-950">로그인이 필요합니다</h1>
+      <main className="flex h-[100dvh] items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
+        <section className="w-full max-w-lg rounded-[28px] border border-neutral-200/70 bg-white p-6">
+          <h1 className="text-2xl font-black text-neutral-950">
+            로그인이 필요합니다
+          </h1>
           <p className="mt-2 text-sm leading-6 text-neutral-500">
             교환판 그룹은 로그인한 사용자만 저장하고 불러올 수 있습니다.
           </p>
@@ -205,114 +283,112 @@ export default function MyTradesPage() {
   }
 
   return (
-    <main className="w-full bg-neutral-100 px-4 py-5 sm:py-6">
-      <section className="mx-auto max-w-md overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)] sm:max-w-lg">
-        <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] p-5">
-          <div className="flex items-center justify-between gap-3">
-            <Link
-              href="/"
-              className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600"
-            >
-              ← 메인으로
-            </Link>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600"
-            >
-              로그아웃
-            </button>
-          </div>
+    <main className="flex h-[100dvh] w-full items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
+      <section className="flex h-full max-h-[860px] w-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
+        <AppTopBar
+          title="내 교환판"
+          backHref="/"
+          onAccountClick={handleLogout}
+          accountLabel="로그아웃"
+        />
 
-          <h1 className="mt-6 text-2xl font-black text-neutral-950">내 교환판</h1>
-          <p className="mt-2 text-sm leading-6 text-neutral-600">
-            저장한 교환판을 다시 열어 교환 완료 굿즈만 삭제하고 계속 수정할 수 있습니다.
-          </p>
-        </header>
-
-        <div className="p-5">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-black text-neutral-950">
-              저장 그룹 {groups.length}/{MAX_TRADE_GROUPS}
+        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+          <section className="border-b border-neutral-100 bg-white px-5 py-4">
+            <p className="text-[12px] font-black tracking-[0.04em] text-[#7C5CFC]">
+              BL GOODS TRADE
             </p>
-            <Link
-              href="/"
-              aria-disabled={!canCreateGroup}
-              className={
-                canCreateGroup
-                  ? 'rounded-xl bg-neutral-950 px-4 py-2.5 text-xs font-black text-white'
-                  : 'pointer-events-none rounded-xl bg-neutral-200 px-4 py-2.5 text-xs font-black text-neutral-400'
-              }
-            >
-              새 교환판 만들기
-            </Link>
-          </div>
-
-          {message ? (
-            <p className="mt-4 rounded-2xl bg-neutral-100 px-4 py-3 text-sm leading-6 text-neutral-700">
-              {message}
+            <h2 className="mt-1 text-[24px] font-black leading-tight tracking-[-0.03em] text-neutral-950">
+              내 교환판
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-neutral-500">
+              저장한 그룹을 선택해 교환판을 바로 수정할 수 있습니다.
             </p>
-          ) : null}
+          </section>
 
-          {sortedGroups.length > 0 ? (
-            <div className="mt-4 space-y-3">
-              {sortedGroups.map((group) => {
-                const collection = collections[group.collection_id];
-                const editHref = collection
-                  ? `/trade/${collection.slug}?group=${group.id}`
-                  : '';
-                const cardCounts = getGroupCardCounts(group);
+          {groups.length > 0 ? (
+            <>
+              <div className="sticky top-0 z-20 border-b border-neutral-100 bg-white/95 px-4 py-3 backdrop-blur">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-xs font-black text-neutral-700">교환판 그룹</p>
+                  <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-black text-neutral-500">
+                    {groups.length}/{MAX_TRADE_GROUPS}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {groups.map((group) => {
+                    const active = group.id === activeGroupId;
 
-                return (
-                  <article
-                    key={group.id}
-                    className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4"
-                  >
-                    <p className="text-base font-black text-neutral-950">{group.name}</p>
-                    <p className="mt-1 text-xs font-bold text-neutral-500">
-                      {collection?.title ?? '행사 정보를 찾을 수 없음'}
-                    </p>
-                    <p className="mt-1 text-[11px] font-bold text-neutral-500">
-                      있어요 {cardCounts.have}개 · 구해요 {cardCounts.want}개
-                    </p>
-                    <p className="mt-1 text-[11px] text-neutral-400">
-                      최근 저장 {formatUpdatedAt(group.updated_at)}
-                    </p>
-
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      {editHref ? (
-                        <Link
-                          href={editHref}
-                          className="rounded-xl bg-neutral-950 px-3 py-3 text-center text-xs font-black text-white"
-                        >
-                          열어서 수정
-                        </Link>
-                      ) : (
-                        <span className="rounded-xl bg-neutral-200 px-3 py-3 text-center text-xs font-black text-neutral-400">
-                          행사 없음
-                        </span>
-                      )}
+                    return (
                       <button
+                        key={group.id}
                         type="button"
-                        onClick={() => handleDelete(group.id)}
-                        disabled={deletingId === group.id}
-                        className="rounded-xl border border-neutral-300 bg-white px-3 py-3 text-xs font-black text-neutral-600 disabled:text-neutral-300"
+                        onClick={() => selectGroup(group.id)}
+                        className={
+                          active
+                            ? "shrink-0 rounded-full bg-neutral-950 px-4 py-2.5 text-xs font-black text-white"
+                            : "shrink-0 rounded-full border border-neutral-200 bg-white px-4 py-2.5 text-xs font-bold text-neutral-500"
+                        }
                       >
-                        {deletingId === group.id ? '삭제 중...' : '삭제'}
+                        {group.name}
                       </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+                    );
+                  })}
+
+                  {groups.length < MAX_TRADE_GROUPS ? (
+                    <Link
+                      href="/"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-dashed border-neutral-300 text-lg font-light text-neutral-500"
+                      aria-label="새 교환판 만들기"
+                    >
+                      +
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+
+              {message ? (
+                <p className="mx-5 mt-4 rounded-2xl bg-neutral-100 px-4 py-3 text-sm leading-6 text-neutral-700">
+                  {message}
+                </p>
+              ) : null}
+
+              {isLoadingEditor || !editorData ? (
+                <div className="p-6 text-center text-sm text-neutral-400">
+                  교환판 편집 화면을 불러오는 중입니다.
+                </div>
+              ) : (
+                <TradeBuilder
+                  key={`${activeGroupId}:${activeGroup?.name ?? ""}`}
+                  collection={editorData.collection}
+                  registeredItems={editorData.registeredItems}
+                  referenceImages={editorData.referenceImages}
+                  initialGroupId={activeGroupId}
+                  embedded
+                  onSavedGroupChange={handleSavedGroupChange}
+                />
+              )}
+            </>
           ) : (
-            <div className="mt-4 rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-10 text-center">
-              <p className="text-sm font-bold text-neutral-400">
-                아직 저장한 교환판이 없습니다.
-              </p>
+            <div className="p-5">
+              <div className="rounded-3xl border border-dashed border-neutral-200 bg-neutral-50 px-5 py-12 text-center">
+                <p className="text-sm font-bold text-neutral-500">
+                  아직 저장한 교환판이 없습니다.
+                </p>
+                <p className="mt-2 text-xs leading-5 text-neutral-400">
+                  행사 굿즈를 선택해 교환판을 만든 뒤 이름을 정해 저장해 주세요.
+                </p>
+                <Link
+                  href="/"
+                  className="mt-5 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-xs font-black text-white"
+                >
+                  새 교환판 만들기
+                </Link>
+              </div>
             </div>
           )}
         </div>
+
+        <AppBottomNav active="trades" />
       </section>
     </main>
   );

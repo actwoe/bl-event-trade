@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { AppBottomNav } from '@/components/ui/AppBottomNav';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -92,22 +93,19 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="w-full bg-neutral-100 px-4 py-5 sm:py-6">
-      <section className="mx-auto max-w-md overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)] sm:max-w-lg">
-        <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] p-5">
-          <Link
-            href="/"
-            className="inline-flex rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600"
-          >
-            ← 메인으로
-          </Link>
-          <h1 className="mt-6 text-2xl font-black text-neutral-950">회원가입</h1>
-          <div className="mt-2 space-y-1 text-sm leading-6 text-neutral-600">
+    <main className="flex h-[100dvh] w-full items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
+      <section className="flex h-full max-h-[860px] w-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <header className="border-b border-neutral-100 bg-white p-5 pt-6">
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#7C5CFC]">
+            BL GOODS TRADE
+          </p>
+          <h1 className="mt-1 text-[25px] font-black leading-tight tracking-[-0.03em] text-neutral-950">
+            회원가입
+          </h1>
+          <div className="mt-2 space-y-1 text-sm leading-6 text-neutral-500">
             <p>회원가입을 하지 않아도 교환판을 만들 수 있습니다.</p>
-            <p>
-              회원가입 시 교환판 그룹을 최대 3개까지 저장하고 편리하게
-              불러와 수정할 수 있습니다.
-            </p>
+            <p>회원가입하면 교환판 그룹을 최대 3개까지 저장할 수 있습니다.</p>
           </div>
         </header>
 
@@ -118,7 +116,7 @@ export default function SignupPage() {
               type="text"
               value={loginId}
               onChange={(event) => setLoginId(event.target.value)}
-              className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+              className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
               autoComplete="username"
               autoCapitalize="none"
               spellCheck={false}
@@ -132,7 +130,7 @@ export default function SignupPage() {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+              className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
               autoComplete="new-password"
               placeholder="8자 이상"
             />
@@ -144,7 +142,7 @@ export default function SignupPage() {
               type="password"
               value={passwordConfirm}
               onChange={(event) => setPasswordConfirm(event.target.value)}
-              className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+              className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
               autoComplete="new-password"
               placeholder="비밀번호 다시 입력"
             />
@@ -171,6 +169,8 @@ export default function SignupPage() {
             </Link>
           </p>
         </form>
+        </div>
+        <AppBottomNav active="login" />
       </section>
     </main>
   );

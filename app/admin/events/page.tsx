@@ -21,6 +21,7 @@ type TradeCollectionRow = {
   description: string | null;
   event_start_date: string | null;
   event_end_date: string | null;
+  event_location: string | null;
   thumbnail_path: string | null;
   status_label: string | null;
   is_public: boolean;
@@ -86,6 +87,7 @@ export default function AdminEventsPage() {
   const [slug, setSlug] = useState('');
   const [eventStartDate, setEventStartDate] = useState('');
   const [eventEndDate, setEventEndDate] = useState('');
+  const [eventLocation, setEventLocation] = useState('');
   const [sortOrder, setSortOrder] = useState('0');
   const [isPublic, setIsPublic] = useState(true);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -141,7 +143,7 @@ export default function AdminEventsPage() {
       const { data, error } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, event_start_date, event_end_date, thumbnail_path, status_label, is_public, sort_order, created_at',
+          'id, slug, title, description, event_start_date, event_end_date, event_location, thumbnail_path, status_label, is_public, sort_order, created_at',
         )
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
@@ -235,6 +237,7 @@ export default function AdminEventsPage() {
           slug: normalizedSlug,
           event_start_date: eventStartDate || null,
           event_end_date: eventEndDate || null,
+          event_location: eventLocation.trim() || null,
           thumbnail_path: thumbnailPath,
           status_label: null,
           is_public: isPublic,
@@ -451,6 +454,16 @@ export default function AdminEventsPage() {
             </div>
 
             <label className="block">
+              <span className="text-sm font-bold text-neutral-800">행사 장소</span>
+              <input
+                value={eventLocation}
+                onChange={(event) => setEventLocation(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                placeholder="예: 서울 · 더현대 서울 5F / 온라인"
+              />
+            </label>
+
+            <label className="block">
               <span className="text-sm font-bold text-neutral-800">Slug</span>
 
               <input
@@ -614,6 +627,11 @@ export default function AdminEventsPage() {
                           <p className="mt-1.5 line-clamp-2 text-xs font-bold leading-5 text-neutral-500">
                             {getEventPeriodLabel(row.event_start_date, row.event_end_date)}
                           </p>
+                          {row.event_location ? (
+                            <p className="mt-1 truncate text-[10px] font-semibold text-neutral-400">
+                              {row.event_location}
+                            </p>
+                          ) : null}
                           <p className="mt-1 truncate text-[10px] text-neutral-400">
                             /trade/{row.slug}
                           </p>
