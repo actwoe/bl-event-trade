@@ -337,9 +337,9 @@ function drawRepeatedGoodsWatermark(
   if (width <= 0 || height <= 0) return;
 
   const diagonal = Math.sqrt(width * width + height * height);
-  const fontSize = Math.max(7, Math.min(11, Math.round(Math.min(width, height) / 6.2)));
-  const stepX = Math.max(GOODS_WATERMARK_TILE_WIDTH * 0.72, fontSize * 5.4);
-  const stepY = Math.max(GOODS_WATERMARK_TILE_HEIGHT * 0.72, fontSize * 2.8);
+  const fontSize = Math.max(6, Math.min(10, Math.round(Math.min(width, height) / 7.2)));
+  const stepX = Math.max(GOODS_WATERMARK_TILE_WIDTH * 0.62, fontSize * 4.8);
+  const stepY = Math.max(GOODS_WATERMARK_TILE_HEIGHT * 0.62, fontSize * 2.35);
 
   context.save();
   createRoundedRectPath(context, x, y, width, height, borderRadius);
