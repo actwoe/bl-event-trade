@@ -5,6 +5,8 @@ import {
   GOODS_WATERMARK_ANGLE_DEG,
   GOODS_WATERMARK_FILL,
   GOODS_WATERMARK_TEXT,
+  GOODS_WATERMARK_TILE_HEIGHT,
+  GOODS_WATERMARK_TILE_WIDTH,
 } from "@/lib/goods-watermark";
 
 const TRADE_PREVIEW_WIDTH = 840;
@@ -335,9 +337,9 @@ function drawRepeatedGoodsWatermark(
   if (width <= 0 || height <= 0) return;
 
   const diagonal = Math.sqrt(width * width + height * height);
-  const fontSize = Math.max(8, Math.min(14, Math.round(Math.min(width, height) / 4.8)));
-  const stepX = Math.max(fontSize * 6.8, 76);
-  const stepY = Math.max(fontSize * 3.6, 42);
+  const fontSize = Math.max(7, Math.min(11, Math.round(Math.min(width, height) / 6.2)));
+  const stepX = Math.max(GOODS_WATERMARK_TILE_WIDTH * 0.72, fontSize * 5.4);
+  const stepY = Math.max(GOODS_WATERMARK_TILE_HEIGHT * 0.72, fontSize * 2.8);
 
   context.save();
   createRoundedRectPath(context, x, y, width, height, borderRadius);
