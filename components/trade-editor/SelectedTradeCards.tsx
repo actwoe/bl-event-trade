@@ -87,9 +87,8 @@ function SelectedTradeCardEditor({
       <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-white">
         <ProtectedGoodsImage
           src={card.imageUrl}
-          alt=""
+          alt={card.memo || card.workTitle || "굿즈 이미지"}
           className="h-full w-full object-contain p-1"
-          watermarkClassName="bottom-1 right-1 text-[5px]"
         />
       </div>
 

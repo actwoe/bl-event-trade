@@ -309,7 +309,7 @@ function PreviewCard({ card, showMeta }: PreviewCardProps) {
       <div className="relative bg-white px-1 pt-0.5">
         <ProtectedGoodsImage
           src={card.imageUrl}
-          alt={card.memo || card.workTitle}
+          alt={card.memo || card.workTitle || '굿즈 이미지'}
           loading="eager"
           decoding="async"
           className={`${card.imageRatio === 'photocard' ? 'aspect-[55/85]' : 'aspect-square'} w-full rounded-xl bg-white object-contain`}

@@ -1,6 +1,11 @@
 "use client";
 
 import { toCanvas } from "html-to-image";
+import {
+  GOODS_WATERMARK_ANGLE_DEG,
+  GOODS_WATERMARK_FILL,
+  GOODS_WATERMARK_TEXT,
+} from "@/lib/goods-watermark";
 
 const TRADE_PREVIEW_WIDTH = 840;
 const TRADE_EXPORT_WIDTH = 2000;
@@ -18,17 +23,6 @@ type ExportBadgeSnapshot = {
   fontWeight: string;
 };
 
-type ExportWatermarkSnapshot = {
-  rect: DOMRect;
-  text: string;
-  backgroundColor: string;
-  color: string;
-  fontFamily: string;
-  fontSize: string;
-  fontWeight: string;
-  borderRadius: number;
-};
-
 type ExportImageSnapshot = {
   element: HTMLImageElement;
   drawable: HTMLImageElement;
@@ -36,7 +30,6 @@ type ExportImageSnapshot = {
   rect: DOMRect;
   borderRadius: number;
   badge: ExportBadgeSnapshot | null;
-  watermark: ExportWatermarkSnapshot | null;
   previousVisibility: string;
 };
 
@@ -161,19 +154,6 @@ function getQuantityBadge(image: HTMLImageElement) {
   ) as HTMLElement | null;
 }
 
-function getGoodsWatermark(image: HTMLImageElement) {
-  const parent = image.parentElement;
-  if (!parent) return null;
-
-  return (
-    Array.from(parent.children).find(
-      (child) =>
-        child instanceof HTMLElement &&
-        child.dataset.goodsWatermark === "true",
-    ) ?? null
-  ) as HTMLElement | null;
-}
-
 async function prepareExportImages(node: HTMLElement) {
   const images = Array.from(node.querySelectorAll("img"));
   const snapshots: ExportImageSnapshot[] = [];
@@ -199,10 +179,6 @@ async function prepareExportImages(node: HTMLElement) {
       const badgeStyle = badgeElement
         ? window.getComputedStyle(badgeElement)
         : null;
-      const watermarkElement = getGoodsWatermark(element);
-      const watermarkStyle = watermarkElement
-        ? window.getComputedStyle(watermarkElement)
-        : null;
 
       snapshots.push({
         element,
@@ -220,20 +196,6 @@ async function prepareExportImages(node: HTMLElement) {
                 fontFamily: badgeStyle.fontFamily,
                 fontSize: badgeStyle.fontSize,
                 fontWeight: badgeStyle.fontWeight,
-              }
-            : null,
-        watermark:
-          watermarkElement && watermarkStyle
-            ? {
-                rect: watermarkElement.getBoundingClientRect(),
-                text: watermarkElement.textContent?.trim() ?? "",
-                backgroundColor: watermarkStyle.backgroundColor,
-                color: watermarkStyle.color,
-                fontFamily: watermarkStyle.fontFamily,
-                fontSize: watermarkStyle.fontSize,
-                fontWeight: watermarkStyle.fontWeight,
-                borderRadius:
-                  Number.parseFloat(watermarkStyle.borderTopLeftRadius) || 0,
               }
             : null,
         previousVisibility: element.style.visibility,
@@ -362,34 +324,39 @@ function drawQuantityBadge(
   context.restore();
 }
 
-function drawGoodsWatermark(
+function drawRepeatedGoodsWatermark(
   context: CanvasRenderingContext2D,
-  watermark: ExportWatermarkSnapshot,
-  nodeRect: DOMRect,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  borderRadius: number,
 ) {
-  const x = watermark.rect.left - nodeRect.left;
-  const y = watermark.rect.top - nodeRect.top;
-  const width = watermark.rect.width;
-  const height = watermark.rect.height;
+  if (width <= 0 || height <= 0) return;
 
-  if (width <= 0 || height <= 0 || !watermark.text) return;
+  const diagonal = Math.sqrt(width * width + height * height);
+  const fontSize = Math.max(8, Math.min(14, Math.round(Math.min(width, height) / 4.8)));
+  const stepX = Math.max(fontSize * 6.8, 76);
+  const stepY = Math.max(fontSize * 3.6, 42);
 
   context.save();
-  createRoundedRectPath(
-    context,
-    x,
-    y,
-    width,
-    height,
-    watermark.borderRadius,
-  );
-  context.fillStyle = watermark.backgroundColor || "rgba(0, 0, 0, 0.45)";
-  context.fill();
-  context.fillStyle = watermark.color || "rgba(255, 255, 255, 0.9)";
-  context.font = `${watermark.fontWeight || "900"} ${watermark.fontSize || "7px"} ${watermark.fontFamily || TRADE_FONT_FAMILY}`;
+  createRoundedRectPath(context, x, y, width, height, borderRadius);
+  context.clip();
+  context.translate(x + width / 2, y + height / 2);
+  context.rotate((GOODS_WATERMARK_ANGLE_DEG * Math.PI) / 180);
+  context.fillStyle = GOODS_WATERMARK_FILL;
+  context.font = `700 ${fontSize}px Arial, sans-serif`;
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(watermark.text, x + width / 2, y + height / 2 + 0.2);
+
+  for (let row = -diagonal; row <= diagonal; row += stepY) {
+    const offsetX = Math.round(row / stepY) % 2 === 0 ? 0 : stepX / 2;
+
+    for (let col = -diagonal; col <= diagonal; col += stepX) {
+      context.fillText(GOODS_WATERMARK_TEXT, col + offsetX, row);
+    }
+  }
+
   context.restore();
 }
 
@@ -423,17 +390,20 @@ function compositeExportImages(
       snapshot.rect.height,
       snapshot.borderRadius,
     );
+
+    drawRepeatedGoodsWatermark(
+      context,
+      snapshot.rect.left - nodeRect.left,
+      snapshot.rect.top - nodeRect.top,
+      snapshot.rect.width,
+      snapshot.rect.height,
+      snapshot.borderRadius,
+    );
   }
 
   for (const snapshot of snapshots) {
     if (snapshot.badge) {
       drawQuantityBadge(context, snapshot.badge, nodeRect);
-    }
-  }
-
-  for (const snapshot of snapshots) {
-    if (snapshot.watermark) {
-      drawGoodsWatermark(context, snapshot.watermark, nodeRect);
     }
   }
 

@@ -1,8 +1,7 @@
 "use client";
 
 import type { ImgHTMLAttributes, SyntheticEvent } from "react";
-
-const WATERMARK_TEXT = "BL EVENT TRADE";
+import { getGoodsWatermarkOverlayStyle } from "@/lib/goods-watermark";
 
 const protectedImageStyle = {
   WebkitTouchCallout: "none",
@@ -15,12 +14,13 @@ const protectionLayerStyle = {
   WebkitTouchCallout: "none",
   WebkitUserDrag: "none",
   userSelect: "none",
-  touchAction: "manipulation",
 } as const;
 
-type ProtectedGoodsImageProps = Omit<ImgHTMLAttributes<HTMLImageElement>, "alt"> & {
+type ProtectedGoodsImageProps = Omit<
+  ImgHTMLAttributes<HTMLImageElement>,
+  "alt"
+> & {
   alt: string;
-  watermarkClassName?: string;
 };
 
 function blockNativeImageAction(event: SyntheticEvent<HTMLElement>) {
@@ -33,7 +33,6 @@ export function ProtectedGoodsImage({
   style,
   onContextMenu,
   onDragStart,
-  watermarkClassName = "bottom-1 right-1 text-[7px]",
   ...props
 }: ProtectedGoodsImageProps) {
   return (
@@ -58,23 +57,19 @@ export function ProtectedGoodsImage({
         }}
       />
 
-      <span
+      <div
         aria-hidden="true"
         data-goods-image-protection-layer="true"
         draggable={false}
         onContextMenu={blockNativeImageAction}
         onDragStart={blockNativeImageAction}
-        className="absolute inset-0 z-[2] select-none [-webkit-touch-callout:none] [-webkit-user-drag:none]"
-        style={protectionLayerStyle}
+        className="absolute inset-0 z-[3]"
+        style={{
+          ...protectionLayerStyle,
+          ...getGoodsWatermarkOverlayStyle(),
+          borderRadius: "inherit",
+        }}
       />
-
-      <span
-        aria-hidden="true"
-        data-goods-watermark="true"
-        className={`pointer-events-none absolute z-[3] whitespace-nowrap rounded bg-black/45 px-1 py-0.5 font-black leading-none tracking-[0.08em] text-white/90 shadow-sm ${watermarkClassName}`}
-      >
-        {WATERMARK_TEXT}
-      </span>
     </>
   );
 }
