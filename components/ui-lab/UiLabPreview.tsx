@@ -284,6 +284,7 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
                     cards={have}
                     columns={columnsPerSide}
                     showMeta={false}
+                    centerIncompleteRow={have.length < want.length}
                   />
                 </div>
                 <div className="min-w-0 border-l border-neutral-200 pl-2">
@@ -291,6 +292,7 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
                     cards={want}
                     columns={columnsPerSide}
                     showMeta={false}
+                    centerIncompleteRow={want.length < have.length}
                   />
                 </div>
               </div>
@@ -325,6 +327,7 @@ function SimpleTradeRows({ cards }: { cards: TradeCard[] }) {
             cards={haveCards}
             columns={columnsPerSide}
             showMeta
+            centerIncompleteRow={haveCards.length < wantCards.length}
           />
         </div>
         <div className="min-w-0 border-l border-neutral-200 pl-2">
@@ -332,6 +335,7 @@ function SimpleTradeRows({ cards }: { cards: TradeCard[] }) {
             cards={wantCards}
             columns={columnsPerSide}
             showMeta
+            centerIncompleteRow={wantCards.length < haveCards.length}
           />
         </div>
       </div>
@@ -343,10 +347,12 @@ function CardGrid({
   cards,
   columns,
   showMeta,
+  centerIncompleteRow = false,
 }: {
   cards: TradeCard[];
   columns: 1 | 2 | 3 | 4 | 6 | 8;
   showMeta: boolean;
+  centerIncompleteRow?: boolean;
 }) {
   if (cards.length === 0) {
     return (
@@ -356,24 +362,36 @@ function CardGrid({
     );
   }
 
-  const gridClass =
-    columns === 8
-      ? "grid-cols-8 gap-x-3 gap-y-2"
-      : columns === 6
-        ? "grid-cols-6 gap-x-3 gap-y-2"
-        : columns === 4
-          ? "grid-cols-4 gap-x-3 gap-y-2"
-          : columns === 3
-            ? "grid-cols-3 gap-x-3 gap-y-2"
-            : columns === 2
-              ? "grid-cols-2 gap-x-3 gap-y-2"
-              : "grid-cols-1 gap-x-3 gap-y-2";
+  const rows: TradeCard[][] = [];
+  for (let index = 0; index < cards.length; index += columns) {
+    rows.push(cards.slice(index, index + columns));
+  }
+
+  const totalGapRem = (columns - 1) * 0.75;
+  const cardWidth = `calc((100% - ${totalGapRem}rem) / ${columns})`;
 
   return (
-    <div className={`grid ${gridClass}`}>
-      {cards.map((card) => (
-        <PreviewCard key={card.id} card={card} showMeta={showMeta} />
-      ))}
+    <div className="flex flex-col gap-y-2">
+      {rows.map((row, rowIndex) => {
+        const shouldCenter = centerIncompleteRow && row.length < columns;
+
+        return (
+          <div
+            key={`${row[0]?.id ?? rowIndex}-${rowIndex}`}
+            className={`flex gap-x-3 ${shouldCenter ? "justify-center" : "justify-start"}`}
+          >
+            {row.map((card) => (
+              <div
+                key={card.id}
+                className="min-w-0 shrink-0"
+                style={{ flexBasis: cardWidth, maxWidth: cardWidth }}
+              >
+                <PreviewCard card={card} showMeta={showMeta} />
+              </div>
+            ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
