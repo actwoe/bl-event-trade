@@ -261,9 +261,11 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
             haveGroups.find((item) => item.key === group.key)?.cards ?? [];
           const want =
             wantGroups.find((item) => item.key === group.key)?.cards ?? [];
+          const isSingleContentRow =
+            order.length === 1 && Math.max(have.length, want.length) <= 3;
           const columnsPerSide = getPreviewColumnsPerSide(
-            have.length,
-            want.length,
+            [have.length, want.length],
+            isSingleContentRow ? 2 : 3,
           );
 
           return (
@@ -304,9 +306,10 @@ function SimpleTradeRows({ cards }: { cards: TradeCard[] }) {
   const sortedCards = sortTradeCardsBySideAndGroup(cards);
   const haveCards = sortedCards.filter((card) => card.side === "have");
   const wantCards = sortedCards.filter((card) => card.side === "want");
+  const isSingleContentRow = Math.max(haveCards.length, wantCards.length) <= 3;
   const columnsPerSide = getPreviewColumnsPerSide(
-    haveCards.length,
-    wantCards.length,
+    [haveCards.length, wantCards.length],
+    isSingleContentRow ? 2 : 3,
   );
 
   return (

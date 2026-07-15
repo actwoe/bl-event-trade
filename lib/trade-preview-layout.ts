@@ -2,8 +2,11 @@ import { TradeCard } from "@/lib/trade-types";
 
 export type PreviewColumnCount = 1 | 2 | 3;
 
-export function getPreviewColumnsPerSide(...counts: number[]): PreviewColumnCount {
-  return Math.min(3, Math.max(1, ...counts)) as PreviewColumnCount;
+export function getPreviewColumnsPerSide(
+  counts: number[],
+  maxColumns: PreviewColumnCount = 3,
+): PreviewColumnCount {
+  return Math.min(maxColumns, Math.max(1, ...counts)) as PreviewColumnCount;
 }
 
 export type PreviewCardGroup = {
