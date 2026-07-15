@@ -18,6 +18,17 @@ type ExportBadgeSnapshot = {
   fontWeight: string;
 };
 
+type ExportWatermarkSnapshot = {
+  rect: DOMRect;
+  text: string;
+  backgroundColor: string;
+  color: string;
+  fontFamily: string;
+  fontSize: string;
+  fontWeight: string;
+  borderRadius: number;
+};
+
 type ExportImageSnapshot = {
   element: HTMLImageElement;
   drawable: HTMLImageElement;
@@ -25,6 +36,7 @@ type ExportImageSnapshot = {
   rect: DOMRect;
   borderRadius: number;
   badge: ExportBadgeSnapshot | null;
+  watermark: ExportWatermarkSnapshot | null;
   previousVisibility: string;
 };
 
@@ -149,6 +161,19 @@ function getQuantityBadge(image: HTMLImageElement) {
   ) as HTMLElement | null;
 }
 
+function getGoodsWatermark(image: HTMLImageElement) {
+  const parent = image.parentElement;
+  if (!parent) return null;
+
+  return (
+    Array.from(parent.children).find(
+      (child) =>
+        child instanceof HTMLElement &&
+        child.dataset.goodsWatermark === "true",
+    ) ?? null
+  ) as HTMLElement | null;
+}
+
 async function prepareExportImages(node: HTMLElement) {
   const images = Array.from(node.querySelectorAll("img"));
   const snapshots: ExportImageSnapshot[] = [];
@@ -174,6 +199,10 @@ async function prepareExportImages(node: HTMLElement) {
       const badgeStyle = badgeElement
         ? window.getComputedStyle(badgeElement)
         : null;
+      const watermarkElement = getGoodsWatermark(element);
+      const watermarkStyle = watermarkElement
+        ? window.getComputedStyle(watermarkElement)
+        : null;
 
       snapshots.push({
         element,
@@ -191,6 +220,20 @@ async function prepareExportImages(node: HTMLElement) {
                 fontFamily: badgeStyle.fontFamily,
                 fontSize: badgeStyle.fontSize,
                 fontWeight: badgeStyle.fontWeight,
+              }
+            : null,
+        watermark:
+          watermarkElement && watermarkStyle
+            ? {
+                rect: watermarkElement.getBoundingClientRect(),
+                text: watermarkElement.textContent?.trim() ?? "",
+                backgroundColor: watermarkStyle.backgroundColor,
+                color: watermarkStyle.color,
+                fontFamily: watermarkStyle.fontFamily,
+                fontSize: watermarkStyle.fontSize,
+                fontWeight: watermarkStyle.fontWeight,
+                borderRadius:
+                  Number.parseFloat(watermarkStyle.borderTopLeftRadius) || 0,
               }
             : null,
         previousVisibility: element.style.visibility,
@@ -319,6 +362,37 @@ function drawQuantityBadge(
   context.restore();
 }
 
+function drawGoodsWatermark(
+  context: CanvasRenderingContext2D,
+  watermark: ExportWatermarkSnapshot,
+  nodeRect: DOMRect,
+) {
+  const x = watermark.rect.left - nodeRect.left;
+  const y = watermark.rect.top - nodeRect.top;
+  const width = watermark.rect.width;
+  const height = watermark.rect.height;
+
+  if (width <= 0 || height <= 0 || !watermark.text) return;
+
+  context.save();
+  createRoundedRectPath(
+    context,
+    x,
+    y,
+    width,
+    height,
+    watermark.borderRadius,
+  );
+  context.fillStyle = watermark.backgroundColor || "rgba(0, 0, 0, 0.45)";
+  context.fill();
+  context.fillStyle = watermark.color || "rgba(255, 255, 255, 0.9)";
+  context.font = `${watermark.fontWeight || "900"} ${watermark.fontSize || "7px"} ${watermark.fontFamily || TRADE_FONT_FAMILY}`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(watermark.text, x + width / 2, y + height / 2 + 0.2);
+  context.restore();
+}
+
 function compositeExportImages(
   canvas: HTMLCanvasElement,
   node: HTMLElement,
@@ -354,6 +428,12 @@ function compositeExportImages(
   for (const snapshot of snapshots) {
     if (snapshot.badge) {
       drawQuantityBadge(context, snapshot.badge, nodeRect);
+    }
+  }
+
+  for (const snapshot of snapshots) {
+    if (snapshot.watermark) {
+      drawGoodsWatermark(context, snapshot.watermark, nodeRect);
     }
   }
 
