@@ -1,6 +1,13 @@
 "use client";
 
 import { toCanvas } from "html-to-image";
+import {
+  GOODS_WATERMARK_ANGLE_DEG,
+  GOODS_WATERMARK_FILL,
+  GOODS_WATERMARK_TEXT,
+  GOODS_WATERMARK_TILE_HEIGHT,
+  GOODS_WATERMARK_TILE_WIDTH,
+} from "@/lib/goods-watermark";
 
 const TRADE_PREVIEW_WIDTH = 840;
 const TRADE_EXPORT_WIDTH = 2000;
@@ -319,6 +326,42 @@ function drawQuantityBadge(
   context.restore();
 }
 
+function drawRepeatedGoodsWatermark(
+  context: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  borderRadius: number,
+) {
+  if (width <= 0 || height <= 0) return;
+
+  const diagonal = Math.sqrt(width * width + height * height);
+  const fontSize = Math.max(6, Math.min(10, Math.round(Math.min(width, height) / 7.2)));
+  const stepX = Math.max(GOODS_WATERMARK_TILE_WIDTH * 0.62, fontSize * 4.8);
+  const stepY = Math.max(GOODS_WATERMARK_TILE_HEIGHT * 0.62, fontSize * 2.35);
+
+  context.save();
+  createRoundedRectPath(context, x, y, width, height, borderRadius);
+  context.clip();
+  context.translate(x + width / 2, y + height / 2);
+  context.rotate((GOODS_WATERMARK_ANGLE_DEG * Math.PI) / 180);
+  context.fillStyle = GOODS_WATERMARK_FILL;
+  context.font = `700 ${fontSize}px Arial, sans-serif`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+
+  for (let row = -diagonal; row <= diagonal; row += stepY) {
+    const offsetX = Math.round(row / stepY) % 2 === 0 ? 0 : stepX / 2;
+
+    for (let col = -diagonal; col <= diagonal; col += stepX) {
+      context.fillText(GOODS_WATERMARK_TEXT, col + offsetX, row);
+    }
+  }
+
+  context.restore();
+}
+
 function compositeExportImages(
   canvas: HTMLCanvasElement,
   node: HTMLElement,
@@ -343,6 +386,15 @@ function compositeExportImages(
     drawContainedImage(
       context,
       snapshot.drawable,
+      snapshot.rect.left - nodeRect.left,
+      snapshot.rect.top - nodeRect.top,
+      snapshot.rect.width,
+      snapshot.rect.height,
+      snapshot.borderRadius,
+    );
+
+    drawRepeatedGoodsWatermark(
+      context,
       snapshot.rect.left - nodeRect.left,
       snapshot.rect.top - nodeRect.top,
       snapshot.rect.width,

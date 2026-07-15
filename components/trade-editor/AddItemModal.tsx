@@ -353,14 +353,12 @@ export function AddItemModal({
                 {uploadedPreviewUrls.length > 0 ? (
                   <div className="mt-3 flex justify-center gap-2 overflow-hidden">
                     {uploadedPreviewUrls.map((url, index) => (
-                      <div key={url} className="relative h-14 w-14">
-                        <ProtectedGoodsImage
-                          src={url}
-                          alt={`추가된 직접 이미지 ${index + 1}`}
-                          className="h-14 w-14 rounded-lg bg-white object-cover ring-1 ring-emerald-200"
-                          watermarkClassName="bottom-0.5 right-0.5 text-[4px]"
-                        />
-                      </div>
+                      <img
+                        key={url}
+                        src={url}
+                        alt={`추가된 직접 이미지 ${index + 1}`}
+                        className="h-14 w-14 rounded-lg bg-white object-cover ring-1 ring-emerald-200"
+                      />
                     ))}
                   </div>
                 ) : null}
