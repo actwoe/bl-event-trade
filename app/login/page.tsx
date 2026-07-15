@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { AppBottomNav } from '@/components/ui/AppBottomNav';
+import { AppFrame } from '@/components/ui/AppFrame';
+import { AppTopBar } from '@/components/ui/AppTopBar';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -91,9 +93,9 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex h-[100dvh] w-full items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
-      <section className="flex h-full max-h-[860px] w-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+    <AppFrame>
+      <AppTopBar title="로그인" backHref="/" showAccount={false} />
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <header className="border-b border-neutral-100 bg-white p-5 pt-6">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#7C5CFC]">
             BL GOODS TRADE
@@ -154,9 +156,8 @@ export default function LoginPage() {
             </Link>
           </p>
         </form>
-        </div>
-        <AppBottomNav active="login" />
-      </section>
-    </main>
+      </div>
+      <AppBottomNav active="login" />
+    </AppFrame>
   );
 }

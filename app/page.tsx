@@ -1,6 +1,5 @@
-import Link from 'next/link';
 import { EventCollectionBrowser } from '@/components/home/EventCollectionBrowser';
-import { UserAuthLinks } from '@/components/auth/UserAuthLinks';
+import { AppFrame } from '@/components/ui/AppFrame';
 import { getKoreaTodayDateString } from '@/lib/event-status';
 import type { HomeTradeCollection } from '@/lib/home-trade-types';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
@@ -61,43 +60,12 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="flex h-[100dvh] w-full items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
-      <section className="flex h-full max-h-[860px] w-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-        <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] p-5">
-          <div className="flex justify-end">
-            <Link
-              href="/cardform"
-              className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
-            >
-              이미지 제보하기
-            </Link>
-          </div>
-
-          <div className="mt-6">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-neutral-500">
-              Popup &amp; Collabo Cafe Trade Board
-            </p>
-
-            <h1 className="mt-1 break-keep text-2xl font-black leading-tight text-neutral-950">
-              팝업 &amp; 콜카 굿즈 교환판
-            </h1>
-
-            <div className="mt-4 h-px bg-white/70" />
-
-            <UserAuthLinks className="mt-4" />
-          </div>
-        </header>
-
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-white p-5">
-          {error ? (
-            <p className="rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-600">
-              {error}
-            </p>
-          ) : (
-            <EventCollectionBrowser collections={collections} today={today} />
-          )}
-        </div>
-      </section>
-    </main>
+    <AppFrame>
+      <EventCollectionBrowser
+        collections={collections}
+        today={today}
+        error={error}
+      />
+    </AppFrame>
   );
 }

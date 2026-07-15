@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AppBottomNav } from "@/components/ui/AppBottomNav";
+import { AppFrame } from "@/components/ui/AppFrame";
 import { AppTopBar } from "@/components/ui/AppTopBar";
 import { TradeBuilder } from "@/components/trade/TradeBuilder";
 import { getTradeAssetUrl, supabase } from "@/lib/supabase";
@@ -253,46 +254,51 @@ export default function MyTradesPage() {
 
   if (authState === "checking" || isLoadingGroups) {
     return (
-      <main className="flex h-[100dvh] items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
-        <section className="w-full max-w-lg rounded-[28px] border border-neutral-200/70 bg-white p-6 text-sm text-neutral-500">
+      <AppFrame>
+      <AppTopBar title="내 교환판" backHref="/" />
+        <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-sm text-neutral-500">
           저장한 교환판을 불러오는 중입니다.
-        </section>
-      </main>
+        </div>
+        <AppBottomNav active="trades" />
+      </AppFrame>
     );
   }
 
   if (authState === "signed-out") {
     return (
-      <main className="flex h-[100dvh] items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
-        <section className="w-full max-w-lg rounded-[28px] border border-neutral-200/70 bg-white p-6">
-          <h1 className="text-2xl font-black text-neutral-950">
-            로그인이 필요합니다
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-neutral-500">
-            교환판 그룹은 로그인한 사용자만 저장하고 불러올 수 있습니다.
-          </p>
-          <Link
-            href="/login?next=/my-trades"
-            className="mt-6 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white"
-          >
-            로그인
-          </Link>
-        </section>
-      </main>
+      <AppFrame>
+      <AppTopBar title="내 교환판" backHref="/" />
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <section className="rounded-3xl border border-dashed border-neutral-200 bg-neutral-50 px-5 py-12 text-center">
+            <h1 className="text-xl font-black text-neutral-950">
+              로그인이 필요합니다
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-neutral-500">
+              교환판 그룹은 로그인한 사용자만 저장하고 불러올 수 있습니다.
+            </p>
+            <Link
+              href="/login?next=/my-trades"
+              className="mt-6 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white"
+            >
+              로그인
+            </Link>
+          </section>
+        </div>
+        <AppBottomNav active="trades" />
+      </AppFrame>
     );
   }
 
   return (
-    <main className="flex h-[100dvh] w-full items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
-      <section className="flex h-full max-h-[860px] w-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-        <AppTopBar
+    <AppFrame>
+      <AppTopBar
           title="내 교환판"
           backHref="/"
           onAccountClick={handleLogout}
           accountLabel="로그아웃"
         />
 
-        <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
           <section className="border-b border-neutral-100 bg-white px-5 py-4">
             <p className="text-[12px] font-black tracking-[0.04em] text-[#7C5CFC]">
               BL GOODS TRADE
@@ -386,10 +392,9 @@ export default function MyTradesPage() {
               </div>
             </div>
           )}
-        </div>
+      </div>
 
-        <AppBottomNav active="trades" />
-      </section>
-    </main>
+      <AppBottomNav active="trades" />
+    </AppFrame>
   );
 }

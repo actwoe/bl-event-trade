@@ -1,6 +1,15 @@
 import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { TradeBuilder } from '@/components/trade/TradeBuilder';
+import { AppBottomNav } from '@/components/ui/AppBottomNav';
+import { AppFrame } from '@/components/ui/AppFrame';
+import { AppTopBar } from '@/components/ui/AppTopBar';
+import {
+  getEventPeriodLabel,
+  getEventStatus,
+  getEventStatusLabel,
+  getKoreaTodayDateString,
+} from '@/lib/event-status';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
 import {
   RegisteredTradeItem,
@@ -23,6 +32,9 @@ type TradeCollectionRow = {
   slug: string;
   title: string;
   description: string | null;
+  event_start_date: string | null;
+  event_end_date: string | null;
+  event_location: string | null;
 };
 
 type TradeItemRow = {
@@ -50,7 +62,9 @@ const getTradePageData = unstable_cache(
   async (slug: string) => {
     const { data: collectionData, error: collectionError } = await supabase
       .from('trade_collections')
-      .select('id, slug, title, description')
+      .select(
+        'id, slug, title, description, event_start_date, event_end_date, event_location',
+      )
       .eq('slug', slug)
       .eq('is_public', true)
       .single();
@@ -97,7 +111,8 @@ export default async function TradePage({ params }: TradePageProps) {
     notFound();
   }
 
-  const { collectionRow, itemData, itemError, referenceData, referenceError } = result;
+  const { collectionRow, itemData, itemError, referenceData, referenceError } =
+    result;
 
   if (itemError) {
     console.error(itemError);
@@ -115,9 +130,14 @@ export default async function TradePage({ params }: TradePageProps) {
     slug: collectionRow.slug,
     title: collectionRow.title,
     description: collectionRow.description,
+    eventStartDate: collectionRow.event_start_date,
+    eventEndDate: collectionRow.event_end_date,
+    location: collectionRow.event_location,
   };
 
-  const registeredItems: RegisteredTradeItem[] = ((itemData ?? []) as TradeItemRow[])
+  const registeredItems: RegisteredTradeItem[] = (
+    (itemData ?? []) as TradeItemRow[]
+  )
     .filter((item) => item.image_path)
     .map((item) => ({
       id: item.id,
@@ -130,7 +150,9 @@ export default async function TradePage({ params }: TradePageProps) {
       benefitSubcategory: item.benefit_subcategory ?? null,
     }));
 
-  const referenceImages: TradeReferenceImage[] = ((referenceData ?? []) as TradeReferenceImageRow[])
+  const referenceImages: TradeReferenceImage[] = (
+    (referenceData ?? []) as TradeReferenceImageRow[]
+  )
     .filter((image) => image.image_path)
     .map((image) => ({
       id: image.id,
@@ -138,11 +160,63 @@ export default async function TradePage({ params }: TradePageProps) {
       sortOrder: image.sort_order ?? 0,
     }));
 
+  const today = getKoreaTodayDateString();
+  const eventStatus = getEventStatus(
+    collection.eventStartDate ?? null,
+    collection.eventEndDate ?? null,
+    today,
+  );
+  const eventPeriod = getEventPeriodLabel(
+    collection.eventStartDate ?? null,
+    collection.eventEndDate ?? null,
+  );
+
   return (
-    <TradeBuilder
-      collection={collection}
-      registeredItems={registeredItems}
-      referenceImages={referenceImages}
-    />
+    <AppFrame>
+      <AppTopBar title="교환판 만들기" backHref="/" />
+
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+        <section className="border-b border-neutral-100 bg-white px-5 py-4">
+          <p className="text-[12px] font-black tracking-[0.04em] text-[#7C5CFC]">
+            BL GOODS TRADE
+          </p>
+
+          <div className="mt-1 flex items-start justify-between gap-3">
+            <h2 className="min-w-0 break-keep text-[24px] font-black leading-tight tracking-[-0.03em] text-neutral-950">
+              {collection.title}
+            </h2>
+            <span
+              className={
+                eventStatus === 'ongoing'
+                  ? 'shrink-0 rounded-full bg-[#F1EDFF] px-3 py-1.5 text-[11px] font-black text-[#7C5CFC]'
+                  : 'shrink-0 rounded-full bg-neutral-100 px-3 py-1.5 text-[11px] font-black text-neutral-500'
+              }
+            >
+              {getEventStatusLabel(eventStatus)}
+            </span>
+          </div>
+
+          <p className="mt-2 text-[12px] font-semibold leading-5 text-neutral-500">
+            {eventPeriod}
+            {collection.location ? ` · ${collection.location}` : ''}
+          </p>
+
+          {collection.description ? (
+            <p className="mt-2 text-sm leading-6 text-neutral-500">
+              {collection.description}
+            </p>
+          ) : null}
+        </section>
+
+        <TradeBuilder
+          collection={collection}
+          registeredItems={registeredItems}
+          referenceImages={referenceImages}
+          embedded
+        />
+      </div>
+
+      <AppBottomNav active="home" />
+    </AppFrame>
   );
 }

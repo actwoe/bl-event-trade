@@ -9,9 +9,27 @@ type AuthState = 'checking' | 'signed-in' | 'signed-out';
 
 type UserAuthLinksProps = {
   className?: string;
+  variant?: 'buttons' | 'icon';
 };
 
-export function UserAuthLinks({ className = '' }: UserAuthLinksProps) {
+function AccountIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-5 w-5 fill-none stroke-current"
+      strokeWidth="1.8"
+    >
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5.5 20c.6-4 2.9-6 6.5-6s5.9 2 6.5 6" />
+    </svg>
+  );
+}
+
+export function UserAuthLinks({
+  className = '',
+  variant = 'buttons',
+}: UserAuthLinksProps) {
   const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>('checking');
 
@@ -42,6 +60,31 @@ export function UserAuthLinks({ className = '' }: UserAuthLinksProps) {
     await supabase.auth.signOut();
     router.push('/');
     router.refresh();
+  }
+
+  if (variant === 'icon') {
+    const accountClassName = `flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-900 shadow-sm transition hover:border-neutral-300 hover:bg-neutral-50 ${className}`;
+
+    if (authState === 'checking') {
+      return (
+        <span
+          aria-label="계정 확인 중"
+          className={`${accountClassName} text-neutral-300`}
+        >
+          <AccountIcon />
+        </span>
+      );
+    }
+
+    return (
+      <Link
+        href={authState === 'signed-in' ? '/my-trades' : '/login'}
+        aria-label={authState === 'signed-in' ? '내 교환판' : '로그인'}
+        className={accountClassName}
+      >
+        <AccountIcon />
+      </Link>
+    );
   }
 
   if (authState === 'checking') {

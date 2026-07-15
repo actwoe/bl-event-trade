@@ -8,6 +8,7 @@ export type AppTopBarProps = {
   loginHref?: string;
   onAccountClick?: () => void;
   accountLabel?: string;
+  showAccount?: boolean;
 };
 
 function BackIcon() {
@@ -43,42 +44,47 @@ export function AppTopBar({
   loginHref = "/login",
   onAccountClick,
   accountLabel = "로그인",
+  showAccount = true,
 }: AppTopBarProps) {
   const accountClassName =
     "flex h-10 w-10 items-center justify-center rounded-full text-neutral-900 transition hover:bg-neutral-100";
 
   return (
-    <header className="grid h-16 shrink-0 grid-cols-[48px_1fr_48px] items-center border-b border-neutral-100 bg-white px-3">
-      <Link
-        href={backHref}
-        aria-label="뒤로가기"
-        className="flex h-10 w-10 items-center justify-center rounded-full text-neutral-900 transition hover:bg-neutral-100"
-      >
-        <BackIcon />
-      </Link>
-
-      <h1 className="truncate px-2 text-center text-[16px] font-black tracking-[-0.02em] text-neutral-950">
-        {title}
-      </h1>
-
-      {onAccountClick ? (
-        <button
-          type="button"
-          onClick={onAccountClick}
-          aria-label={accountLabel}
-          className={accountClassName}
-        >
-          <AccountIcon />
-        </button>
-      ) : (
+    <header className="shrink-0 border-b border-neutral-100 bg-white pt-[env(safe-area-inset-top)]">
+      <div className="grid h-16 grid-cols-[48px_1fr_48px] items-center px-3">
         <Link
-          href={loginHref}
-          aria-label={accountLabel}
-          className={accountClassName}
+          href={backHref}
+          aria-label="뒤로가기"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-neutral-900 transition hover:bg-neutral-100"
         >
-          <AccountIcon />
+          <BackIcon />
         </Link>
-      )}
+
+        <h1 className="truncate px-2 text-center text-[16px] font-black tracking-[-0.02em] text-neutral-950">
+          {title}
+        </h1>
+
+        {!showAccount ? (
+          <span aria-hidden="true" />
+        ) : onAccountClick ? (
+          <button
+            type="button"
+            onClick={onAccountClick}
+            aria-label={accountLabel}
+            className={accountClassName}
+          >
+            <AccountIcon />
+          </button>
+        ) : (
+          <Link
+            href={loginHref}
+            aria-label={accountLabel}
+            className={accountClassName}
+          >
+            <AccountIcon />
+          </Link>
+        )}
+      </div>
     </header>
   );
 }
