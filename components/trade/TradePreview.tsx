@@ -7,6 +7,7 @@ import {
   TradeCard,
 } from '@/lib/trade-types';
 import { QuantityBadge } from './QuantityBadge';
+import { ProtectedGoodsImage } from '@/components/trade-editor/ProtectedGoodsImage';
 
 type TradePreviewProps = {
   board: TradeBoard;
@@ -306,7 +307,7 @@ function PreviewCard({ card, showMeta }: PreviewCardProps) {
   return (
     <article className="overflow-hidden rounded-2xl bg-white">
       <div className="relative bg-white px-1 pt-0.5">
-        <img
+        <ProtectedGoodsImage
           src={card.imageUrl}
           alt={card.memo || card.workTitle}
           loading="eager"

@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useRef, useState } from "react";
 import { TRADE_CATEGORIES, TradeBoard, TradeCard } from "@/lib/trade-types";
 import { QuantityBadge } from "@/components/trade/QuantityBadge";
+import { ProtectedGoodsImage } from "@/components/trade-editor/ProtectedGoodsImage";
 import { sortTradeCardsBySideAndGroup } from "@/lib/trade-card-order";
 import {
   getPreviewColumnsPerSide,
@@ -409,7 +410,7 @@ function PreviewCard({
   return (
     <article className="min-w-0 bg-white">
       <div className="relative bg-white">
-        <img
+        <ProtectedGoodsImage
           src={card.imageUrl}
           alt={card.memo || card.workTitle}
           loading="eager"

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { QuantityBadge } from "@/components/trade/QuantityBadge";
 import { GoodsWorkReference } from "@/components/trade-editor/TradeEditorShared";
+import { ProtectedGoodsImage } from "@/components/trade-editor/ProtectedGoodsImage";
 import { getRegisteredItemQuantity } from "@/lib/trade-editor-core";
 import {
   getBenefitSubcategoryLabel,
@@ -352,12 +353,14 @@ export function AddItemModal({
                 {uploadedPreviewUrls.length > 0 ? (
                   <div className="mt-3 flex justify-center gap-2 overflow-hidden">
                     {uploadedPreviewUrls.map((url, index) => (
-                      <img
-                        key={url}
-                        src={url}
-                        alt={`추가된 직접 이미지 ${index + 1}`}
-                        className="h-14 w-14 rounded-lg bg-white object-cover ring-1 ring-emerald-200"
-                      />
+                      <div key={url} className="relative h-14 w-14">
+                        <ProtectedGoodsImage
+                          src={url}
+                          alt={`추가된 직접 이미지 ${index + 1}`}
+                          className="h-14 w-14 rounded-lg bg-white object-cover ring-1 ring-emerald-200"
+                          watermarkClassName="bottom-0.5 right-0.5 text-[4px]"
+                        />
+                      </div>
                     ))}
                   </div>
                 ) : null}
@@ -452,7 +455,7 @@ function RegisteredItemCard({
             variant === "lab" ? "leading-none" : ""
           }`}
         >
-          <img
+          <ProtectedGoodsImage
             src={item.imageUrl}
             alt={item.itemName}
             loading="lazy"

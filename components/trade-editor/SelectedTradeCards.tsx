@@ -11,6 +11,7 @@ import {
   QuantityTradeCard,
 } from "@/lib/trade-editor-core";
 import { getCardMetaLabel } from "@/lib/trade-editor-display";
+import { ProtectedGoodsImage } from "@/components/trade-editor/ProtectedGoodsImage";
 
 type SideLabelMode = "bilingual" | "korean";
 
@@ -84,10 +85,11 @@ function SelectedTradeCardEditor({
   return (
     <div className="grid grid-cols-[64px_1fr] gap-3 rounded-xl bg-neutral-50 p-3">
       <div className="relative h-16 w-16 overflow-hidden rounded-lg bg-white">
-        <img
+        <ProtectedGoodsImage
           src={card.imageUrl}
           alt=""
           className="h-full w-full object-contain p-1"
+          watermarkClassName="bottom-1 right-1 text-[5px]"
         />
       </div>
 
