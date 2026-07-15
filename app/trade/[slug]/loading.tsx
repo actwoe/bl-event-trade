@@ -1,12 +1,17 @@
+import { AppBottomNav } from '@/components/ui/AppBottomNav';
+import { AppFrame } from '@/components/ui/AppFrame';
+import { AppTopBar } from '@/components/ui/AppTopBar';
+
 export default function TradeLoadingPage() {
   return (
-    <section className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
-      <div className="mx-auto w-full max-w-md overflow-hidden rounded-[2rem] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)] sm:max-w-lg">
-        <div className="bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] px-5 pb-6 pt-5">
-          <div className="h-8 w-24 animate-pulse rounded-full bg-white/70" />
-          <div className="mt-6 h-7 w-3/4 animate-pulse rounded-lg bg-white/75" />
-          <div className="mt-3 h-4 w-full animate-pulse rounded bg-white/55" />
-          <div className="mt-2 h-4 w-2/3 animate-pulse rounded bg-white/55" />
+    <AppFrame>
+      <AppTopBar title="교환판 만들기" backHref="/" />
+
+      <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="border-b border-neutral-100 px-5 py-4">
+          <div className="h-3 w-28 animate-pulse rounded bg-neutral-100" />
+          <div className="mt-3 h-7 w-3/4 animate-pulse rounded-lg bg-neutral-100" />
+          <div className="mt-3 h-4 w-1/2 animate-pulse rounded bg-neutral-100" />
         </div>
 
         <div className="space-y-3 p-5">
@@ -18,6 +23,8 @@ export default function TradeLoadingPage() {
           ))}
         </div>
       </div>
-    </section>
+
+      <AppBottomNav active="home" />
+    </AppFrame>
   );
 }

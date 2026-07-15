@@ -1,6 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { AppBottomNav } from "@/components/ui/AppBottomNav";
+import { AppFrame } from "@/components/ui/AppFrame";
+import { AppTopBar } from "@/components/ui/AppTopBar";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { nanoid } from "nanoid";
 import { supabase } from "@/lib/supabase";
@@ -214,21 +216,6 @@ export default function CardFormPage() {
   }, [collectionId]);
 
   useEffect(() => {
-    if (category !== "benefit") {
-      setBenefitSubcategory("");
-      return;
-    }
-
-    setBenefitSubcategory((prev) => {
-      if (prev && benefitSubcategories.includes(prev)) {
-        return prev;
-      }
-
-      return benefitSubcategories[0] ?? "";
-    });
-  }, [category, benefitSubcategories]);
-
-  useEffect(() => {
     return () => {
       if (imagePreviewUrl) {
         URL.revokeObjectURL(imagePreviewUrl);
@@ -241,7 +228,16 @@ export default function CardFormPage() {
 
     if (nextCategory !== "benefit") {
       setBenefitSubcategory("");
+      return;
     }
+
+    setBenefitSubcategory((current) => {
+      if (current && benefitSubcategories.includes(current)) {
+        return current;
+      }
+
+      return benefitSubcategories[0] ?? "";
+    });
   }
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
@@ -346,215 +342,202 @@ export default function CardFormPage() {
   }
 
   return (
-    <main className="w-full bg-neutral-100 px-4 pb-5 pt-5 sm:pb-6 sm:pt-6">
-      <section className="mx-auto w-full max-w-md sm:max-w-lg">
-        <div className="overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-          <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] p-5">
-            <div className="mb-6 flex items-center justify-between gap-3">
-              <Link
-                href="/"
-                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
-              >
-                ← 메인으로
-              </Link>
-
-              <Link
-                href="/cardform"
-                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
-              >
-                이미지 제보하기
-              </Link>
+    <AppFrame>
+      <AppTopBar title="이미지 제보하기" backHref="/" />
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <section className="border-b border-neutral-100 bg-white px-5 py-4">
+            <p className="text-[12px] font-black tracking-[0.04em] text-[#7C5CFC]">
+              BL GOODS TRADE
+            </p>
+            <h2 className="mt-1 text-[24px] font-black leading-tight tracking-[-0.03em] text-neutral-950">
+              이미지 제보하기
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-neutral-500">
+              실물이 없는 굿즈 이미지를 제보해 주세요.
+            </p>
+            <div className="mt-3 rounded-2xl bg-neutral-50 p-4 text-xs leading-6 text-neutral-600">
+              제보 이미지는 관리자 검수 후 교환판에 추가됩니다.
             </div>
-
-            <h1 className="text-2xl font-black text-neutral-950">
-              이미지 제보
-            </h1>
-
-            <div className="mt-5 rounded-2xl border border-white/60 bg-white/65 p-4 text-xs leading-6 text-neutral-600 shadow-[0_8px_20px_rgba(15,23,42,0.025)]">
-              <p>실물이 없는 굿즈 이미지를 제보해주시면 많은 도움이 됩니다!</p>
-              <p>제보 이미지는 관리자 검수 후 교환판에 추가됩니다.</p>
-            </div>
-          </header>
+          </section>
 
           {isSubmitted ? (
             <section className="p-5 text-center">
-            <h2 className="text-xl font-black text-neutral-950">
-              제보가 접수되었습니다
-            </h2>
+              <h2 className="text-xl font-black text-neutral-950">
+                제보가 접수되었습니다
+              </h2>
 
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              관리자가 확인한 뒤 팝업 & 콜카 굿즈 교환판에 반영됩니다.
-            </p>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                관리자가 확인한 뒤 팝업 & 콜카 굿즈 교환판에 반영됩니다.
+              </p>
 
-            <button
-              type="button"
-              onClick={() => setIsSubmitted(false)}
-              className="mt-6 w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-bold text-white transition hover:bg-neutral-800"
-            >
-              다른 이미지 제보하기
-            </button>
-          </section>
-        ) : (
-          <form
-            onSubmit={handleSubmit}
-            className="p-5"
-          >
-            <div className="space-y-5">
-              <label className="block">
-                <span className="text-sm font-semibold text-neutral-800">
-                  행사 선택
-                </span>
-
-                <select
-                  value={collectionId}
-                  onChange={(event) => setCollectionId(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
-                >
-                  {collections.length > 0 ? (
-                    collections.map((collection) => (
-                      <option key={collection.id} value={collection.id}>
-                        {collection.title}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">등록된 행사가 없습니다</option>
-                  )}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-semibold text-neutral-800">
-                  작품 선택
-                </span>
-
-                <select
-                  value={workTitle}
-                  onChange={(event) => setWorkTitle(event.target.value)}
-                  disabled={workTitles.length === 0}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900 disabled:bg-neutral-100 disabled:text-neutral-400"
-                >
-                  {workTitles.length > 0 ? (
-                    workTitles.map((title) => (
-                      <option key={title} value={title}>
-                        {title}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">등록된 작품이 없습니다</option>
-                  )}
-                </select>
-
-                <p className="mt-2 text-xs leading-5 text-neutral-400">
-                  작품 목록은 관리자가 해당 행사에 등록한 작품 기준으로
-                  표시됩니다.
-                </p>
-              </label>
-
-              <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setIsSubmitted(false)}
+                className="mt-6 w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-bold text-white transition hover:bg-neutral-800"
+              >
+                다른 이미지 제보하기
+              </button>
+            </section>
+          ) : (
+            <form onSubmit={handleSubmit} className="p-5">
+              <div className="space-y-5">
                 <label className="block">
                   <span className="text-sm font-semibold text-neutral-800">
-                    굿즈 종류
+                    행사 선택
                   </span>
 
                   <select
-                    value={category}
-                    onChange={(event) =>
-                      handleCategoryChange(event.target.value as TradeCategory)
-                    }
-                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900"
+                    value={collectionId}
+                    onChange={(event) => setCollectionId(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
                   >
-                    {TRADE_CATEGORIES.map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-semibold text-neutral-800">
-                    특전 하위 분류
-                  </span>
-
-                  <select
-                    value={benefitSubcategory}
-                    onChange={(event) =>
-                      setBenefitSubcategory(event.target.value)
-                    }
-                    disabled={!canSelectBenefitSubcategory}
-                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-900 disabled:bg-neutral-100 disabled:text-neutral-400"
-                  >
-                    {category !== "benefit" ? (
-                      <option value="">특전 선택 시 사용</option>
-                    ) : benefitSubcategories.length > 0 ? (
-                      <>
-                        {benefitSubcategories.map((subcategory) => (
-                          <option key={subcategory} value={subcategory}>
-                            {subcategory}
-                          </option>
-                        ))}
-                      </>
+                    {collections.length > 0 ? (
+                      collections.map((collection) => (
+                        <option key={collection.id} value={collection.id}>
+                          {collection.title}
+                        </option>
+                      ))
                     ) : (
-                      <option value="">등록된 하위 분류 없음</option>
+                      <option value="">등록된 행사가 없습니다</option>
                     )}
                   </select>
                 </label>
-              </div>
 
-              <div>
-                <span className="text-sm font-semibold text-neutral-800">
-                  이미지
-                </span>
+                <label className="block">
+                  <span className="text-sm font-semibold text-neutral-800">
+                    작품 선택
+                  </span>
 
-                <label className="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center hover:border-neutral-950">
-                  {imagePreviewUrl ? (
-                    <img
-                      src={imagePreviewUrl}
-                      alt="제보 이미지 미리보기"
-                      className="aspect-square w-32 rounded-2xl bg-white object-contain p-1 shadow-[0_6px_18px_rgba(15,23,42,0.04)]"
-                    />
-                  ) : (
-                    <>
-                      <span className="text-sm font-bold text-neutral-700">
-                        이미지 선택
-                      </span>
-                      <span className="mt-2 text-xs leading-5 text-neutral-400">
-                        빛 반사가 적은 정방형 이미지를 권장합니다.
-                      </span>
-                    </>
-                  )}
+                  <select
+                    value={workTitle}
+                    onChange={(event) => setWorkTitle(event.target.value)}
+                    disabled={workTitles.length === 0}
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC] disabled:bg-neutral-100 disabled:text-neutral-400"
+                  >
+                    {workTitles.length > 0 ? (
+                      workTitles.map((title) => (
+                        <option key={title} value={title}>
+                          {title}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">등록된 작품이 없습니다</option>
+                    )}
+                  </select>
 
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
+                  <p className="mt-2 text-xs leading-5 text-neutral-400">
+                    작품 목록은 관리자가 해당 행사에 등록한 작품 기준으로
+                    표시됩니다.
+                  </p>
                 </label>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="text-sm font-semibold text-neutral-800">
+                      굿즈 종류
+                    </span>
+
+                    <select
+                      value={category}
+                      onChange={(event) =>
+                        handleCategoryChange(
+                          event.target.value as TradeCategory,
+                        )
+                      }
+                      className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
+                    >
+                      {TRADE_CATEGORIES.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-semibold text-neutral-800">
+                      특전 하위 분류
+                    </span>
+
+                    <select
+                      value={benefitSubcategory}
+                      onChange={(event) =>
+                        setBenefitSubcategory(event.target.value)
+                      }
+                      disabled={!canSelectBenefitSubcategory}
+                      className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC] disabled:bg-neutral-100 disabled:text-neutral-400"
+                    >
+                      {category !== "benefit" ? (
+                        <option value="">특전 선택 시 사용</option>
+                      ) : benefitSubcategories.length > 0 ? (
+                        <>
+                          {benefitSubcategories.map((subcategory) => (
+                            <option key={subcategory} value={subcategory}>
+                              {subcategory}
+                            </option>
+                          ))}
+                        </>
+                      ) : (
+                        <option value="">등록된 하위 분류 없음</option>
+                      )}
+                    </select>
+                  </label>
+                </div>
+
+                <div>
+                  <span className="text-sm font-semibold text-neutral-800">
+                    이미지
+                  </span>
+
+                  <label className="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center hover:border-neutral-950">
+                    {imagePreviewUrl ? (
+                      <img
+                        src={imagePreviewUrl}
+                        alt="제보 이미지 미리보기"
+                        className="aspect-square w-32 rounded-2xl bg-white object-contain p-1 shadow-[0_6px_18px_rgba(15,23,42,0.04)]"
+                      />
+                    ) : (
+                      <>
+                        <span className="text-sm font-bold text-neutral-700">
+                          이미지 선택
+                        </span>
+                        <span className="mt-2 text-xs leading-5 text-neutral-400">
+                          빛 반사가 적은 정방형 이미지를 권장합니다.
+                        </span>
+                      </>
+                    )}
+
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                {message ? (
+                  <p className="rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-600">
+                    {message}
+                  </p>
+                ) : null}
+
+                <button
+                  type="submit"
+                  disabled={
+                    isSubmitting ||
+                    collections.length === 0 ||
+                    workTitles.length === 0
+                  }
+                  className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-bold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-300"
+                >
+                  {isSubmitting ? "제보 중..." : "이미지 제보하기"}
+                </button>
               </div>
-
-              {message ? (
-                <p className="rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-600">
-                  {message}
-                </p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={
-                  isSubmitting ||
-                  collections.length === 0 ||
-                  workTitles.length === 0
-                }
-                className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-bold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-300"
-              >
-                {isSubmitting ? "제보 중..." : "이미지 제보하기"}
-              </button>
-            </div>
-          </form>
+            </form>
           )}
         </div>
-      </section>
-    </main>
+      <AppBottomNav active="submit" />
+    </AppFrame>
   );
 }

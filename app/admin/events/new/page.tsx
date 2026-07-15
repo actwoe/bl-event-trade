@@ -41,6 +41,7 @@ export default function AdminEventNewPage() {
   const [periodNote, setPeriodNote] = useState("");
   const [eventStartDate, setEventStartDate] = useState("");
   const [eventEndDate, setEventEndDate] = useState("");
+  const [eventLocation, setEventLocation] = useState("");
   const [sortOrder, setSortOrder] = useState("0");
   const [isPublic, setIsPublic] = useState(true);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -157,6 +158,7 @@ export default function AdminEventNewPage() {
           description: periodNote.trim() || null,
           event_start_date: eventStartDate || null,
           event_end_date: eventEndDate || null,
+          event_location: eventLocation.trim() || null,
           thumbnail_path: thumbnailPath,
           status_label: null,
           is_public: isPublic,
@@ -322,6 +324,16 @@ export default function AdminEventNewPage() {
                   />
                 </label>
               </div>
+
+              <label className="block">
+                <span className="text-sm font-semibold text-neutral-800">행사 장소</span>
+                <input
+                  value={eventLocation}
+                  onChange={(event) => setEventLocation(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-950"
+                  placeholder="예: 서울 · 더현대 서울 5F / 온라인"
+                />
+              </label>
 
               <label className="block">
                 <span className="text-sm font-semibold text-neutral-800">행사 기간 메모</span>

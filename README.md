@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BL Event Trade Board
 
-## Getting Started
+팝업·콜라보 카페 굿즈 교환판을 만들고 PNG로 저장하는 Next.js 프로젝트입니다.
 
-First, run the development server:
+## 주요 구조
+
+- `app/page.tsx`: 공개 행사 목록
+- `components/home/EventCollectionBrowser.tsx`: 행사 상태 필터와 6개 단위 더보기
+- `app/trade/[slug]/page.tsx`: 행사별 교환판 데이터 로드
+- `components/trade/`: 실제 사용자 교환판
+- `components/trade-lab/`: 관리자 테스트 교환판
+- `app/api/image-proxy/route.ts`: 브라우저 직접 이미지 로드가 실패했을 때만 사용하는 제한적 fallback
+
+## 무료 사용량 절약 원칙
+
+- 교환판 PNG는 사용자의 브라우저 Canvas에서 생성합니다.
+- Supabase Storage 이미지는 브라우저에서 CORS 직접 로드를 먼저 시도합니다.
+- 직접 로드가 실패한 이미지만 `/api/image-proxy`를 사용합니다.
+- 메인 행사 목록은 ISR로 한 번 로드하고, 상태 필터와 더보기는 브라우저에서 처리합니다.
+- 사용하지 않는 서버 PNG 생성 API와 무거운 이미지 처리 의존성은 두지 않습니다.
+
+## 개발 명령
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+로컬 주소는 기본적으로 `http://localhost:3000`입니다.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 배포 전 확인
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. `npm run build`가 성공하는지 확인합니다.
+2. 메인에서 전체·예정·진행중·종료 필터와 더보기를 확인합니다.
+3. PC와 모바일에서 PNG 저장을 확인합니다.
+4. 브라우저 Network 탭에서 대부분의 Supabase 이미지가 직접 로드되고, `/api/image-proxy`는 fallback일 때만 호출되는지 확인합니다.
+5. 테스트 Lab 변경을 실제 교환판에 옮길 때는 `components/trade-lab/`과 `components/trade/`를 별도로 비교합니다.

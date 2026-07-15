@@ -1,23 +1,37 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 86_400;
+export const runtime = "nodejs";
 
-function isAllowedImageUrl(url: URL) {
-  if (url.protocol !== "https:") return false;
+const BROWSER_CACHE_SECONDS = 86_400;
+const CDN_CACHE_SECONDS = 604_800;
+const STALE_CACHE_SECONDS = 2_592_000;
 
+function getAllowedSupabaseHost() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (supabaseUrl) {
-    try {
-      if (url.hostname === new URL(supabaseUrl).hostname) return true;
-    } catch {
-      // 환경변수가 잘못되어도 일반 Supabase 호스트 검사를 계속합니다.
-    }
+
+  if (!supabaseUrl) return null;
+
+  try {
+    return new URL(supabaseUrl).host;
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedStorageImageUrl(sourceUrl: URL) {
+  const allowedHost = getAllowedSupabaseHost();
+
+  if (
+    sourceUrl.protocol !== "https:" ||
+    !allowedHost ||
+    sourceUrl.host !== allowedHost
+  ) {
+    return false;
   }
 
   return (
-    url.hostname.endsWith(".supabase.co") ||
-    url.hostname.endsWith(".supabase.in")
+    sourceUrl.pathname.startsWith("/storage/v1/object/public/") ||
+    sourceUrl.pathname.startsWith("/storage/v1/render/image/public/")
   );
 }
 
@@ -28,46 +42,55 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Missing image URL" }, { status: 400 });
   }
 
-  let imageUrl: URL;
+  let sourceUrl: URL;
+
   try {
-    imageUrl = new URL(source);
+    sourceUrl = new URL(source);
   } catch {
     return NextResponse.json({ error: "Invalid image URL" }, { status: 400 });
   }
 
-  if (!isAllowedImageUrl(imageUrl)) {
-    return NextResponse.json({ error: "Image host is not allowed" }, { status: 403 });
+  if (!isAllowedStorageImageUrl(sourceUrl)) {
+    return NextResponse.json({ error: "Image URL is not allowed" }, { status: 403 });
   }
 
   try {
-    const response = await fetch(imageUrl, {
+    const imageResponse = await fetch(sourceUrl, {
       cache: "force-cache",
-      next: { revalidate: 86_400 },
-      headers: { Accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8" },
+      next: { revalidate: BROWSER_CACHE_SECONDS },
+      headers: {
+        Accept: "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+      },
     });
 
-    if (!response.ok) {
+    if (!imageResponse.ok) {
       return NextResponse.json(
-        { error: "Image request failed" },
-        { status: response.status },
+        { error: "Failed to fetch image" },
+        { status: imageResponse.status },
       );
     }
 
-    const contentType = response.headers.get("content-type") ?? "image/jpeg";
-    if (!contentType.startsWith("image/")) {
-      return NextResponse.json({ error: "Invalid image response" }, { status: 415 });
+    const contentType = imageResponse.headers.get("content-type");
+
+    if (!contentType?.startsWith("image/")) {
+      return NextResponse.json(
+        { error: "Requested resource is not an image" },
+        { status: 415 },
+      );
     }
 
-    return new NextResponse(await response.arrayBuffer(), {
+    return new NextResponse(imageResponse.body, {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000",
+        "Cache-Control": `public, max-age=${BROWSER_CACHE_SECONDS}, s-maxage=${CDN_CACHE_SECONDS}, stale-while-revalidate=${STALE_CACHE_SECONDS}`,
         "Access-Control-Allow-Origin": "*",
+        "X-Content-Type-Options": "nosniff",
+        Vary: "Accept",
       },
     });
   } catch (error) {
-    console.error("Image proxy failed", error);
+    console.error("Image proxy request failed", error);
     return NextResponse.json({ error: "Image proxy failed" }, { status: 502 });
   }
 }

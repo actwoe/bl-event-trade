@@ -19,6 +19,7 @@ type TradeCollectionRow = {
   description: string | null;
   event_start_date: string | null;
   event_end_date: string | null;
+  event_location: string | null;
   thumbnail_path: string;
   status_label: string | null;
   is_public: boolean;
@@ -213,9 +214,9 @@ export default function AdminEventManagePage() {
 
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
-  const [periodNote, setPeriodNote] = useState('');
   const [eventStartDate, setEventStartDate] = useState('');
   const [eventEndDate, setEventEndDate] = useState('');
+  const [eventLocation, setEventLocation] = useState('');
   const [isPublic, setIsPublic] = useState(true);
   const [sortOrder, setSortOrder] = useState('0');
 
@@ -410,7 +411,7 @@ export default function AdminEventManagePage() {
       const { data, error } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, event_start_date, event_end_date, thumbnail_path, status_label, is_public, sort_order',
+          'id, slug, title, description, event_start_date, event_end_date, event_location, thumbnail_path, status_label, is_public, sort_order',
         )
         .eq('id', eventId)
         .single();
@@ -426,9 +427,9 @@ export default function AdminEventManagePage() {
       setEventData(typedEvent);
       setTitle(typedEvent.title);
       setSlug(typedEvent.slug);
-      setPeriodNote(typedEvent.description ?? '');
       setEventStartDate(typedEvent.event_start_date ?? '');
       setEventEndDate(typedEvent.event_end_date ?? '');
+      setEventLocation(typedEvent.event_location ?? '');
       setIsPublic(typedEvent.is_public);
       setSortOrder(String(typedEvent.sort_order ?? 0));
       setThumbnailPreviewUrl(getTradeAssetUrl(typedEvent.thumbnail_path));
@@ -442,6 +443,8 @@ export default function AdminEventManagePage() {
     }
 
     loadPageData();
+    // 각 로더는 행사 ID가 바뀔 때만 한 번 실행합니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
   useEffect(() => {
@@ -656,6 +659,11 @@ export default function AdminEventManagePage() {
       return;
     }
 
+    if (eventStartDate && eventEndDate && eventEndDate < eventStartDate) {
+      setMessage('종료일은 시작일보다 빠를 수 없습니다.');
+      return;
+    }
+
     try {
       setIsSubmittingEvent(true);
       setMessage('');
@@ -690,9 +698,9 @@ export default function AdminEventManagePage() {
         .update({
           title: title.trim(),
           slug: normalizedSlug,
-          description: periodNote.trim() || null,
           event_start_date: eventStartDate || null,
           event_end_date: eventEndDate || null,
+          event_location: eventLocation.trim() || null,
           thumbnail_path: nextThumbnailPath,
           status_label: null,
           is_public: isPublic,
@@ -711,7 +719,7 @@ export default function AdminEventManagePage() {
       const { data } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, event_start_date, event_end_date, thumbnail_path, status_label, is_public, sort_order',
+          'id, slug, title, description, event_start_date, event_end_date, event_location, thumbnail_path, status_label, is_public, sort_order',
         )
         .eq('id', eventData.id)
         .single();
@@ -722,9 +730,9 @@ export default function AdminEventManagePage() {
         setEventData(refreshedEvent);
         setTitle(refreshedEvent.title);
         setSlug(refreshedEvent.slug);
-        setPeriodNote(refreshedEvent.description ?? '');
         setEventStartDate(refreshedEvent.event_start_date ?? '');
         setEventEndDate(refreshedEvent.event_end_date ?? '');
+        setEventLocation(refreshedEvent.event_location ?? '');
         setIsPublic(refreshedEvent.is_public);
         setSortOrder(String(refreshedEvent.sort_order ?? 0));
         setThumbnailPreviewUrl(getTradeAssetUrl(refreshedEvent.thumbnail_path));
@@ -1630,13 +1638,12 @@ export default function AdminEventManagePage() {
             </div>
 
             <label className="block">
-              <span className="text-sm font-bold text-neutral-800">행사 기간 메모</span>
-
+              <span className="text-sm font-bold text-neutral-800">행사 장소</span>
               <input
-                value={periodNote}
-                onChange={(event) => setPeriodNote(event.target.value)}
+                value={eventLocation}
+                onChange={(event) => setEventLocation(event.target.value)}
                 className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="선택 입력"
+                placeholder="예: 서울 · 더현대 서울 5F / 온라인"
               />
             </label>
 

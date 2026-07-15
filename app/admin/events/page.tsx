@@ -4,6 +4,13 @@ import Link from 'next/link';
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
+import {
+  compareEventsByStatus,
+  getEventPeriodLabel,
+  getEventStatus,
+  getEventStatusLabel,
+  getKoreaTodayDateString,
+} from '@/lib/event-status';
 
 type AdminState = 'checking' | 'admin' | 'not-admin' | 'signed-out';
 
@@ -14,6 +21,7 @@ type TradeCollectionRow = {
   description: string | null;
   event_start_date: string | null;
   event_end_date: string | null;
+  event_location: string | null;
   thumbnail_path: string | null;
   status_label: string | null;
   is_public: boolean;
@@ -45,71 +53,27 @@ function getFileExtension(file: File) {
 }
 
 
-function getKoreaTodayDateString() {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-
-  const parts = formatter.formatToParts(new Date());
-  const year = parts.find((part) => part.type === 'year')?.value ?? '';
-  const month = parts.find((part) => part.type === 'month')?.value ?? '';
-  const day = parts.find((part) => part.type === 'day')?.value ?? '';
-
-  return `${year}-${month}-${day}`;
-}
-
-function isEventEnded(row: TradeCollectionRow) {
-  if (!row.event_end_date) {
-    return false;
-  }
-
-  return row.event_end_date < getKoreaTodayDateString();
-}
-
-function formatDate(value: string | null) {
-  if (!value) return '';
-
-  const [year, month, day] = value.split('-');
-
-  if (!year || !month || !day) {
-    return value;
-  }
-
-  return `${year}.${month}.${day}`;
-}
-
-function getEventPeriodLabel(row: TradeCollectionRow) {
-  if (row.event_start_date && row.event_end_date) {
-    return `${formatDate(row.event_start_date)} - ${formatDate(row.event_end_date)}`;
-  }
-
-  if (row.event_start_date) {
-    return `${formatDate(row.event_start_date)} 시작`;
-  }
-
-  if (row.event_end_date) {
-    return `${formatDate(row.event_end_date)} 종료`;
-  }
-
-  return row.description ?? '';
-}
 
 function sortEvents(rows: TradeCollectionRow[]) {
-  return [...rows].sort((a, b) => {
-    const sortDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+  const today = getKoreaTodayDateString();
 
-    if (sortDiff !== 0) {
-      return sortDiff;
-    }
-
-    return a.title.localeCompare(b.title, 'ko-KR', {
-      numeric: true,
-      sensitivity: 'base',
-    });
-  });
+  return [...rows].sort((a, b) =>
+    compareEventsByStatus(
+      {
+        title: a.title,
+        eventStartDate: a.event_start_date,
+        eventEndDate: a.event_end_date,
+        sortOrder: a.sort_order ?? 0,
+      },
+      {
+        title: b.title,
+        eventStartDate: b.event_start_date,
+        eventEndDate: b.event_end_date,
+        sortOrder: b.sort_order ?? 0,
+      },
+      today,
+    ),
+  );
 }
 
 export default function AdminEventsPage() {
@@ -121,9 +85,9 @@ export default function AdminEventsPage() {
 
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
-  const [periodNote, setPeriodNote] = useState('');
   const [eventStartDate, setEventStartDate] = useState('');
   const [eventEndDate, setEventEndDate] = useState('');
+  const [eventLocation, setEventLocation] = useState('');
   const [sortOrder, setSortOrder] = useState('0');
   const [isPublic, setIsPublic] = useState(true);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -179,7 +143,7 @@ export default function AdminEventsPage() {
       const { data, error } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, event_start_date, event_end_date, thumbnail_path, status_label, is_public, sort_order, created_at',
+          'id, slug, title, description, event_start_date, event_end_date, event_location, thumbnail_path, status_label, is_public, sort_order, created_at',
         )
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
@@ -232,6 +196,11 @@ export default function AdminEventsPage() {
       return;
     }
 
+    if (eventStartDate && eventEndDate && eventEndDate < eventStartDate) {
+      setMessage('종료일은 시작일보다 빠를 수 없습니다.');
+      return;
+    }
+
     try {
       setIsSubmittingEvent(true);
       setMessage('');
@@ -266,9 +235,9 @@ export default function AdminEventsPage() {
         .insert({
           title: title.trim(),
           slug: normalizedSlug,
-          description: periodNote.trim() || null,
           event_start_date: eventStartDate || null,
           event_end_date: eventEndDate || null,
+          event_location: eventLocation.trim() || null,
           thumbnail_path: thumbnailPath,
           status_label: null,
           is_public: isPublic,
@@ -283,7 +252,6 @@ export default function AdminEventsPage() {
 
       setTitle('');
       setSlug('');
-      setPeriodNote('');
       setEventStartDate('');
       setEventEndDate('');
       setSortOrder('0');
@@ -486,13 +454,12 @@ export default function AdminEventsPage() {
             </div>
 
             <label className="block">
-              <span className="text-sm font-bold text-neutral-800">행사 기간 메모</span>
-
+              <span className="text-sm font-bold text-neutral-800">행사 장소</span>
               <input
-                value={periodNote}
-                onChange={(event) => setPeriodNote(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
-                placeholder="선택 입력"
+                value={eventLocation}
+                onChange={(event) => setEventLocation(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                placeholder="예: 서울 · 더현대 서울 5F / 온라인"
               />
             </label>
 
@@ -610,7 +577,13 @@ export default function AdminEventsPage() {
               {events.map((row) => {
                 const thumbnailUrl = getTradeAssetUrl(row.thumbnail_path ?? '');
                 const isDeleting = isDeletingEventId === row.id;
-                const ended = isEventEnded(row);
+                const status = getEventStatus(
+                    row.event_start_date,
+                    row.event_end_date,
+                    getKoreaTodayDateString(),
+                  );
+                const ended = status === 'ended';
+                const statusLabel = getEventStatusLabel(status);
 
                 return (
                   <article
@@ -631,11 +604,17 @@ export default function AdminEventsPage() {
                           </div>
                         )}
 
-                        {ended ? (
-                          <span className="absolute left-2 top-2 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black text-white">
-                            종료
-                          </span>
-                        ) : null}
+                        <span
+                          className={`absolute left-2 top-2 rounded-full px-2.5 py-1 text-[10px] font-black ${
+                            status === 'ended'
+                              ? 'bg-neutral-950 text-white'
+                              : status === 'scheduled'
+                                ? 'bg-violet-100 text-violet-700'
+                                : 'bg-emerald-100 text-emerald-700'
+                          }`}
+                        >
+                          {statusLabel}
+                        </span>
                       </div>
                     </Link>
 
@@ -645,7 +624,15 @@ export default function AdminEventsPage() {
                           <p className="line-clamp-2 text-sm font-black leading-5 text-neutral-950">
                             {row.title}
                           </p>
-                          <p className="mt-1 truncate text-[10px] text-neutral-500">
+                          <p className="mt-1.5 line-clamp-2 text-xs font-bold leading-5 text-neutral-500">
+                            {getEventPeriodLabel(row.event_start_date, row.event_end_date)}
+                          </p>
+                          {row.event_location ? (
+                            <p className="mt-1 truncate text-[10px] font-semibold text-neutral-400">
+                              {row.event_location}
+                            </p>
+                          ) : null}
+                          <p className="mt-1 truncate text-[10px] text-neutral-400">
                             /trade/{row.slug}
                           </p>
                         </div>
@@ -661,12 +648,8 @@ export default function AdminEventsPage() {
                         </span>
                       </div>
 
-                      <p className="mt-2 line-clamp-2 min-h-10 text-xs leading-5 text-neutral-500">
-                        {getEventPeriodLabel(row) || '행사 기간이 없습니다.'}
-                      </p>
-
-                      <p className="mt-1 text-[10px] font-bold text-neutral-400">
-                        {isEventEnded(row) ? '종료 · ' : ''}정렬 {row.sort_order ?? 0}
+                      <p className="mt-2 text-[10px] font-bold text-neutral-400">
+                        {statusLabel} · 정렬 {row.sort_order ?? 0}
                       </p>
 
                       <div className="mt-3 grid grid-cols-3 gap-1.5">

@@ -26,6 +26,7 @@ type TradeBuilderLabProps = {
 };
 
 const PREVIEW_WIDTH = 560;
+const TRADE_LAB_FONT_FAMILY = "'Pretendard', Arial, sans-serif";
 const ALL_WORKS_VALUE = "all";
 const ALL_CATEGORIES_VALUE = "all";
 const ALL_BENEFIT_SUBCATEGORIES_VALUE = "all";
@@ -37,6 +38,7 @@ type BenefitSubcategoryFilterValue = string;
 type QuantityTradeCard = TradeCard & {
   quantity?: number;
   registeredItemId?: string;
+  registeredSortOrder?: number;
 };
 
 type UploadedCardMetadata = {
@@ -143,24 +145,53 @@ function drawCenteredText(
 
 const canvasImageCache = new Map<string, Promise<HTMLImageElement>>();
 
+function loadImageElement(source: string, useCors: boolean) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+
+    if (useCors) {
+      image.crossOrigin = "anonymous";
+    }
+
+    image.decoding = "async";
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
+    image.src = source;
+  });
+}
+
+function isLocalCanvasImageSource(source: string) {
+  return (
+    source.startsWith("data:") ||
+    source.startsWith("blob:") ||
+    source.startsWith("/")
+  );
+}
+
+async function loadCanvasImageWithoutCache(source: string) {
+  if (isLocalCanvasImageSource(source)) {
+    return loadImageElement(source, false);
+  }
+
+  try {
+    // Supabase Storage가 CORS를 허용하면 Vercel Function을 거치지 않고 직접 사용합니다.
+    return await loadImageElement(source, true);
+  } catch {
+    // 직접 로드가 막힌 환경에서만 서버 프록시를 한 번 사용합니다.
+    return loadImageElement(
+      `/api/image-proxy?url=${encodeURIComponent(source)}`,
+      false,
+    );
+  }
+}
+
 function loadCanvasImage(source: string) {
   const cachedImage = canvasImageCache.get(source);
   if (cachedImage) return cachedImage;
 
-  const resolvedSource =
-    source.startsWith("data:") || source.startsWith("blob:")
-      ? source
-      : `/api/image-proxy?url=${encodeURIComponent(source)}`;
-
-  const imagePromise = new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.decoding = "async";
-    image.onload = () => resolve(image);
-    image.onerror = () => {
-      canvasImageCache.delete(source);
-      reject(new Error("굿즈 이미지를 불러오지 못했습니다."));
-    };
-    image.src = resolvedSource;
+  const imagePromise = loadCanvasImageWithoutCache(source).catch((error) => {
+    canvasImageCache.delete(source);
+    throw error;
   });
 
   canvasImageCache.set(source, imagePromise);
@@ -184,10 +215,29 @@ function drawContainedImage(
   context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
 }
 
+async function ensureTradeLabFontReady() {
+  if (typeof document === "undefined" || !("fonts" in document)) return;
+
+  await document.fonts.load(`900 22px ${TRADE_LAB_FONT_FAMILY}`);
+  await document.fonts.ready;
+}
+
+function getTradeDateLabel() {
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(new Date())
+    .replace(/\s/g, "");
+}
+
 async function renderBoardToPngBlob(
   board: TradeBoard,
   collectionTitle: string,
 ) {
+  await ensureTradeLabFontReady();
+
   const width = 560;
   const scale = 2000 / width;
   const sideWidth = 232;
@@ -196,9 +246,18 @@ async function renderBoardToPngBlob(
   const cardGap = 10;
   const rowGap = 18;
   const grouped = board.categoryDisplayMode !== "simple";
-  const cardsWithImages = await Promise.all(
-    board.cards.map(async (card) => ({ card, image: await loadCanvasImage(card.imageUrl) })),
-  );
+  const [cardsWithImages, sideIcons] = await Promise.all([
+    Promise.all(
+      board.cards.map(async (card) => ({
+        card,
+        image: await loadCanvasImage(card.imageUrl),
+      })),
+    ),
+    Promise.all([
+      loadCanvasImage("/trade-icons/have.png"),
+      loadCanvasImage("/trade-icons/want.png"),
+    ]),
+  ]);
 
   const getGroups = () => {
     const groups: Array<{ key: string; label: string }> = [];
@@ -222,8 +281,13 @@ async function renderBoardToPngBlob(
       : card.category;
   };
 
+  const getCardImageHeight = (card: TradeCard) =>
+    card.imageRatio === "photocard"
+      ? Math.round((cardWidth * 85) / 55)
+      : cardWidth;
+
   const cardHeight = (card: TradeCard, showMeta: boolean) =>
-    (card.imageRatio === "photocard" ? 170 : 112) + 24 + (showMeta ? 16 : 0);
+    getCardImageHeight(card) + 24 + (showMeta ? 16 : 0);
 
   const gridHeight = (cards: TradeCard[], showMeta: boolean) => {
     if (cards.length === 0) return 0;
@@ -244,14 +308,16 @@ async function renderBoardToPngBlob(
     for (const group of getGroups()) {
       const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
       const want = board.cards.filter((card) => card.side === "want" && cardGroupKey(card) === group.key);
-      contentHeight += 25 + Math.max(gridHeight(have, false), gridHeight(want, false), 112) + 24;
+      contentHeight += 33 + Math.max(gridHeight(have, false), gridHeight(want, false), cardWidth) + 24;
     }
   } else {
     const have = board.cards.filter((card) => card.side === "have");
     const want = board.cards.filter((card) => card.side === "want");
-    contentHeight += Math.max(gridHeight(have, true), gridHeight(want, true), 112) + 24;
+    contentHeight += Math.max(gridHeight(have, true), gridHeight(want, true), cardWidth) + 24;
   }
-  const height = Math.max(300, contentHeight + 24);
+  const footerHeight = 84;
+  const height = Math.max(384, contentHeight + footerHeight + 56);
+  const footerTop = height - 20 - footerHeight;
 
   const canvas = document.createElement("canvas");
   canvas.width = width * scale;
@@ -276,8 +342,7 @@ async function renderBoardToPngBlob(
   context.fill();
   context.fillRect(20, headerBottom - 26, 520, 26);
 
-  const koreanFont = "'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif";
-  const emojiFont = "'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif";
+  const koreanFont = TRADE_LAB_FONT_FAMILY;
 
   context.fillStyle = "#a3a3a3";
   context.font = `900 9px ${koreanFont}`;
@@ -285,13 +350,6 @@ async function renderBoardToPngBlob(
   context.fillStyle = "#ffffff";
   context.font = `900 22px ${koreanFont}`;
   context.fillText(collectionTitle, 40, 73);
-  const profile = [board.nickname, board.contact].filter(Boolean).join(" · ");
-  if (profile) {
-    context.fillStyle = "#d4d4d4";
-    context.font = `600 11px ${koreanFont}`;
-    context.fillText(profile, 40, 94);
-  }
-
   const conditionChips = board.memo
     .split(" · ")
     .map((value) => value.trim())
@@ -335,26 +393,31 @@ async function renderBoardToPngBlob(
     context.fill();
 
     const centerX = sideLeft[side] + sideWidth / 2;
-    const emoji = side === "have" ? "🙋" : "❤";
-    const label = side === "have" ? "있어요" : "구해요";
-    context.font = `12px ${emojiFont}`;
-    const emojiWidth = context.measureText(emoji).width;
+    const icon = side === "have" ? sideIcons[0] : sideIcons[1];
+    const label = side === "have" ? "있어요 (Have)" : "구해요 (Want)";
+    const iconSize = 14;
     context.font = `900 11px ${koreanFont}`;
     const labelWidth = context.measureText(label).width;
-    const totalWidth = emojiWidth + 5 + labelWidth;
+    const totalWidth = iconSize + 5 + labelWidth;
+    const startX = centerX - totalWidth / 2;
+    drawContainedImage(
+      context,
+      icon,
+      startX,
+      sideHeaderY + (22 - iconSize) / 2,
+      iconSize,
+      iconSize,
+    );
     context.fillStyle = "#404040";
-    context.font = `12px ${emojiFont}`;
-    context.fillText(emoji, centerX - totalWidth / 2, sideHeaderY + 15);
-    context.font = `900 11px ${koreanFont}`;
-    context.fillText(label, centerX - totalWidth / 2 + emojiWidth + 5, sideHeaderY + 15);
+    context.fillText(label, startX + iconSize + 5, sideHeaderY + 15);
   }
 
   const imageMap = new Map(cardsWithImages.map(({ card, image }) => [card.id, image]));
 
   const drawCard = (card: TradeCard, x: number, y: number, showMeta: boolean) => {
-    const imageHeight = card.imageRatio === "photocard" ? 170 : 112;
+    const imageHeight = getCardImageHeight(card);
     roundedRect(context, x, y, cardWidth, imageHeight, 12);
-    context.fillStyle = "#f5f5f5";
+    context.fillStyle = "#ffffff";
     context.fill();
     context.save();
     roundedRect(context, x, y, cardWidth, imageHeight, 12);
@@ -391,18 +454,37 @@ async function renderBoardToPngBlob(
   let y = contentStartY;
   if (grouped) {
     for (const group of getGroups()) {
-      context.fillStyle = "#171717";
+      if (y > contentStartY) {
+        context.strokeStyle = "#e5e5e5";
+        context.lineWidth = 1;
+        context.beginPath();
+        context.moveTo(36, y - 9);
+        context.lineTo(524, y - 9);
+        context.stroke();
+      }
+
       context.font = `900 10px ${koreanFont}`;
-      context.fillText(group.label, 36, y + 11);
-      const groupLabelWidth = context.measureText(group.label).width;
+      const groupLabelWidth = Math.min(context.measureText(group.label).width + 22, 180);
+      roundedRect(context, 36, y, groupLabelWidth, 22, 11);
+      context.fillStyle = "#e5e5e5";
+      context.fill();
+      drawCenteredText(
+        context,
+        group.label,
+        36 + groupLabelWidth / 2,
+        y + 15,
+        groupLabelWidth - 14,
+        `900 10px ${koreanFont}`,
+        "#404040",
+      );
       const dividerStartX = Math.min(36 + groupLabelWidth + 12, 512);
       context.strokeStyle = "#d4d4d4";
       context.lineWidth = 1;
       context.beginPath();
-      context.moveTo(dividerStartX, y + 7);
-      context.lineTo(524, y + 7);
+      context.moveTo(dividerStartX, y + 11);
+      context.lineTo(524, y + 11);
       context.stroke();
-      const gridY = y + 24;
+      const gridY = y + 32;
       const have = board.cards.filter((card) => card.side === "have" && cardGroupKey(card) === group.key);
       const want = board.cards.filter((card) => card.side === "want" && cardGroupKey(card) === group.key);
       const haveHeight = drawGrid(have, "have", gridY, false);
@@ -429,6 +511,44 @@ async function renderBoardToPngBlob(
     y += groupHeight + 24;
   }
 
+
+  roundedRect(context, 20, footerTop, 520, footerHeight, 26);
+  context.fillStyle = "#0a0a0a";
+  context.fill();
+  context.fillRect(20, footerTop, 520, 26);
+
+  const footerNickname = board.nickname.trim() || "닉네임";
+  const footerContact = board.contact.trim() || "@계정";
+  const dateLabel = getTradeDateLabel();
+
+  context.fillStyle = "#ffffff";
+  context.font = `900 12px ${koreanFont}`;
+  context.fillText(footerNickname, 40, footerTop + 24);
+  context.fillStyle = "#a3a3a3";
+  context.font = `700 10px ${koreanFont}`;
+  context.fillText(footerContact, 40, footerTop + 41);
+
+  context.textAlign = "right";
+  context.fillStyle = "#a3a3a3";
+  context.font = `700 10px ${koreanFont}`;
+  context.fillText(`${dateLabel} 기준`, 520, footerTop + 28);
+  context.textAlign = "left";
+
+  context.strokeStyle = "rgba(255,255,255,0.10)";
+  context.lineWidth = 1;
+  context.beginPath();
+  context.moveTo(40, footerTop + 50);
+  context.lineTo(520, footerTop + 50);
+  context.stroke();
+
+  context.fillStyle = "#737373";
+  context.font = `500 8px ${koreanFont}`;
+  context.fillText(
+    "업로드된 모든 이미지의 저작권은 각 플랫폼과 작가님께 있습니다.",
+    40,
+    footerTop + 66,
+  );
+  context.fillText("제작 NP @ru1ned1over", 40, footerTop + 78);
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {
@@ -584,6 +704,64 @@ function sortRegisteredItems(items: RegisteredTradeItem[]) {
 
     return a.sortOrder - b.sortOrder;
   });
+}
+
+function getTradeSideSortIndex(side: TradeSide) {
+  return side === "have" ? 0 : 1;
+}
+
+function compareTradeCards(a: TradeCard, b: TradeCard) {
+  const aCard = a as QuantityTradeCard;
+  const bCard = b as QuantityTradeCard;
+  const sideDiff =
+    getTradeSideSortIndex(a.side) - getTradeSideSortIndex(b.side);
+
+  if (sideDiff !== 0) {
+    return sideDiff;
+  }
+
+  const categoryDiff =
+    getCategorySortIndex(a.category) - getCategorySortIndex(b.category);
+
+  if (categoryDiff !== 0) {
+    return categoryDiff;
+  }
+
+  if (a.category === "benefit" && b.category === "benefit") {
+    const subcategoryDiff = getBenefitSubcategoryLabel(
+      a.benefitSubcategory,
+    ).localeCompare(getBenefitSubcategoryLabel(b.benefitSubcategory), "ko-KR", {
+      numeric: true,
+      sensitivity: "base",
+    });
+
+    if (subcategoryDiff !== 0) {
+      return subcategoryDiff;
+    }
+  }
+
+  const titleDiff = a.workTitle.localeCompare(b.workTitle, "ko-KR", {
+    numeric: true,
+    sensitivity: "base",
+  });
+
+  if (titleDiff !== 0) {
+    return titleDiff;
+  }
+
+  const sortOrderDiff =
+    (aCard.registeredSortOrder ?? Number.MAX_SAFE_INTEGER) -
+    (bCard.registeredSortOrder ?? Number.MAX_SAFE_INTEGER);
+
+  if (sortOrderDiff !== 0) {
+    return sortOrderDiff;
+  }
+
+  return a.id.localeCompare(b.id);
+}
+
+function sortTradeCards(cards: TradeCard[]) {
+  return [...cards].sort(compareTradeCards);
 }
 
 export function TradeBuilderLab({
@@ -845,20 +1023,23 @@ export function TradeBuilderLab({
       if (existingCard) {
         return {
           ...prev,
-          cards: prev.cards.map((card) =>
-            card.id === existingCard.id
-              ? {
-                  ...card,
-                  category: item.category,
-                  imageUrl: item.imageUrl,
-                  workTitle: item.workTitle,
-                  memo: item.itemName,
-                  imageRatio: getItemImageRatio(item),
-                  benefitSubcategory: item.benefitSubcategory ?? null,
-                  quantity: safeQuantity,
-                  registeredItemId: item.id,
-                }
-              : card,
+          cards: sortTradeCards(
+            prev.cards.map((card) =>
+              card.id === existingCard.id
+                ? {
+                    ...card,
+                    category: item.category,
+                    imageUrl: item.imageUrl,
+                    workTitle: item.workTitle,
+                    memo: item.itemName,
+                    imageRatio: getItemImageRatio(item),
+                    benefitSubcategory: item.benefitSubcategory ?? null,
+                    quantity: safeQuantity,
+                    registeredItemId: item.id,
+                    registeredSortOrder: item.sortOrder,
+                  }
+                : card,
+            ),
           ),
         };
       }
@@ -874,11 +1055,12 @@ export function TradeBuilderLab({
         benefitSubcategory: item.benefitSubcategory ?? null,
         quantity: safeQuantity,
         registeredItemId: item.id,
+        registeredSortOrder: item.sortOrder,
       };
 
       return {
         ...prev,
-        cards: [...prev.cards, newCard],
+        cards: sortTradeCards([...prev.cards, newCard]),
       };
     });
   }
@@ -922,21 +1104,24 @@ export function TradeBuilderLab({
             ? metadata.benefitSubcategory
             : null,
         quantity: 1,
+        registeredSortOrder: Number.MAX_SAFE_INTEGER,
       }));
 
     if (newCards.length === 0) return;
 
     setBoard((prev) => ({
       ...prev,
-      cards: [...prev.cards, ...newCards],
+      cards: sortTradeCards([...prev.cards, ...newCards]),
     }));
   }
 
   function updateCard(cardId: string, patch: Partial<QuantityTradeCard>) {
     setBoard((prev) => ({
       ...prev,
-      cards: prev.cards.map((card) =>
-        card.id === cardId ? { ...card, ...patch } : card,
+      cards: sortTradeCards(
+        prev.cards.map((card) =>
+          card.id === cardId ? { ...card, ...patch } : card,
+        ),
       ),
     }));
   }
@@ -985,7 +1170,10 @@ export function TradeBuilderLab({
   const scaledPreviewHeight = Math.ceil(previewHeight * previewScale);
 
   return (
-    <section className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
+    <section
+      className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6"
+      style={{ fontFamily: TRADE_LAB_FONT_FAMILY }}
+    >
       <div className="mx-auto flex w-full max-w-md flex-col gap-5 sm:max-w-lg">
         <div className="w-full overflow-hidden rounded-[2rem] border border-neutral-200/70 bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
           <div className="-mx-5 -mt-5 border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] px-5 pb-5 pt-5">
@@ -1015,8 +1203,8 @@ export function TradeBuilderLab({
               </p>
             ) : (
               <p className="mt-2 text-sm leading-6 text-neutral-500">
-                등록된 굿즈 이미지를 선택해 있어요 / 구해요 팝업 & 콜카 굿즈
-                교환판을 만들 수 있습니다.
+                등록된 굿즈 이미지를 선택해 있어요 (Have) / 구해요 (Want) 팝업 &
+                콜카 굿즈 교환판을 만들 수 있습니다.
               </p>
             )}
           </div>
@@ -1184,15 +1372,17 @@ export function TradeBuilderLab({
 
             <div className="mt-4 grid grid-cols-2 gap-3">
               <AddSideButton
-                title="있어요"
-                emoji="🙋🏻‍♀️"
+                koreanTitle="있어요"
+                englishTitle="Have"
+                iconSrc="/trade-icons/have.png"
                 count={haveCardCount}
                 onClick={() => openAddModal("have")}
               />
 
               <AddSideButton
-                title="구해요"
-                emoji="❤️"
+                koreanTitle="구해요"
+                englishTitle="Want"
+                iconSrc="/trade-icons/want.png"
                 count={wantCardCount}
                 onClick={() => openAddModal("want")}
               />
@@ -1325,8 +1515,9 @@ export function TradeBuilderLab({
 }
 
 type AddSideButtonProps = {
-  title: string;
-  emoji: string;
+  koreanTitle: string;
+  englishTitle: string;
+  iconSrc: string;
   count: number;
   onClick: () => void;
 };
@@ -1377,22 +1568,36 @@ function ExportPreviewModal({ imageUrl, onClose }: ExportPreviewModalProps) {
   );
 }
 
-function AddSideButton({ title, emoji, count, onClick }: AddSideButtonProps) {
+function AddSideButton({
+  koreanTitle,
+  englishTitle,
+  iconSrc,
+  count,
+  onClick,
+}: AddSideButtonProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label={`${title} 이미지 추가${count > 0 ? `, 현재 ${count}개 선택됨` : ""}`}
-      className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-left transition hover:border-neutral-950 hover:bg-white"
+      aria-label={`${koreanTitle} (${englishTitle}) 이미지 추가${count > 0 ? `, 현재 ${count}개 선택됨` : ""}`}
+      className="rounded-2xl border border-neutral-200 bg-neutral-50 px-3 py-3 text-left transition hover:border-neutral-950 hover:bg-white"
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className="text-sm" aria-hidden="true">
-            {emoji}
-          </span>
-          <span className="text-sm font-black text-neutral-950">{title}</span>
+      <div className="flex items-center gap-2">
+        <img
+          src={iconSrc}
+          alt=""
+          aria-hidden="true"
+          className="h-6 w-6 shrink-0 object-contain"
+        />
+        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-neutral-400">
+          {englishTitle}
         </span>
+      </div>
 
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <span className="whitespace-nowrap text-sm font-black text-neutral-950">
+          {koreanTitle}
+        </span>
         <span className="shrink-0 rounded-full bg-neutral-950 px-2.5 py-1 text-[10px] font-black text-white">
           + 추가
         </span>
@@ -1442,7 +1647,9 @@ function AddItemModal({
   onDecreaseItem,
   onUpload,
 }: AddItemModalProps) {
-  const sideLabel = side === "have" ? "있어요" : "구해요";
+  const sideKoreanLabel = side === "have" ? "있어요" : "구해요";
+  const sideEnglishLabel = side === "have" ? "Have" : "Want";
+  const sideLabel = `${sideKoreanLabel} (${sideEnglishLabel})`;
   const canUseBenefitSubcategoryFilter =
     (selectedCategory === ALL_CATEGORIES_VALUE ||
       selectedCategory === "benefit") &&
@@ -1484,11 +1691,11 @@ function AddItemModal({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-400">
-                Add Item
+                Add Item · {sideEnglishLabel}
               </p>
 
               <h2 className="mt-1 text-2xl font-black text-neutral-950">
-                {sideLabel} 이미지 추가
+                {sideKoreanLabel} 이미지 추가
               </h2>
             </div>
 
@@ -1853,13 +2060,13 @@ function RegisteredItemCard({
       }
     >
       <div className="w-full text-left">
-        <div className="relative border-b border-neutral-200 bg-neutral-100">
+        <div className="relative overflow-hidden border-b border-neutral-200 bg-white leading-none">
           <img
             src={item.imageUrl}
             alt={item.itemName}
             loading="lazy"
             decoding="async"
-            className={`${getImageRatioClass(imageRatio)} w-full bg-white object-contain`}
+            className={`${getImageRatioClass(imageRatio)} block w-full bg-white object-contain align-top`}
           />
 
           <QuantityBadge quantity={quantity} />
@@ -1957,10 +2164,10 @@ function CardEditor({ card, onUpdate, onRemove }: CardEditorProps) {
                 })
               }
               className="min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
-              aria-label="있어요 또는 구해요"
+              aria-label="있어요 (Have) 또는 구해요 (Want)"
             >
-              <option value="have">있어요</option>
-              <option value="want">구해요</option>
+              <option value="have">있어요 (Have)</option>
+              <option value="want">구해요 (Want)</option>
             </select>
 
             <select
