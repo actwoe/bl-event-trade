@@ -196,16 +196,33 @@ export default async function TradePage({ params }: TradePageProps) {
             </span>
           </div>
 
-          <p className="mt-2 text-[12px] font-semibold leading-5 text-neutral-500">
-            {eventPeriod}
-            {collection.location ? ` · ${collection.location}` : ''}
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-semibold text-neutral-500">
+            <svg
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+              className="h-4 w-4 shrink-0 fill-none stroke-current"
+              strokeWidth="1.8"
+            >
+              <rect x="4" y="5.5" width="16" height="14" rx="2" />
+              <path d="M8 3.5v4M16 3.5v4M4 9.5h16" />
+            </svg>
+            <span>{eventPeriod}</span>
+            {collection.location ? (
+              <>
+                <span className="text-neutral-300">|</span>
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  className="h-4 w-4 shrink-0 fill-none stroke-current"
+                  strokeWidth="1.8"
+                >
+                  <path d="M12 21s6-5.1 6-11a6 6 0 1 0-12 0c0 5.9 6 11 6 11Z" />
+                  <circle cx="12" cy="10" r="2.2" />
+                </svg>
+                <span>{collection.location}</span>
+              </>
+            ) : null}
           </p>
-
-          {collection.description ? (
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              {collection.description}
-            </p>
-          ) : null}
         </section>
 
         <TradeBuilder
