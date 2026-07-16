@@ -12,6 +12,10 @@ import {
 } from '@/lib/event-status';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
 import {
+  createBenefitSubcategoryOrderMap,
+  getBenefitSubcategorySortOrder,
+} from '@/lib/trade-benefit-subcategory-order';
+import {
   RegisteredTradeItem,
   TradeCategory,
   TradeCollectionSummary,
@@ -48,6 +52,11 @@ type TradeItemRow = {
   benefit_subcategory: string | null;
 };
 
+type TradeBenefitSubcategoryRow = {
+  name: string;
+  sort_order: number | null;
+};
+
 type TradeReferenceImageRow = {
   id: string;
   image_path: string;
@@ -74,7 +83,8 @@ const getTradePageData = unstable_cache(
     }
 
     const collectionRow = collectionData as TradeCollectionRow;
-    const [itemsResult, referencesResult] = await Promise.all([
+    const [itemsResult, referencesResult, subcategoriesResult] =
+      await Promise.all([
       supabase
         .from('trade_items')
         .select(
@@ -89,6 +99,13 @@ const getTradePageData = unstable_cache(
         .eq('collection_id', collectionRow.id)
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true }),
+      supabase
+        .from('trade_benefit_subcategories')
+        .select('name, sort_order')
+        .eq('collection_id', collectionRow.id)
+        .eq('is_visible', true)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true }),
     ]);
 
     return {
@@ -97,6 +114,8 @@ const getTradePageData = unstable_cache(
       itemError: itemsResult.error,
       referenceData: referencesResult.data,
       referenceError: referencesResult.error,
+      subcategoryData: subcategoriesResult.data,
+      subcategoryError: subcategoriesResult.error,
     };
   },
   ['trade-page-data'],
@@ -111,11 +130,25 @@ export default async function TradePage({ params }: TradePageProps) {
     notFound();
   }
 
-  const { collectionRow, itemData, itemError, referenceData, referenceError } =
-    result;
+  const {
+    collectionRow,
+    itemData,
+    itemError,
+    referenceData,
+    referenceError,
+    subcategoryData,
+    subcategoryError,
+  } = result;
 
   if (itemError) {
     console.error(itemError);
+  }
+
+  if (subcategoryError && process.env.NODE_ENV !== 'production') {
+    console.warn(
+      '특전 하위 분류 순서를 불러오지 못해 기본 순서로 표시합니다.',
+      subcategoryError.message,
+    );
   }
 
   if (referenceError && process.env.NODE_ENV !== 'production') {
@@ -135,6 +168,10 @@ export default async function TradePage({ params }: TradePageProps) {
     location: collectionRow.event_location,
   };
 
+  const benefitSubcategoryOrderMap = createBenefitSubcategoryOrderMap(
+    (subcategoryData ?? []) as TradeBenefitSubcategoryRow[],
+  );
+
   const registeredItems: RegisteredTradeItem[] = (
     (itemData ?? []) as TradeItemRow[]
   )
@@ -148,6 +185,10 @@ export default async function TradePage({ params }: TradePageProps) {
       sortOrder: item.sort_order ?? 0,
       imageRatio: getSafeImageRatio(item.image_ratio),
       benefitSubcategory: item.benefit_subcategory ?? null,
+      benefitSubcategorySortOrder: getBenefitSubcategorySortOrder(
+        benefitSubcategoryOrderMap,
+        item.benefit_subcategory,
+      ),
     }));
 
   const referenceImages: TradeReferenceImage[] = (

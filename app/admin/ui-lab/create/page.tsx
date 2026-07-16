@@ -7,6 +7,10 @@ import { UiLabBuilder } from "@/components/ui-lab/UiLabBuilder";
 import { AppBottomNav } from "@/components/ui/AppBottomNav";
 import { AppTopBar } from "@/components/ui/AppTopBar";
 import { getTradeAssetUrl, supabase } from "@/lib/supabase";
+import {
+  createBenefitSubcategoryOrderMap,
+  getBenefitSubcategorySortOrder,
+} from "@/lib/trade-benefit-subcategory-order";
 import { getEventStatus, getEventStatusLabel, getKoreaTodayDateString } from "@/lib/event-status";
 import {
   RegisteredTradeItem,
@@ -40,6 +44,11 @@ type TradeItemRow = {
   sort_order: number | null;
   image_ratio: TradeImageRatio | null;
   benefit_subcategory: string | null;
+};
+
+type TradeBenefitSubcategoryRow = {
+  name: string;
+  sort_order: number | null;
 };
 
 type TradeReferenceImageRow = {
@@ -162,7 +171,7 @@ function AdminUiLabCreatePageContent() {
         return;
       }
 
-      const [itemsResult, referencesResult] = await Promise.all([
+      const [itemsResult, referencesResult, subcategoriesResult] = await Promise.all([
         supabase
           .from("trade_items")
           .select(
@@ -177,6 +186,13 @@ function AdminUiLabCreatePageContent() {
           .eq("collection_id", selectedCollection.id)
           .order("sort_order", { ascending: true })
           .order("created_at", { ascending: true }),
+        supabase
+          .from("trade_benefit_subcategories")
+          .select("name, sort_order")
+          .eq("collection_id", selectedCollection.id)
+          .eq("is_visible", true)
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true }),
       ]);
 
       if (isCancelled) {
@@ -196,6 +212,14 @@ function AdminUiLabCreatePageContent() {
       if (referencesResult.error) {
         console.error(referencesResult.error);
       }
+
+      if (subcategoriesResult.error) {
+        console.error(subcategoriesResult.error);
+      }
+
+      const benefitSubcategoryOrderMap = createBenefitSubcategoryOrderMap(
+        (subcategoriesResult.data ?? []) as TradeBenefitSubcategoryRow[],
+      );
 
       setCollection({
         id: selectedCollection.id,
@@ -222,6 +246,10 @@ function AdminUiLabCreatePageContent() {
             sortOrder: item.sort_order ?? 0,
             imageRatio: getSafeImageRatio(item.image_ratio),
             benefitSubcategory: item.benefit_subcategory ?? null,
+            benefitSubcategorySortOrder: getBenefitSubcategorySortOrder(
+              benefitSubcategoryOrderMap,
+              item.benefit_subcategory,
+            ),
           })),
       );
 

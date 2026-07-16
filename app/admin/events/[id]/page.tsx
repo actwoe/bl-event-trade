@@ -1,9 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import {
+  ChangeEvent,
+  FormEvent,
+  PointerEvent as ReactPointerEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
+import {
+  compareBenefitSubcategoryValues,
+  createBenefitSubcategoryOrderMap,
+  getBenefitSubcategorySortOrder,
+} from '@/lib/trade-benefit-subcategory-order';
 import {
   TRADE_CATEGORIES,
   TradeCategory,
@@ -162,7 +175,10 @@ function getCategorySortIndex(category: TradeCategory) {
   return index === -1 ? TRADE_CATEGORIES.length : index;
 }
 
-function sortTradeItems(rows: TradeItemRow[]) {
+function sortTradeItems(
+  rows: TradeItemRow[],
+  benefitSubcategoryOrderMap: ReadonlyMap<string, number>,
+) {
   return [...rows].sort((a, b) => {
     const categoryDiff =
       getCategorySortIndex(a.category) - getCategorySortIndex(b.category);
@@ -172,12 +188,14 @@ function sortTradeItems(rows: TradeItemRow[]) {
     }
 
     if (a.category === 'benefit' && b.category === 'benefit') {
-      const subcategoryDiff = getBenefitSubcategoryLabel(
-        a.benefit_subcategory,
-      ).localeCompare(getBenefitSubcategoryLabel(b.benefit_subcategory), 'ko-KR', {
-        numeric: true,
-        sensitivity: 'base',
-      });
+      const leftName = getBenefitSubcategoryLabel(a.benefit_subcategory);
+      const rightName = getBenefitSubcategoryLabel(b.benefit_subcategory);
+      const subcategoryDiff = compareBenefitSubcategoryValues(
+        leftName,
+        getBenefitSubcategorySortOrder(benefitSubcategoryOrderMap, leftName),
+        rightName,
+        getBenefitSubcategorySortOrder(benefitSubcategoryOrderMap, rightName),
+      );
 
       if (subcategoryDiff !== 0) {
         return subcategoryDiff;
@@ -291,6 +309,15 @@ export default function AdminEventManagePage() {
     useState('');
   const [isDeletingBenefitSubcategoryId, setIsDeletingBenefitSubcategoryId] =
     useState('');
+  const [draggingBenefitSubcategoryId, setDraggingBenefitSubcategoryId] =
+    useState('');
+  const [isSavingBenefitSubcategoryOrder, setIsSavingBenefitSubcategoryOrder] =
+    useState(false);
+  const benefitSubcategoriesRef = useRef<TradeBenefitSubcategoryRow[]>([]);
+  const benefitSubcategoryDragStartRef = useRef<
+    TradeBenefitSubcategoryRow[]
+  >([]);
+  const benefitSubcategoryDraggingIdRef = useRef('');
   const [isSubmittingItem, setIsSubmittingItem] = useState(false);
   const [isSubmittingReferenceImages, setIsSubmittingReferenceImages] =
     useState(false);
@@ -312,6 +339,10 @@ export default function AdminEventManagePage() {
     return sortBenefitSubcategories(
       benefitSubcategories.filter((subcategory) => subcategory.is_visible),
     );
+  }, [benefitSubcategories]);
+
+  const benefitSubcategoryOrderMap = useMemo(() => {
+    return createBenefitSubcategoryOrderMap(benefitSubcategories);
   }, [benefitSubcategories]);
 
   const itemFilterWorks = useMemo(() => {
@@ -342,12 +373,14 @@ export default function AdminEventManagePage() {
     );
 
     return labels.sort((a, b) =>
-      a.localeCompare(b, 'ko-KR', {
-        numeric: true,
-        sensitivity: 'base',
-      }),
+      compareBenefitSubcategoryValues(
+        a,
+        getBenefitSubcategorySortOrder(benefitSubcategoryOrderMap, a),
+        b,
+        getBenefitSubcategorySortOrder(benefitSubcategoryOrderMap, b),
+      ),
     );
-  }, [items]);
+  }, [benefitSubcategoryOrderMap, items]);
 
   const hasUncategorizedBenefitItems = useMemo(() => {
     return items.some(
@@ -361,7 +394,7 @@ export default function AdminEventManagePage() {
     itemFilterBenefitSubcategories.length > 0 || hasUncategorizedBenefitItems;
 
   const filteredItems = useMemo(() => {
-    return sortTradeItems(items).filter((item) => {
+    return sortTradeItems(items, benefitSubcategoryOrderMap).filter((item) => {
       const matchesWork =
         itemFilterWorkTitle === 'all' || item.work_title === itemFilterWorkTitle;
       const matchesCategory =
@@ -380,10 +413,15 @@ export default function AdminEventManagePage() {
     });
   }, [
     items,
+    benefitSubcategoryOrderMap,
     itemFilterWorkTitle,
     itemFilterCategory,
     itemFilterBenefitSubcategory,
   ]);
+
+  useEffect(() => {
+    benefitSubcategoriesRef.current = benefitSubcategories;
+  }, [benefitSubcategories]);
 
   useEffect(() => {
     async function loadPageData() {
@@ -535,7 +573,7 @@ export default function AdminEventManagePage() {
       return;
     }
 
-    setItems(sortTradeItems((data ?? []) as TradeItemRow[]));
+    setItems((data ?? []) as TradeItemRow[]);
   }
 
   async function loadReferenceImages() {
@@ -924,6 +962,123 @@ export default function AdminEventManagePage() {
     } finally {
       setIsDeletingWorkId('');
     }
+  }
+
+  function moveBenefitSubcategory(activeId: string, targetId: string) {
+    if (!activeId || activeId === targetId) return;
+
+    const currentRows = benefitSubcategoriesRef.current;
+    const activeIndex = currentRows.findIndex((row) => row.id === activeId);
+    const targetIndex = currentRows.findIndex((row) => row.id === targetId);
+
+    if (activeIndex === -1 || targetIndex === -1) return;
+
+    const nextRows = [...currentRows];
+    const [movedRow] = nextRows.splice(activeIndex, 1);
+    nextRows.splice(targetIndex, 0, movedRow);
+
+    benefitSubcategoriesRef.current = nextRows;
+    setBenefitSubcategories(nextRows);
+  }
+
+  function handleBenefitSubcategoryPointerDown(
+    event: ReactPointerEvent<HTMLButtonElement>,
+    subcategoryId: string,
+  ) {
+    if (isSavingBenefitSubcategoryOrder) return;
+
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    benefitSubcategoryDragStartRef.current = [
+      ...benefitSubcategoriesRef.current,
+    ];
+    benefitSubcategoryDraggingIdRef.current = subcategoryId;
+    setDraggingBenefitSubcategoryId(subcategoryId);
+  }
+
+  function handleBenefitSubcategoryPointerMove(
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    const activeId = benefitSubcategoryDraggingIdRef.current;
+    if (!activeId) return;
+
+    event.preventDefault();
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>('[data-benefit-subcategory-id]');
+    const targetId = target?.dataset.benefitSubcategoryId ?? '';
+
+    if (targetId) {
+      moveBenefitSubcategory(activeId, targetId);
+    }
+  }
+
+  async function saveBenefitSubcategoryOrder() {
+    const previousRows = benefitSubcategoryDragStartRef.current;
+    const currentRows = benefitSubcategoriesRef.current;
+    benefitSubcategoryDraggingIdRef.current = '';
+    setDraggingBenefitSubcategoryId('');
+
+    if (
+      previousRows.length === currentRows.length &&
+      previousRows.every((row, index) => row.id === currentRows[index]?.id)
+    ) {
+      benefitSubcategoryDragStartRef.current = [];
+      return;
+    }
+
+    const normalizedRows = currentRows.map((row, index) => ({
+      ...row,
+      sort_order: index,
+    }));
+
+    benefitSubcategoriesRef.current = normalizedRows;
+    setBenefitSubcategories(normalizedRows);
+
+    try {
+      setIsSavingBenefitSubcategoryOrder(true);
+      setMessage('');
+
+      const updateResults = await Promise.all(
+        normalizedRows.map((row, index) =>
+          supabase
+            .from('trade_benefit_subcategories')
+            .update({ sort_order: index })
+            .eq('id', row.id),
+        ),
+      );
+      const failedResult = updateResults.find((result) => result.error);
+
+      if (failedResult?.error) {
+        console.error(failedResult.error);
+        await loadBenefitSubcategories();
+        setMessage('특전 하위 분류 순서 저장에 실패했습니다.');
+        return;
+      }
+
+      setMessage('특전 하위 분류 순서가 저장되었습니다.');
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      await loadBenefitSubcategories();
+      setMessage('특전 하위 분류 순서 저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSavingBenefitSubcategoryOrder(false);
+      benefitSubcategoryDragStartRef.current = [];
+    }
+  }
+
+  function cancelBenefitSubcategoryDrag() {
+    const previousRows = benefitSubcategoryDragStartRef.current;
+
+    if (previousRows.length > 0) {
+      benefitSubcategoriesRef.current = previousRows;
+      setBenefitSubcategories(previousRows);
+    }
+
+    benefitSubcategoryDragStartRef.current = [];
+    benefitSubcategoryDraggingIdRef.current = '';
+    setDraggingBenefitSubcategoryId('');
   }
 
   async function handleAddBenefitSubcategory(event: FormEvent<HTMLFormElement>) {
@@ -2012,6 +2167,17 @@ export default function AdminEventManagePage() {
 
               {benefitSubcategories.length > 0 ? (
                 <div className="mt-5 space-y-2">
+                  <div className="flex items-center justify-between gap-3 px-1 pb-1">
+                    <p className="text-[11px] font-bold text-neutral-500">
+                      왼쪽 핸들을 누른 채 드래그해 표시 순서를 바꿔 주세요.
+                    </p>
+                    {isSavingBenefitSubcategoryOrder ? (
+                      <span className="shrink-0 text-[10px] font-black text-[#7C5CFC]">
+                        순서 저장 중...
+                      </span>
+                    ) : null}
+                  </div>
+
                   {benefitSubcategories.map((subcategory) => {
                     const isEditing =
                       editingBenefitSubcategoryId === subcategory.id;
@@ -2023,7 +2189,12 @@ export default function AdminEventManagePage() {
                     return (
                       <div
                         key={subcategory.id}
-                        className="rounded-2xl border border-neutral-200 bg-neutral-50 p-3"
+                        data-benefit-subcategory-id={subcategory.id}
+                        className={`rounded-2xl border p-3 transition ${
+                          draggingBenefitSubcategoryId === subcategory.id
+                            ? 'border-[#7C5CFC] bg-[#F7F5FF] shadow-sm'
+                            : 'border-neutral-200 bg-neutral-50'
+                        }`}
                       >
                         {isEditing ? (
                           <div className="space-y-3">
@@ -2089,7 +2260,38 @@ export default function AdminEventManagePage() {
                           </div>
                         ) : (
                           <div className="flex items-center justify-between gap-3">
-                            <div className="min-w-0">
+                            <button
+                              type="button"
+                              aria-label={`${subcategory.name} 순서 이동`}
+                              disabled={isSavingBenefitSubcategoryOrder}
+                              onPointerDown={(event) =>
+                                handleBenefitSubcategoryPointerDown(
+                                  event,
+                                  subcategory.id,
+                                )
+                              }
+                              onPointerMove={handleBenefitSubcategoryPointerMove}
+                              onPointerUp={() =>
+                                void saveBenefitSubcategoryOrder()
+                              }
+                              onPointerCancel={cancelBenefitSubcategoryDrag}
+                              className="grid h-10 w-9 shrink-0 touch-none cursor-grab place-items-center rounded-xl border border-neutral-200 bg-white text-neutral-400 active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+                            >
+                              <svg
+                                viewBox="0 0 24 24"
+                                aria-hidden="true"
+                                className="h-5 w-5 fill-current"
+                              >
+                                <circle cx="8" cy="6" r="1.4" />
+                                <circle cx="16" cy="6" r="1.4" />
+                                <circle cx="8" cy="12" r="1.4" />
+                                <circle cx="16" cy="12" r="1.4" />
+                                <circle cx="8" cy="18" r="1.4" />
+                                <circle cx="16" cy="18" r="1.4" />
+                              </svg>
+                            </button>
+
+                            <div className="min-w-0 flex-1">
                               <p className="line-clamp-1 text-sm font-black text-neutral-950">
                                 {subcategory.name}
                               </p>

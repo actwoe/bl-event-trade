@@ -9,6 +9,7 @@ import {
 } from '@/components/ui-lab/UiLabApp';
 import { getKoreaTodayDateString } from '@/lib/event-status';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
+import { normalizeBenefitSubcategoryName } from '@/lib/trade-benefit-subcategory-order';
 import type {
   RegisteredTradeItem,
   TradeCategory,
@@ -25,6 +26,12 @@ type CollectionRow = {
   event_start_date: string | null;
   event_end_date: string | null;
   event_location: string | null;
+  sort_order: number | null;
+};
+
+type BenefitSubcategoryRow = {
+  collection_id: string;
+  name: string;
   sort_order: number | null;
 };
 
@@ -75,7 +82,7 @@ export default function AdminUiLabPage() {
 
       if (!cancelled) setAdminState('admin');
 
-      const [collectionsResult, itemsResult] = await Promise.all([
+      const [collectionsResult, itemsResult, subcategoriesResult] = await Promise.all([
         supabase
           .from('trade_collections')
           .select('id, slug, title, thumbnail_path, event_start_date, event_end_date, event_location, sort_order')
@@ -85,6 +92,12 @@ export default function AdminUiLabPage() {
           .select('id, collection_id, category, work_title, item_name, image_path, sort_order, image_ratio, benefit_subcategory')
           .eq('is_visible', true)
           .order('sort_order', { ascending: true }),
+        supabase
+          .from('trade_benefit_subcategories')
+          .select('collection_id, name, sort_order')
+          .eq('is_visible', true)
+          .order('sort_order', { ascending: true })
+          .order('name', { ascending: true }),
       ]);
 
       if (cancelled) return;
@@ -99,6 +112,20 @@ export default function AdminUiLabPage() {
         console.error(itemsResult.error);
         setMessage('굿즈 목록을 불러오지 못했습니다.');
         return;
+      }
+
+      if (subcategoriesResult.error) {
+        console.error(subcategoriesResult.error);
+      }
+
+      const subcategoryOrderMap = new Map<string, number>();
+      for (const row of (subcategoriesResult.data ?? []) as BenefitSubcategoryRow[]) {
+        const name = normalizeBenefitSubcategoryName(row.name);
+        if (!name) continue;
+        subcategoryOrderMap.set(
+          `${row.collection_id}::${name}`,
+          row.sort_order ?? Number.MAX_SAFE_INTEGER,
+        );
       }
 
       const nextCollections = ((collectionsResult.data ?? []) as CollectionRow[]).map(
@@ -126,6 +153,9 @@ export default function AdminUiLabPage() {
           sortOrder: row.sort_order ?? 0,
           imageRatio: getSafeRatio(row.image_ratio),
           benefitSubcategory: row.benefit_subcategory,
+          benefitSubcategorySortOrder: subcategoryOrderMap.get(
+            `${row.collection_id}::${normalizeBenefitSubcategoryName(row.benefit_subcategory)}`,
+          ) ?? null,
         };
         nextItems[row.collection_id] = [...(nextItems[row.collection_id] ?? []), item];
       }

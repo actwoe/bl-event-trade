@@ -1,7 +1,18 @@
-import { TradeCard, TradeSide } from "@/lib/trade-types";
+import {
+  TRADE_CATEGORIES,
+  TradeCard,
+  TradeCategory,
+  TradeSide,
+} from "@/lib/trade-types";
+import { normalizeBenefitSubcategorySortOrder } from "@/lib/trade-benefit-subcategory-order";
 
 function getTradeSideSortIndex(side: TradeSide) {
   return side === "have" ? 0 : 1;
+}
+
+function getTradeCategorySortIndex(category: TradeCategory) {
+  const index = TRADE_CATEGORIES.findIndex((option) => option.id === category);
+  return index === -1 ? TRADE_CATEGORIES.length : index;
 }
 
 export function getTradeCardGroupKey(card: TradeCard) {
@@ -14,28 +25,91 @@ export function getTradeCardGroupKey(card: TradeCard) {
   return `category:${card.category}`;
 }
 
+type TradeCardGroupOrder = {
+  key: string;
+  category: TradeCategory;
+  benefitSubcategory: string;
+  benefitSubcategorySortOrder: number;
+  firstIndex: number;
+};
+
+function createSharedGroupOrder(cards: TradeCard[]) {
+  const groups = new Map<string, TradeCardGroupOrder>();
+
+  cards.forEach((card, index) => {
+    const key = getTradeCardGroupKey(card);
+    const existing = groups.get(key);
+    const benefitSubcategory = card.benefitSubcategory?.trim() ?? "";
+    const benefitSubcategorySortOrder = benefitSubcategory
+      ? normalizeBenefitSubcategorySortOrder(
+          card.benefitSubcategorySortOrder,
+        )
+      : -1;
+
+    if (!existing) {
+      groups.set(key, {
+        key,
+        category: card.category,
+        benefitSubcategory,
+        benefitSubcategorySortOrder,
+        firstIndex: index,
+      });
+      return;
+    }
+
+    if (
+      card.category === "benefit" &&
+      benefitSubcategorySortOrder < existing.benefitSubcategorySortOrder
+    ) {
+      existing.benefitSubcategorySortOrder = benefitSubcategorySortOrder;
+    }
+  });
+
+  return [...groups.values()]
+    .sort((left, right) => {
+      const categoryDiff =
+        getTradeCategorySortIndex(left.category) -
+        getTradeCategorySortIndex(right.category);
+      if (categoryDiff !== 0) return categoryDiff;
+
+      if (left.category === "benefit" && right.category === "benefit") {
+        const subcategoryOrderDiff =
+          left.benefitSubcategorySortOrder -
+          right.benefitSubcategorySortOrder;
+        if (subcategoryOrderDiff !== 0) return subcategoryOrderDiff;
+
+        if (
+          left.benefitSubcategorySortOrder !== Number.MAX_SAFE_INTEGER &&
+          right.benefitSubcategorySortOrder !== Number.MAX_SAFE_INTEGER
+        ) {
+          const labelDiff = left.benefitSubcategory.localeCompare(
+            right.benefitSubcategory,
+            "ko-KR",
+            { numeric: true, sensitivity: "base" },
+          );
+          if (labelDiff !== 0) return labelDiff;
+        }
+      }
+
+      return left.firstIndex - right.firstIndex;
+    })
+    .reduce((orderMap, group, index) => {
+      orderMap.set(group.key, index);
+      return orderMap;
+    }, new Map<string, number>());
+}
+
 /**
  * 있어요와 구해요가 같은 특전 종류 순서를 공유하도록 정렬합니다.
  *
- * 1. 있어요에서 처음 등장한 특전 종류 순서를 기준으로 삼습니다.
- * 2. 구해요에만 존재하는 특전 종류는 그 뒤에 처음 등장한 순서대로 붙입니다.
+ * 1. 행사 관리에서 지정한 특전 하위 분류 순서를 우선합니다.
+ * 2. 순서가 없는 직접 업로드 그룹은 사용자가 처음 선택한 순서를 유지합니다.
  * 3. 각 특전 종류 안에서는 사용자가 선택한 순서를 유지합니다.
  * 4. 최종 목록에서는 있어요를 먼저, 구해요를 뒤에 배치합니다.
  */
 export function sortTradeCardsBySideAndGroup(cards: TradeCard[]) {
   const indexedCards = cards.map((card, index) => ({ card, index }));
-  const sharedGroupOrder = new Map<string, number>();
-
-  for (const side of ["have", "want"] as const) {
-    for (const { card } of indexedCards) {
-      if (card.side !== side) continue;
-
-      const groupKey = getTradeCardGroupKey(card);
-      if (!sharedGroupOrder.has(groupKey)) {
-        sharedGroupOrder.set(groupKey, sharedGroupOrder.size);
-      }
-    }
-  }
+  const sharedGroupOrder = createSharedGroupOrder(cards);
 
   return indexedCards
     .sort((a, b) => {

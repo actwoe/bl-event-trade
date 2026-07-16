@@ -28,6 +28,7 @@ export type TradeCard = {
   memo: string;
   imageRatio?: TradeImageRatio | null;
   benefitSubcategory?: string | null;
+  benefitSubcategorySortOrder?: number | null;
 };
 
 export type TradeBoard = {
@@ -48,6 +49,7 @@ export type RegisteredTradeItem = {
   benefitType?: string | null;
   imageRatio?: TradeImageRatio | null;
   benefitSubcategory?: string | null;
+  benefitSubcategorySortOrder?: number | null;
 };
 
 export type TradeReferenceImage = {

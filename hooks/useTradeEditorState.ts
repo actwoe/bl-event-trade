@@ -19,6 +19,10 @@ import {
   sortRegisteredItems,
 } from "@/lib/trade-editor-display";
 import type { UploadedCardMetadata } from "@/components/trade-editor/AddItemModal";
+import {
+  compareBenefitSubcategoryValues,
+  normalizeBenefitSubcategorySortOrder,
+} from "@/lib/trade-benefit-subcategory-order";
 import type {
   RegisteredTradeItem,
   TradeBoard,
@@ -62,14 +66,40 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
     return sortKoreanTitles(Array.from(new Set(titles)));
   }, [registeredItems]);
 
-  const benefitSubcategoryOptions = useMemo(() => {
-    const subcategories = registeredItems
-      .filter((item) => item.category === "benefit")
-      .map((item) => getBenefitSubcategoryLabel(item.benefitSubcategory))
-      .filter((subcategory) => subcategory.length > 0);
+  const benefitSubcategoryOrderMap = useMemo(() => {
+    const orderMap = new Map<string, number>();
 
-    return sortKoreanTitles(Array.from(new Set(subcategories)));
+    for (const item of registeredItems) {
+      if (item.category !== "benefit") continue;
+
+      const subcategory = getBenefitSubcategoryLabel(item.benefitSubcategory);
+      if (!subcategory) continue;
+
+      const sortOrder = normalizeBenefitSubcategorySortOrder(
+        item.benefitSubcategorySortOrder,
+      );
+      const currentOrder = orderMap.get(subcategory);
+
+      if (currentOrder === undefined || sortOrder < currentOrder) {
+        orderMap.set(subcategory, sortOrder);
+      }
+    }
+
+    return orderMap;
   }, [registeredItems]);
+
+  const benefitSubcategoryOptions = useMemo(() => {
+    return [...benefitSubcategoryOrderMap.entries()]
+      .sort(([leftName, leftOrder], [rightName, rightOrder]) =>
+        compareBenefitSubcategoryValues(
+          leftName,
+          leftOrder,
+          rightName,
+          rightOrder,
+        ),
+      )
+      .map(([subcategory]) => subcategory);
+  }, [benefitSubcategoryOrderMap]);
 
   const hasBenefitItemsWithoutSubcategory = useMemo(() => {
     return registeredItems.some(
@@ -233,6 +263,8 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
                     memo: item.itemName,
                     imageRatio: getItemImageRatio(item),
                     benefitSubcategory: item.benefitSubcategory ?? null,
+                    benefitSubcategorySortOrder:
+                      item.benefitSubcategorySortOrder ?? null,
                     quantity: safeQuantity,
                     registeredItemId: item.id,
                     registeredSortOrder: item.sortOrder,
@@ -252,6 +284,8 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
         memo: item.itemName,
         imageRatio: getItemImageRatio(item),
         benefitSubcategory: item.benefitSubcategory ?? null,
+        benefitSubcategorySortOrder:
+          item.benefitSubcategorySortOrder ?? null,
         quantity: safeQuantity,
         registeredItemId: item.id,
         registeredSortOrder: item.sortOrder,
@@ -307,6 +341,12 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
         benefitSubcategory:
           metadata.category === "benefit"
             ? metadata.benefitSubcategory
+            : null,
+        benefitSubcategorySortOrder:
+          metadata.category === "benefit" && metadata.benefitSubcategory
+            ? (benefitSubcategoryOrderMap.get(
+                metadata.benefitSubcategory.trim(),
+              ) ?? null)
             : null,
         quantity: 1,
         registeredSortOrder: Number.MAX_SAFE_INTEGER,

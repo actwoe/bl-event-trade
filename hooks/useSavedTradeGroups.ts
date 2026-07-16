@@ -97,6 +97,8 @@ function restoreSavedTradeGroupBoard(
         imageRatio: savedCard.imageRatio,
         benefitSubcategory:
           savedCard.benefitSubcategory ?? item.benefitSubcategory ?? null,
+        benefitSubcategorySortOrder:
+          item.benefitSubcategorySortOrder ?? null,
         quantity: savedCard.quantity,
         registeredItemId: item.id,
       },

@@ -5,6 +5,9 @@ import {
   TradeCategory,
   TradeImageRatio,
 } from "@/lib/trade-types";
+import {
+  compareBenefitSubcategoryValues,
+} from "@/lib/trade-benefit-subcategory-order";
 
 export function sortKoreanTitles(titles: string[]) {
   return [...titles].sort((a, b) =>
@@ -55,10 +58,11 @@ export function sortRegisteredItems(items: RegisteredTradeItem[]) {
     if (categoryDiff !== 0) return categoryDiff;
 
     if (a.category === "benefit" && b.category === "benefit") {
-      const subcategoryDiff = getBenefitSubcategoryLabel(a.benefitSubcategory).localeCompare(
+      const subcategoryDiff = compareBenefitSubcategoryValues(
+        getBenefitSubcategoryLabel(a.benefitSubcategory),
+        a.benefitSubcategorySortOrder,
         getBenefitSubcategoryLabel(b.benefitSubcategory),
-        "ko-KR",
-        { numeric: true, sensitivity: "base" },
+        b.benefitSubcategorySortOrder,
       );
       if (subcategoryDiff !== 0) return subcategoryDiff;
     }
