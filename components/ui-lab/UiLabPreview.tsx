@@ -13,8 +13,6 @@ import {
 type UiLabPreviewProps = {
   board: TradeBoard;
   collectionTitle: string;
-  eventStartDate?: string | null;
-  eventEndDate?: string | null;
   responsive?: boolean;
 };
 
@@ -25,20 +23,6 @@ type CardGroup = {
   label: string;
   cards: TradeCard[];
 };
-
-function formatEventPeriod(start?: string | null, end?: string | null) {
-  const format = (value?: string | null) => {
-    if (!value) return "";
-    const [year, month, day] = value.split("-");
-    if (!year || !month || !day) return value;
-    return `${year}.${month}.${day}`;
-  };
-
-  const startLabel = format(start);
-  const endLabel = format(end);
-  if (startLabel && endLabel) return `${startLabel} ~ ${endLabel}`;
-  return startLabel || endLabel;
-}
 
 function getMemoChips(memo: string) {
   return memo
@@ -86,7 +70,7 @@ function getCardGroups(cards: TradeCard[]): CardGroup[] {
 
 export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
   function UiLabPreview(
-    { board, collectionTitle, eventStartDate, eventEndDate, responsive = false },
+    { board, collectionTitle, responsive = false },
     ref,
   ) {
     const hasCards = board.cards.length > 0;

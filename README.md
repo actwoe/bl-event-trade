@@ -7,8 +7,9 @@
 - `app/page.tsx`: 공개 행사 목록
 - `components/home/EventCollectionBrowser.tsx`: 행사 상태 필터와 6개 단위 더보기
 - `app/trade/[slug]/page.tsx`: 행사별 교환판 데이터 로드
-- `components/trade/`: 실제 사용자 교환판
-- `components/trade-lab/`: 관리자 테스트 교환판
+- `components/trade-editor/`: 일반 사용자와 관리자 테스트가 함께 사용하는 공통 교환판 편집기
+- `components/trade/`: 교환판 카드·미리보기 보조 UI
+- `app/admin/trade-lab/page.tsx`: 실제 공통 편집기를 사용하는 관리자 교환판 테스트
 - `app/api/image-proxy/route.ts`: 브라우저 직접 이미지 로드가 실패했을 때만 사용하는 제한적 fallback
 
 ## 무료 사용량 절약 원칙
@@ -36,4 +37,4 @@ npm run lint
 2. 메인에서 전체·예정·진행중·종료 필터와 더보기를 확인합니다.
 3. PC와 모바일에서 PNG 저장을 확인합니다.
 4. 브라우저 Network 탭에서 대부분의 Supabase 이미지가 직접 로드되고, `/api/image-proxy`는 fallback일 때만 호출되는지 확인합니다.
-5. 테스트 Lab 변경을 실제 교환판에 옮길 때는 `components/trade-lab/`과 `components/trade/`를 별도로 비교합니다.
+5. 관리자 교환판 테스트와 실제 교환판이 동일한 `TradeEditor`를 사용하는지 확인합니다.

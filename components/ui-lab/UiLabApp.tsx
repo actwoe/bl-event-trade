@@ -9,10 +9,6 @@ import {
   getEventStatus,
   type EventFilter,
 } from '@/lib/event-status';
-import type {
-  RegisteredTradeItem,
-  TradeCategory,
-} from '@/lib/trade-types';
 
 export type UiLabCollection = {
   id: string;
@@ -25,13 +21,9 @@ export type UiLabCollection = {
   sortOrder: number;
 };
 
-export type UiLabCollectionItems = Record<string, RegisteredTradeItem[]>;
-
-type PreviewMode = 'grouped' | 'simple';
 
 type UiLabAppProps = {
   collections: UiLabCollection[];
-  itemsByCollection: UiLabCollectionItems;
   today: string;
 };
 
@@ -41,14 +33,6 @@ const FILTERS: Array<{ id: EventFilter; label: string }> = [
   { id: 'ongoing', label: '진행중' },
   { id: 'ended', label: '종료' },
 ];
-
-const CATEGORY_LABELS: Record<TradeCategory, string> = {
-  benefit: '특전',
-  deco_photo_pack: '데코 포토팩',
-  sweets_acrylic_magnet: '스위츠 아크릴 마그넷',
-  heart_can_badge: '하트 캔뱃지',
-  collection_photo_card: '컬렉션 포토카드',
-};
 
 function Icon({ name }: { name: AppBottomNavItem | 'back' | 'share' | 'user' }) {
   if (name === 'home') {
@@ -105,61 +89,13 @@ function Icon({ name }: { name: AppBottomNavItem | 'back' | 'share' | 'user' }) 
   );
 }
 
-function formatDateLabel(value: string | null) {
-  if (!value) return '';
-  const [year, month, day] = value.split('-');
-  if (!year || !month || !day) return value;
-  return `${year}.${month}.${day}`;
-}
-
 function getStatusLabel(status: ReturnType<typeof getEventStatus>) {
   if (status === 'scheduled') return '예정';
   if (status === 'ended') return '종료';
   return '진행중';
 }
 
-function getGroupLabel(item: RegisteredTradeItem) {
-  if (item.category === 'benefit' && item.benefitSubcategory?.trim()) {
-    return item.benefitSubcategory.trim();
-  }
-  return CATEGORY_LABELS[item.category];
-}
-
-function splitItems(items: RegisteredTradeItem[]) {
-  const sorted = [...items].sort((a, b) => {
-    const groupDiff = getGroupLabel(a).localeCompare(getGroupLabel(b), 'ko-KR', {
-      numeric: true,
-      sensitivity: 'base',
-    });
-    if (groupDiff !== 0) return groupDiff;
-    const titleDiff = a.workTitle.localeCompare(b.workTitle, 'ko-KR', {
-      numeric: true,
-      sensitivity: 'base',
-    });
-    if (titleDiff !== 0) return titleDiff;
-    return a.sortOrder - b.sortOrder;
-  });
-
-  const have = sorted.filter((_, index) => index % 2 === 0).slice(0, 8);
-  const want = sorted.filter((_, index) => index % 2 === 1).slice(0, 8);
-
-  if (want.length === 0 && have.length > 1) {
-    return { have: have.slice(0, Math.ceil(have.length / 2)), want: have.slice(Math.ceil(have.length / 2)) };
-  }
-
-  return { have, want };
-}
-
-function groupItems(items: RegisteredTradeItem[]) {
-  const groups = new Map<string, RegisteredTradeItem[]>();
-  for (const item of items) {
-    const label = getGroupLabel(item);
-    groups.set(label, [...(groups.get(label) ?? []), item]);
-  }
-  return Array.from(groups, ([label, cards]) => ({ label, cards })).slice(0, 2);
-}
-
-export function UiLabApp({ collections, itemsByCollection: _itemsByCollection, today }: UiLabAppProps) {
+export function UiLabApp({ collections, today }: UiLabAppProps) {
   const [filter, setFilter] = useState<EventFilter>('all');
 
   const filteredCollections = useMemo(() => {
@@ -289,201 +225,6 @@ function HomeScreen({
       </main>
 
       <BottomNav active="home" />
-    </div>
-  );
-}
-
-function TradeScreen({
-  collection,
-  today,
-  haveItems,
-  wantItems,
-  previewMode,
-  onModeChange,
-  onBack,
-}: {
-  collection: UiLabCollection;
-  today: string;
-  haveItems: RegisteredTradeItem[];
-  wantItems: RegisteredTradeItem[];
-  previewMode: PreviewMode;
-  onModeChange: (mode: PreviewMode) => void;
-  onBack: () => void;
-}) {
-  const status = getEventStatus(collection.eventStartDate, collection.eventEndDate, today);
-  const todayLabel = formatDateLabel(today);
-
-  return (
-    <div className="flex h-full min-h-0 flex-col bg-[#fafafa]">
-      <header className="bg-white px-4 pb-4 pt-4">
-        <div className="grid grid-cols-[40px_1fr_40px] items-center">
-          <button type="button" onClick={onBack} className="flex h-10 w-10 items-center justify-center" aria-label="뒤로가기">
-            <Icon name="back" />
-          </button>
-          <h1 className="text-center text-sm font-black">교환판 미리보기</h1>
-          <button type="button" className="flex h-10 w-10 items-center justify-center" aria-label="공유">
-            <Icon name="share" />
-          </button>
-        </div>
-
-        <div className="mt-3">
-          <span className="rounded-full bg-[#F3F0FF] px-2.5 py-1 text-[10px] font-black text-[#7C5CFC]">{getStatusLabel(status)}</span>
-          <h2 className="mt-2 break-keep text-[22px] font-black leading-tight tracking-[-0.025em]">{collection.title}</h2>
-          <p className="mt-2 text-[11px] font-semibold text-neutral-500">{getEventPeriodLabel(collection.eventStartDate, collection.eventEndDate)}{collection.location ? ` · ${collection.location}` : ''}</p>
-        </div>
-
-        <div className="mt-4 flex gap-2 rounded-full bg-neutral-100 p-1">
-          <button
-            type="button"
-            onClick={() => onModeChange('grouped')}
-            className={previewMode === 'grouped' ? 'flex-1 rounded-full bg-white px-3 py-2 text-[11px] font-black shadow-sm' : 'flex-1 rounded-full px-3 py-2 text-[11px] font-bold text-neutral-500'}
-          >
-            특전 구분
-          </button>
-          <button
-            type="button"
-            onClick={() => onModeChange('simple')}
-            className={previewMode === 'simple' ? 'flex-1 rounded-full bg-white px-3 py-2 text-[11px] font-black shadow-sm' : 'flex-1 rounded-full px-3 py-2 text-[11px] font-bold text-neutral-500'}
-          >
-            구분 없이
-          </button>
-        </div>
-      </header>
-
-      <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6 pt-2">
-        <div className="overflow-hidden rounded-[24px] border border-neutral-200 bg-neutral-950 shadow-[0_18px_38px_rgba(15,23,42,0.15)]">
-          <div className="px-5 py-4 text-white">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1 text-left">
-                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-white/45">Trade Board</p>
-                <h3 className="mt-1 break-keep text-[20px] font-black leading-tight">{collection.title}</h3>
-              </div>
-
-              <div className="flex max-w-[165px] shrink-0 flex-wrap justify-end gap-1.5 pt-1">
-                <span className="rounded-full bg-white px-2.5 py-1.5 text-[8px] font-black leading-none text-neutral-950">동일 작품 우선</span>
-                <span className="rounded-full bg-white px-2.5 py-1.5 text-[8px] font-black leading-none text-neutral-950">하자 확인</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-t-[20px] bg-white px-3 pb-7 pt-3">
-
-            {previewMode === 'grouped' ? (
-              <GroupedPreview haveItems={haveItems} wantItems={wantItems} />
-            ) : (
-              <SimplePreview haveItems={haveItems} wantItems={wantItems} />
-            )}
-          </div>
-
-          <div className="px-4 py-3 text-white">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-[11px] font-black">ru1ned1over</p>
-                <p className="truncate text-[9px] text-white/60">@ru1ned1over</p>
-              </div>
-              <p className="shrink-0 text-[9px] font-semibold text-white/70">{todayLabel} 기준</p>
-            </div>
-            <div className="mt-3 border-t border-white/10 pt-3 text-center text-[8px] leading-4 text-white/55">
-              <p>업로드된 모든 이미지의 저작권은 각 플랫폼과 작가님께 있습니다.</p>
-              <p>제작 NP @ru1ned1over</p>
-            </div>
-          </div>
-        </div>
-
-        <Link
-          href={`/admin/ui-lab/create?collection=${encodeURIComponent(collection.id)}`}
-          className="mt-4 flex w-full items-center justify-center rounded-2xl bg-neutral-950 px-5 py-3.5 text-sm font-black text-white"
-        >
-          이 행사로 교환판 만들기
-        </Link>
-        <p className="mt-2 text-center text-[10px] font-semibold leading-4 text-neutral-400">
-          다음 화면에서는 실제 굿즈 선택·업로드·수량 변경·PNG 저장이 동작합니다.
-        </p>
-      </main>
-
-      <BottomNav active="home" />
-    </div>
-  );
-}
-
-function GroupedPreview({ haveItems, wantItems }: { haveItems: RegisteredTradeItem[]; wantItems: RegisteredTradeItem[] }) {
-  const haveGroups = groupItems(haveItems);
-  const wantGroups = groupItems(wantItems);
-  const labels = Array.from(new Set([...haveGroups.map((group) => group.label), ...wantGroups.map((group) => group.label)])).slice(0, 2);
-  const visibleLabels = labels.length > 0 ? labels : ['굿즈'];
-
-  return (
-    <div className="mt-4">
-      <div className="grid grid-cols-2 pb-3">
-        <h4 className="px-2 text-center text-[12px] font-black text-[#7C5CFC]">있어요 (Have)</h4>
-        <h4 className="px-2 text-center text-[12px] font-black text-[#7C5CFC]">구해요 (Want)</h4>
-      </div>
-
-      <div className="space-y-4">
-        {visibleLabels.map((label) => {
-          const haveCards = haveGroups.find((group) => group.label === label)?.cards ?? [];
-          const wantCards = wantGroups.find((group) => group.label === label)?.cards ?? [];
-          const fallbackHave = label === '굿즈' ? haveItems.slice(0, 4) : haveCards;
-          const fallbackWant = label === '굿즈' ? wantItems.slice(0, 4) : wantCards;
-
-          return (
-            <section key={label} className="border-t border-neutral-200 pt-4 first:border-t-0 first:pt-0">
-              <div className="mb-3 flex justify-center">
-                <h5 className="rounded-full bg-neutral-100 px-3 py-1.5 text-[9px] font-black text-neutral-700">{label}</h5>
-              </div>
-              <div className="grid grid-cols-2">
-                <div className="grid grid-cols-2 gap-1.5 pr-2">
-                  {fallbackHave.slice(0, 4).map((item) => (
-                    <MiniItem key={item.id} item={item} />
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-1.5 border-l border-dashed border-neutral-300 pl-2">
-                  {fallbackWant.slice(0, 4).map((item) => (
-                    <MiniItem key={item.id} item={item} />
-                  ))}
-                </div>
-              </div>
-            </section>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function SimplePreview({ haveItems, wantItems }: { haveItems: RegisteredTradeItem[]; wantItems: RegisteredTradeItem[] }) {
-  return (
-    <div className="mt-4 space-y-4">
-      <SimpleSection title="있어요 (Have)" items={haveItems} />
-      <div className="border-t border-neutral-200" />
-      <SimpleSection title="구해요 (Want)" items={wantItems} />
-    </div>
-  );
-}
-
-function SimpleSection({ title, items }: { title: string; items: RegisteredTradeItem[] }) {
-  return (
-    <section>
-      <h4 className="text-center text-[12px] font-black text-[#7C5CFC]">{title}</h4>
-      <div className="mt-2 grid grid-cols-4 gap-2">
-        {items.slice(0, 8).map((item) => (
-          <MiniItem key={item.id} item={item} showCategory />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function MiniItem({ item, showCategory = false }: { item: RegisteredTradeItem; showCategory?: boolean }) {
-  return (
-    <div className="min-w-0 text-center">
-      <div className="aspect-square overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
-        <img src={item.imageUrl} alt="" className="block h-full w-full object-contain" />
-      </div>
-      <p className="mt-1 line-clamp-2 text-[7px] font-bold leading-3 text-neutral-700">{showCategory ? item.workTitle : item.itemName || item.workTitle}</p>
-      {showCategory ? (
-        <p className="mt-0.5 truncate text-[6.5px] font-semibold leading-3 text-neutral-400">{getGroupLabel(item)}</p>
-      ) : null}
     </div>
   );
 }

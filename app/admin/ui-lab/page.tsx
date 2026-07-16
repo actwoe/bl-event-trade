@@ -2,19 +2,9 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import {
-  UiLabApp,
-  type UiLabCollection,
-  type UiLabCollectionItems,
-} from '@/components/ui-lab/UiLabApp';
+import { UiLabApp, type UiLabCollection } from '@/components/ui-lab/UiLabApp';
 import { getKoreaTodayDateString } from '@/lib/event-status';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
-import { normalizeBenefitSubcategoryName } from '@/lib/trade-benefit-subcategory-order';
-import type {
-  RegisteredTradeItem,
-  TradeCategory,
-  TradeImageRatio,
-} from '@/lib/trade-types';
 
 type AdminState = 'checking' | 'admin' | 'not-admin' | 'signed-out';
 
@@ -29,32 +19,9 @@ type CollectionRow = {
   sort_order: number | null;
 };
 
-type BenefitSubcategoryRow = {
-  collection_id: string;
-  name: string;
-  sort_order: number | null;
-};
-
-type ItemRow = {
-  id: string;
-  collection_id: string;
-  category: TradeCategory;
-  work_title: string;
-  item_name: string | null;
-  image_path: string;
-  sort_order: number | null;
-  image_ratio: TradeImageRatio | null;
-  benefit_subcategory: string | null;
-};
-
-function getSafeRatio(value: TradeImageRatio | null): TradeImageRatio {
-  return value === 'photocard' ? 'photocard' : 'square';
-}
-
 export default function AdminUiLabPage() {
   const [adminState, setAdminState] = useState<AdminState>('checking');
   const [collections, setCollections] = useState<UiLabCollection[]>([]);
-  const [itemsByCollection, setItemsByCollection] = useState<UiLabCollectionItems>({});
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -82,53 +49,20 @@ export default function AdminUiLabPage() {
 
       if (!cancelled) setAdminState('admin');
 
-      const [collectionsResult, itemsResult, subcategoriesResult] = await Promise.all([
-        supabase
-          .from('trade_collections')
-          .select('id, slug, title, thumbnail_path, event_start_date, event_end_date, event_location, sort_order')
-          .order('sort_order', { ascending: true }),
-        supabase
-          .from('trade_items')
-          .select('id, collection_id, category, work_title, item_name, image_path, sort_order, image_ratio, benefit_subcategory')
-          .eq('is_visible', true)
-          .order('sort_order', { ascending: true }),
-        supabase
-          .from('trade_benefit_subcategories')
-          .select('collection_id, name, sort_order')
-          .eq('is_visible', true)
-          .order('sort_order', { ascending: true })
-          .order('name', { ascending: true }),
-      ]);
+      const { data, error } = await supabase
+        .from('trade_collections')
+        .select('id, slug, title, thumbnail_path, event_start_date, event_end_date, event_location, sort_order')
+        .order('sort_order', { ascending: true });
 
       if (cancelled) return;
 
-      if (collectionsResult.error) {
-        console.error(collectionsResult.error);
+      if (error) {
+        console.error(error);
         setMessage('행사 목록을 불러오지 못했습니다.');
         return;
       }
 
-      if (itemsResult.error) {
-        console.error(itemsResult.error);
-        setMessage('굿즈 목록을 불러오지 못했습니다.');
-        return;
-      }
-
-      if (subcategoriesResult.error) {
-        console.error(subcategoriesResult.error);
-      }
-
-      const subcategoryOrderMap = new Map<string, number>();
-      for (const row of (subcategoriesResult.data ?? []) as BenefitSubcategoryRow[]) {
-        const name = normalizeBenefitSubcategoryName(row.name);
-        if (!name) continue;
-        subcategoryOrderMap.set(
-          `${row.collection_id}::${name}`,
-          row.sort_order ?? Number.MAX_SAFE_INTEGER,
-        );
-      }
-
-      const nextCollections = ((collectionsResult.data ?? []) as CollectionRow[]).map(
+      const nextCollections = ((data ?? []) as CollectionRow[]).map(
         (row): UiLabCollection => ({
           id: row.id,
           slug: row.slug,
@@ -141,27 +75,7 @@ export default function AdminUiLabPage() {
         }),
       );
 
-      const nextItems: UiLabCollectionItems = {};
-      for (const row of (itemsResult.data ?? []) as ItemRow[]) {
-        if (!row.image_path) continue;
-        const item: RegisteredTradeItem = {
-          id: row.id,
-          category: row.category,
-          workTitle: row.work_title,
-          itemName: row.item_name ?? '',
-          imageUrl: getTradeAssetUrl(row.image_path),
-          sortOrder: row.sort_order ?? 0,
-          imageRatio: getSafeRatio(row.image_ratio),
-          benefitSubcategory: row.benefit_subcategory,
-          benefitSubcategorySortOrder: subcategoryOrderMap.get(
-            `${row.collection_id}::${normalizeBenefitSubcategoryName(row.benefit_subcategory)}`,
-          ) ?? null,
-        };
-        nextItems[row.collection_id] = [...(nextItems[row.collection_id] ?? []), item];
-      }
-
       setCollections(nextCollections);
-      setItemsByCollection(nextItems);
     }
 
     load();
@@ -193,7 +107,6 @@ export default function AdminUiLabPage() {
   return (
     <UiLabApp
       collections={collections}
-      itemsByCollection={itemsByCollection}
       today={getKoreaTodayDateString()}
     />
   );

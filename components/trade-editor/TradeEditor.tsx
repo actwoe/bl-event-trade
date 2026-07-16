@@ -393,8 +393,6 @@ export function TradeEditorView({
               responsive
               board={board}
               collectionTitle={collection.title}
-              eventStartDate={collection.eventStartDate}
-              eventEndDate={collection.eventEndDate}
             />
           </div>
 
