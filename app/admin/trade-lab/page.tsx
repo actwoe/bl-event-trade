@@ -230,7 +230,7 @@ export default function AdminTradeLabPage() {
 
   if (adminState === 'checking') {
     return (
-      <main className="w-full bg-[#fafafa] px-5 py-4">
+      <main className="w-full bg-white px-5 py-4">
         <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-500">
           관리자 권한을 확인하는 중입니다.
         </section>
@@ -240,7 +240,7 @@ export default function AdminTradeLabPage() {
 
   if (adminState === 'signed-out') {
     return (
-      <main className="w-full bg-[#fafafa] px-5 py-4">
+      <main className="w-full bg-white px-5 py-4">
         <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
           <h1 className="text-lg font-black text-neutral-950">
             로그인이 필요합니다
@@ -261,7 +261,7 @@ export default function AdminTradeLabPage() {
 
   if (adminState === 'not-admin') {
     return (
-      <main className="w-full bg-[#fafafa] px-5 py-4">
+      <main className="w-full bg-white px-5 py-4">
         <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
           <h1 className="text-lg font-black text-neutral-950">
             관리자 권한이 없습니다
@@ -275,7 +275,7 @@ export default function AdminTradeLabPage() {
   }
 
   return (
-    <main className="w-full bg-[#fafafa]">
+    <main className="w-full bg-white">
       <section className="border-b border-neutral-100 bg-white px-5 py-4">
         <p className="text-[12px] font-black tracking-[0.04em] text-[#7C5CFC]">
           ADMIN TRADE LAB
@@ -288,7 +288,7 @@ export default function AdminTradeLabPage() {
         </p>
       </section>
 
-      <div className="space-y-4 px-5 py-4">
+      <div className="space-y-3 bg-white px-5 pb-5 pt-3">
         <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
           <label className="block">
             <span className="text-sm font-black text-neutral-950">
@@ -309,13 +309,13 @@ export default function AdminTradeLabPage() {
           </label>
 
           {message ? (
-            <p className="mt-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-6 text-neutral-600">
+            <p className="mt-3 rounded-xl bg-white px-3 py-3 text-sm leading-6 text-neutral-600 ring-1 ring-neutral-200">
               {message}
             </p>
           ) : null}
 
           {!message && collections.length === 0 ? (
-            <p className="mt-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-6 text-neutral-600">
+            <p className="mt-3 rounded-xl bg-white px-3 py-3 text-sm leading-6 text-neutral-600 ring-1 ring-neutral-200">
               등록된 행사가 없습니다.
             </p>
           ) : null}

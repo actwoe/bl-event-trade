@@ -313,7 +313,7 @@ export default function AdminEventsPage() {
 
   if (adminState === 'checking') {
     return (
-      <main className="w-full bg-[#fafafa] px-5 py-4">
+      <main className="w-full bg-white px-5 py-4">
         <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-500">
           관리자 권한을 확인하는 중입니다.
         </section>
@@ -323,7 +323,7 @@ export default function AdminEventsPage() {
 
   if (adminState === 'signed-out') {
     return (
-      <main className="w-full bg-[#fafafa] px-5 py-4">
+      <main className="w-full bg-white px-5 py-4">
         <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
           <h1 className="text-lg font-black text-neutral-950">
             로그인이 필요합니다
@@ -344,7 +344,7 @@ export default function AdminEventsPage() {
 
   if (adminState === 'not-admin') {
     return (
-      <main className="w-full bg-[#fafafa] px-5 py-4">
+      <main className="w-full bg-white px-5 py-4">
         <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
           <h1 className="text-lg font-black text-neutral-950">
             관리자 권한이 없습니다
@@ -365,7 +365,7 @@ export default function AdminEventsPage() {
   }
 
   return (
-    <main className="w-full bg-[#fafafa]">
+    <main className="w-full bg-white">
       <section className="border-b border-neutral-100 bg-white px-5 py-4">
         <p className="text-[12px] font-black tracking-[0.04em] text-[#7C5CFC]">
           EVENT MANAGEMENT
@@ -378,9 +378,9 @@ export default function AdminEventsPage() {
         </p>
       </section>
 
-      <div className="space-y-4 px-5 py-4">
+      <div className="space-y-3 bg-white px-5 pb-5 pt-3">
         {message ? (
-          <p className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-6 text-neutral-600">
+          <p className="rounded-xl bg-neutral-50 px-3 py-3 text-sm leading-6 text-neutral-600">
             {message}
           </p>
         ) : null}
@@ -523,7 +523,7 @@ export default function AdminEventsPage() {
             <button
               type="submit"
               disabled={isSubmittingEvent}
-              className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+              className="w-full rounded-xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
             >
               {isSubmittingEvent ? '등록 중...' : '행사 등록'}
             </button>

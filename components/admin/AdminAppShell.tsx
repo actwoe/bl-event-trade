@@ -76,11 +76,15 @@ export function AdminAppShell({ children }: AdminAppShellProps) {
         accountLabel="로그아웃"
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#fafafa]">
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${
+          usesProductionPageDesign ? "bg-white" : "bg-[#fafafa]"
+        }`}
+      >
         <div
           className={
             usesProductionPageDesign
-              ? "min-h-full bg-[#fafafa]"
+              ? "min-h-full bg-white"
               : "admin-app-content min-h-full"
           }
         >
