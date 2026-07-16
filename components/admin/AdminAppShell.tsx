@@ -55,6 +55,10 @@ export function AdminAppShell({ children }: AdminAppShellProps) {
 
   const route = getAdminRouteMeta(pathname);
   const isLoginPage = pathname === "/admin/login";
+  const usesProductionPageDesign =
+    pathname === "/admin/events" ||
+    pathname === "/admin/events/new" ||
+    pathname.startsWith("/admin/trade-lab");
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -73,7 +77,15 @@ export function AdminAppShell({ children }: AdminAppShellProps) {
       />
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#fafafa]">
-        <div className="admin-app-content min-h-full">{children}</div>
+        <div
+          className={
+            usesProductionPageDesign
+              ? "min-h-full bg-[#fafafa]"
+              : "admin-app-content min-h-full"
+          }
+        >
+          {children}
+        </div>
       </div>
 
       <AdminBottomNav active={route.active} />

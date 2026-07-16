@@ -313,8 +313,8 @@ export default function AdminEventsPage() {
 
   if (adminState === 'checking') {
     return (
-      <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 text-sm text-neutral-500 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+      <main className="w-full bg-[#fafafa] px-5 py-4">
+        <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-500">
           관리자 권한을 확인하는 중입니다.
         </section>
       </main>
@@ -323,19 +323,17 @@ export default function AdminEventsPage() {
 
   if (adminState === 'signed-out') {
     return (
-      <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
-          <h1 className="text-2xl font-black text-neutral-950">
+      <main className="w-full bg-[#fafafa] px-5 py-4">
+        <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+          <h1 className="text-lg font-black text-neutral-950">
             로그인이 필요합니다
           </h1>
-
           <p className="mt-2 text-sm leading-6 text-neutral-500">
             행사 관리는 관리자 로그인 후 이용할 수 있습니다.
           </p>
-
           <Link
             href="/admin/login"
-            className="mt-6 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white"
+            className="mt-5 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white"
           >
             관리자 로그인
           </Link>
@@ -346,20 +344,18 @@ export default function AdminEventsPage() {
 
   if (adminState === 'not-admin') {
     return (
-      <main className="min-h-screen bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-3xl border border-neutral-200 bg-white p-6 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
-          <h1 className="text-2xl font-black text-neutral-950">
+      <main className="w-full bg-[#fafafa] px-5 py-4">
+        <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+          <h1 className="text-lg font-black text-neutral-950">
             관리자 권한이 없습니다
           </h1>
-
           <p className="mt-2 text-sm leading-6 text-neutral-500">
             현재 로그인한 계정은 관리자 목록에 등록되어 있지 않습니다.
           </p>
-
           <button
             type="button"
             onClick={handleLogout}
-            className="mt-6 rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white"
+            className="mt-5 rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white"
           >
             로그아웃
           </button>
@@ -369,158 +365,141 @@ export default function AdminEventsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-100 px-4 py-5">
-      <section className="mx-auto w-full max-w-md sm:max-w-lg">
-        <div className="overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-          <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] p-5">
-            <div className="mb-6 flex items-center justify-between gap-3">
-              <Link
-                href="/"
-                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
-              >
-                ← 메인으로
-              </Link>
+    <main className="w-full bg-[#fafafa]">
+      <section className="border-b border-neutral-100 bg-white px-5 py-4">
+        <p className="text-[12px] font-black tracking-[0.04em] text-[#7C5CFC]">
+          EVENT MANAGEMENT
+        </p>
+        <h1 className="mt-1 break-keep text-[24px] font-black leading-tight tracking-[-0.03em] text-neutral-950">
+          행사 관리
+        </h1>
+        <p className="mt-2 text-[13px] font-medium leading-5 text-neutral-500">
+          교환판 행사를 등록하고 행사별 작품과 굿즈를 관리합니다.
+        </p>
+      </section>
 
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
-              >
-                로그아웃
-              </button>
-            </div>
-
-          <div className="mt-6">
-            <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
-              Popup & Callabo Cafe Trade Board
-            </p>
-
-            <h1 className="mt-1 text-2xl font-black text-neutral-950">
-              행사 관리
-            </h1>
-
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              팝업 & 콜카 굿즈 교환판 행사를 등록하고, 각 행사별 작품·특전·굿즈를 관리합니다.
-            </p>
-          </div>
-          </header>
-
-          {message ? (
-            <p className="mx-5 mt-5 rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-700">
+      <div className="space-y-4 px-5 py-4">
+        {message ? (
+          <p className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-6 text-neutral-600">
             {message}
           </p>
         ) : null}
 
         <form
           onSubmit={handleCreateEvent}
-          className="p-5"
+          className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4"
         >
-          <h2 className="text-lg font-black text-neutral-950">행사 등록</h2>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-black text-neutral-950">
+                새 행사 등록
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-neutral-400">
+                메인 화면과 교환판에 노출할 행사를 등록합니다.
+              </p>
+            </div>
+            <Link
+              href="/admin/events/new"
+              className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-neutral-500 ring-1 ring-neutral-200"
+            >
+              전체 화면
+            </Link>
+          </div>
 
-          <div className="mt-5 space-y-5">
+          <div className="mt-4 space-y-4">
             <label className="block">
-              <span className="text-sm font-bold text-neutral-800">행사 제목</span>
-
+              <span className="text-xs font-black text-neutral-500">행사 제목</span>
               <input
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
                 placeholder="예: 2026 여름 팝업 & 콜카 굿즈 교환판"
               />
             </label>
 
             <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="text-sm font-bold text-neutral-800">시작일</span>
-
+              <label className="block min-w-0">
+                <span className="text-xs font-black text-neutral-500">시작일</span>
                 <input
                   type="date"
                   value={eventStartDate}
                   onChange={(event) => setEventStartDate(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                  className="mt-1 w-full min-w-0 rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#7C5CFC]"
                 />
               </label>
 
-              <label className="block">
-                <span className="text-sm font-bold text-neutral-800">종료일</span>
-
+              <label className="block min-w-0">
+                <span className="text-xs font-black text-neutral-500">종료일</span>
                 <input
                   type="date"
                   value={eventEndDate}
                   onChange={(event) => setEventEndDate(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                  className="mt-1 w-full min-w-0 rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#7C5CFC]"
                 />
               </label>
             </div>
 
             <label className="block">
-              <span className="text-sm font-bold text-neutral-800">행사 장소</span>
+              <span className="text-xs font-black text-neutral-500">행사 장소</span>
               <input
                 value={eventLocation}
                 onChange={(event) => setEventLocation(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
                 placeholder="예: 서울 · 더현대 서울 5F / 온라인"
               />
             </label>
 
             <label className="block">
-              <span className="text-sm font-bold text-neutral-800">Slug</span>
-
+              <span className="text-xs font-black text-neutral-500">Slug</span>
               <input
                 value={slug}
                 onChange={(event) => setSlug(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
                 placeholder="예: summer-event-2026"
               />
-
               <p className="mt-2 text-xs leading-5 text-neutral-400">
                 실제 주소는 /trade/{normalizedSlug || 'slug'} 형태입니다.
               </p>
             </label>
 
             <label className="block">
-              <span className="text-sm font-bold text-neutral-800">
-                정렬 순서
-              </span>
-
+              <span className="text-xs font-black text-neutral-500">정렬 순서</span>
               <input
                 type="number"
                 value={sortOrder}
                 onChange={(event) => setSortOrder(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
                 placeholder="0"
               />
             </label>
 
-            <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
+            <label className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3">
               <span>
-                <span className="block text-sm font-bold text-neutral-800">
+                <span className="block text-sm font-black text-neutral-950">
                   공개 여부
                 </span>
-                <span className="mt-1 block text-xs text-neutral-500">
-                  공개 상태여야 메인 페이지와 팝업 & 콜카 굿즈 교환판 목록에 노출됩니다.
+                <span className="mt-1 block text-xs leading-5 text-neutral-400">
+                  공개 상태여야 메인 페이지에 노출됩니다.
                 </span>
               </span>
-
               <input
                 type="checkbox"
                 checked={isPublic}
                 onChange={(event) => setIsPublic(event.target.checked)}
-                className="h-5 w-5"
+                className="h-5 w-5 accent-[#7C5CFC]"
               />
             </label>
 
             <div>
-              <span className="text-sm font-bold text-neutral-800">
+              <span className="text-xs font-black text-neutral-500">
                 행사 썸네일
               </span>
-
-              <label className="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-8 text-center hover:border-neutral-950">
+              <label className="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white px-4 py-7 text-center transition hover:border-[#7C5CFC]">
                 {thumbnailPreviewUrl ? (
                   <img
                     src={thumbnailPreviewUrl}
                     alt="썸네일 미리보기"
-                    className="aspect-[32/45] w-44 rounded-2xl object-cover shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
+                    className="aspect-[32/45] w-40 rounded-xl object-cover"
                   />
                 ) : (
                   <>
@@ -532,7 +511,6 @@ export default function AdminEventsPage() {
                     </span>
                   </>
                 )}
-
                 <input
                   type="file"
                   accept="image/*"
@@ -551,46 +529,42 @@ export default function AdminEventsPage() {
             </button>
           </div>
         </form>
-        </div>
 
-        <section className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-[0_18px_48px_rgba(15,23,42,0.06)]">
+        <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-lg font-black text-neutral-950">행사 목록</h2>
-              <p className="mt-1 text-xs text-neutral-400">
-                총 {events.length}개
-              </p>
+              <h2 className="text-sm font-black text-neutral-950">행사 목록</h2>
+              <p className="mt-1 text-xs text-neutral-400">총 {events.length}개</p>
             </div>
-
             <button
               type="button"
               onClick={loadEvents}
               disabled={isLoadingEvents}
-              className="rounded-full border border-neutral-200 px-4 py-2 text-xs font-black text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-neutral-500 ring-1 ring-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLoadingEvents ? '불러오는 중' : '새로고침'}
             </button>
           </div>
 
           {events.length > 0 ? (
-            <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="mt-4 grid grid-cols-2 gap-3">
               {events.map((row) => {
                 const thumbnailUrl = getTradeAssetUrl(row.thumbnail_path ?? '');
                 const isDeleting = isDeletingEventId === row.id;
                 const status = getEventStatus(
-                    row.event_start_date,
-                    row.event_end_date,
-                    getKoreaTodayDateString(),
-                  );
+                  row.event_start_date,
+                  row.event_end_date,
+                  getKoreaTodayDateString(),
+                );
                 const ended = status === 'ended';
                 const statusLabel = getEventStatusLabel(status);
 
                 return (
                   <article
                     key={row.id}
-                    className="overflow-hidden rounded-2xl border border-neutral-200 bg-neutral-50"
+                    className="min-w-0 overflow-hidden rounded-2xl border border-neutral-200 bg-white"
                   >
-                    <Link href={`/admin/events/${row.id}`} className="block bg-white">
+                    <Link href={`/admin/events/${row.id}`} className="block">
                       <div className="relative aspect-[32/45] w-full overflow-hidden bg-white">
                         {thumbnailUrl ? (
                           <img
@@ -603,13 +577,12 @@ export default function AdminEventsPage() {
                             NO IMG
                           </div>
                         )}
-
                         <span
                           className={`absolute left-2 top-2 rounded-full px-2.5 py-1 text-[10px] font-black ${
                             status === 'ended'
                               ? 'bg-neutral-950 text-white'
                               : status === 'scheduled'
-                                ? 'bg-violet-100 text-violet-700'
+                                ? 'bg-[#F1EDFF] text-[#7C5CFC]'
                                 : 'bg-emerald-100 text-emerald-700'
                           }`}
                         >
@@ -632,25 +605,17 @@ export default function AdminEventsPage() {
                               {row.event_location}
                             </p>
                           ) : null}
-                          <p className="mt-1 truncate text-[10px] text-neutral-400">
-                            /trade/{row.slug}
-                          </p>
                         </div>
-
                         <span
                           className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${
                             row.is_public
-                              ? 'bg-green-50 text-green-700'
-                              : 'bg-neutral-200 text-neutral-500'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-neutral-100 text-neutral-500'
                           }`}
                         >
                           {row.is_public ? '공개' : '숨김'}
                         </span>
                       </div>
-
-                      <p className="mt-2 text-[10px] font-bold text-neutral-400">
-                        {statusLabel} · 정렬 {row.sort_order ?? 0}
-                      </p>
 
                       <div className="mt-3 grid grid-cols-3 gap-1.5">
                         <Link
@@ -659,14 +624,12 @@ export default function AdminEventsPage() {
                         >
                           관리
                         </Link>
-
                         <Link
                           href={`/trade/${row.slug}`}
                           className="rounded-xl border border-neutral-200 bg-white px-2 py-2 text-center text-[11px] font-black text-neutral-600"
                         >
                           보기
                         </Link>
-
                         <button
                           type="button"
                           onClick={() => handleDeleteEvent(row)}
@@ -682,12 +645,12 @@ export default function AdminEventsPage() {
               })}
             </div>
           ) : (
-            <p className="mt-5 rounded-2xl bg-neutral-50 px-4 py-8 text-center text-sm text-neutral-400">
+            <p className="mt-4 rounded-2xl border border-neutral-200 bg-white px-4 py-8 text-center text-sm text-neutral-400">
               아직 등록된 행사가 없습니다.
             </p>
           )}
         </section>
-      </section>
+      </div>
     </main>
   );
 }

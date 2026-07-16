@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { TradeBuilderLab } from '@/components/trade-lab/TradeBuilderLab';
+import { TradeBuilder } from '@/components/trade/TradeBuilder';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
 import {
   RegisteredTradeItem,
@@ -19,6 +19,9 @@ type TradeCollectionRow = {
   slug: string;
   title: string;
   description: string | null;
+  event_start_date: string | null;
+  event_end_date: string | null;
+  event_location: string | null;
   is_public: boolean;
   sort_order: number | null;
   created_at: string | null;
@@ -101,7 +104,7 @@ export default function AdminTradeLabPage() {
       const { data, error } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, is_public, sort_order, created_at',
+          'id, slug, title, description, event_start_date, event_end_date, event_location, is_public, sort_order, created_at',
         )
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
@@ -185,6 +188,9 @@ export default function AdminTradeLabPage() {
         slug: selectedCollection.slug,
         title: selectedCollection.title,
         description: selectedCollection.description,
+        eventStartDate: selectedCollection.event_start_date,
+        eventEndDate: selectedCollection.event_end_date,
+        location: selectedCollection.event_location,
       });
 
       setRegisteredItems(
@@ -224,8 +230,8 @@ export default function AdminTradeLabPage() {
 
   if (adminState === 'checking') {
     return (
-      <main className="w-full bg-neutral-100 px-4 py-5 sm:py-6">
-        <section className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-5 text-sm text-neutral-500 shadow-[0_8px_26px_rgba(15,23,42,0.032)] sm:max-w-lg">
+      <main className="w-full bg-[#fafafa] px-5 py-4">
+        <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-500">
           관리자 권한을 확인하는 중입니다.
         </section>
       </main>
@@ -234,9 +240,9 @@ export default function AdminTradeLabPage() {
 
   if (adminState === 'signed-out') {
     return (
-      <main className="w-full bg-neutral-100 px-4 py-5 sm:py-6">
-        <section className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.032)] sm:max-w-lg">
-          <h1 className="text-2xl font-bold text-neutral-950">
+      <main className="w-full bg-[#fafafa] px-5 py-4">
+        <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+          <h1 className="text-lg font-black text-neutral-950">
             로그인이 필요합니다
           </h1>
           <p className="mt-2 text-sm leading-6 text-neutral-500">
@@ -244,7 +250,7 @@ export default function AdminTradeLabPage() {
           </p>
           <Link
             href="/admin/login"
-            className="mt-6 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-bold text-white"
+            className="mt-5 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white"
           >
             관리자 로그인
           </Link>
@@ -255,9 +261,9 @@ export default function AdminTradeLabPage() {
 
   if (adminState === 'not-admin') {
     return (
-      <main className="w-full bg-neutral-100 px-4 py-5 sm:py-6">
-        <section className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-5 shadow-[0_8px_26px_rgba(15,23,42,0.032)] sm:max-w-lg">
-          <h1 className="text-2xl font-bold text-neutral-950">
+      <main className="w-full bg-[#fafafa] px-5 py-4">
+        <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+          <h1 className="text-lg font-black text-neutral-950">
             관리자 권한이 없습니다
           </h1>
           <p className="mt-2 text-sm leading-6 text-neutral-500">
@@ -269,79 +275,71 @@ export default function AdminTradeLabPage() {
   }
 
   return (
-    <main className="w-full bg-neutral-100 pb-5 sm:pb-6">
-      <section className="px-4 pt-5 sm:pt-6">
-        <div className="mx-auto max-w-md overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)] sm:max-w-lg">
-          <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] p-5">
-            <Link
-              href="/admin"
-              className="inline-flex rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
-            >
-              ← 관리자 홈
-            </Link>
-
-            <p className="mt-6 text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">
-              Trade Lab
-            </p>
-            <h1 className="mt-1 text-2xl font-bold text-neutral-950">
-              교환판 테스트 페이지
-            </h1>
-            <p className="mt-2 text-sm leading-6 text-neutral-500">
-              실제 서비스와 분리된 관리자 전용 실험 화면입니다.
-            </p>
-          </header>
-
-          <div className="p-5">
-            <label className="block">
-              <span className="text-sm font-bold text-neutral-800">
-                테스트할 행사
-              </span>
-              <select
-                value={selectedCollectionId}
-                onChange={(event) =>
-                  setSelectedCollectionId(event.target.value)
-                }
-                className="mt-2 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
-              >
-                {collections.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.title}
-                    {item.is_public ? '' : ' · 비공개'}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            {message ? (
-              <p className="mt-4 rounded-2xl bg-neutral-100 px-4 py-3 text-sm leading-6 text-neutral-700">
-                {message}
-              </p>
-            ) : null}
-
-            {!message && collections.length === 0 ? (
-              <p className="mt-4 rounded-2xl bg-neutral-100 px-4 py-3 text-sm leading-6 text-neutral-700">
-                등록된 행사가 없습니다.
-              </p>
-            ) : null}
-          </div>
-        </div>
+    <main className="w-full bg-[#fafafa]">
+      <section className="border-b border-neutral-100 bg-white px-5 py-4">
+        <p className="text-[12px] font-black tracking-[0.04em] text-[#7C5CFC]">
+          ADMIN TRADE LAB
+        </p>
+        <h1 className="mt-1 break-keep text-[24px] font-black leading-tight tracking-[-0.03em] text-neutral-950">
+          교환판 테스트
+        </h1>
+        <p className="mt-2 text-[13px] font-medium leading-5 text-neutral-500">
+          실제 운영 교환판과 동일한 편집기에서 행사별 굿즈를 테스트합니다.
+        </p>
       </section>
 
-      {isLoadingCollection ? (
-        <section className="px-4 pt-5">
-          <div className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-5 text-sm text-neutral-500 shadow-[0_8px_26px_rgba(15,23,42,0.032)] sm:max-w-lg">
-            행사와 굿즈 데이터를 불러오는 중입니다.
-          </div>
+      <div className="space-y-4 px-5 py-4">
+        <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+          <label className="block">
+            <span className="text-sm font-black text-neutral-950">
+              테스트할 행사
+            </span>
+            <select
+              value={selectedCollectionId}
+              onChange={(event) => setSelectedCollectionId(event.target.value)}
+              className="mt-3 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
+            >
+              {collections.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title}
+                  {item.is_public ? '' : ' · 비공개'}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {message ? (
+            <p className="mt-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-6 text-neutral-600">
+              {message}
+            </p>
+          ) : null}
+
+          {!message && collections.length === 0 ? (
+            <p className="mt-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-6 text-neutral-600">
+              등록된 행사가 없습니다.
+            </p>
+          ) : null}
         </section>
+      </div>
+
+      {isLoadingCollection ? (
+        <div className="px-5 pb-4">
+          <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-500">
+            행사와 굿즈 데이터를 불러오는 중입니다.
+          </section>
+        </div>
       ) : null}
 
       {!isLoadingCollection && collection ? (
-        <TradeBuilderLab
-          key={collection.id}
-          collection={collection}
-          registeredItems={registeredItems}
-          referenceImages={referenceImages}
-        />
+        <div className="border-t border-neutral-100 bg-white">
+          <TradeBuilder
+            key={collection.id}
+            collection={collection}
+            registeredItems={registeredItems}
+            referenceImages={referenceImages}
+            embedded
+          />
+        </div>
       ) : null}
     </main>
   );

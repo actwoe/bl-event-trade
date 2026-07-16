@@ -192,8 +192,8 @@ export default function AdminEventNewPage() {
 
   if (adminState === "checking") {
     return (
-      <main className="w-full bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-6 text-sm text-neutral-500 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
+      <main className="w-full bg-[#fafafa] px-5 py-4">
+        <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-500">
           관리자 권한을 확인하는 중입니다.
         </section>
       </main>
@@ -202,15 +202,15 @@ export default function AdminEventNewPage() {
 
   if (adminState === "signed-out") {
     return (
-      <main className="w-full bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-6 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-          <h1 className="text-2xl font-bold text-neutral-950">로그인이 필요합니다</h1>
+      <main className="w-full bg-[#fafafa] px-5 py-4">
+        <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+          <h1 className="text-lg font-black text-neutral-950">로그인이 필요합니다</h1>
           <p className="mt-2 text-sm leading-6 text-neutral-500">
             행사 등록은 관리자 로그인 후 이용할 수 있습니다.
           </p>
           <Link
             href="/admin/login"
-            className="mt-6 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-bold text-white"
+            className="mt-5 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white"
           >
             관리자 로그인
           </Link>
@@ -221,16 +221,16 @@ export default function AdminEventNewPage() {
 
   if (adminState === "not-admin") {
     return (
-      <main className="w-full bg-neutral-100 px-4 py-10">
-        <section className="mx-auto max-w-md rounded-[28px] border border-neutral-200/70 bg-white p-6 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-          <h1 className="text-2xl font-bold text-neutral-950">관리자 권한이 없습니다</h1>
+      <main className="w-full bg-[#fafafa] px-5 py-4">
+        <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+          <h1 className="text-lg font-black text-neutral-950">관리자 권한이 없습니다</h1>
           <p className="mt-2 text-sm leading-6 text-neutral-500">
             현재 로그인한 계정은 관리자 목록에 등록되어 있지 않습니다.
           </p>
           <button
             type="button"
             onClick={handleLogout}
-            className="mt-6 rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-bold text-white"
+            className="mt-5 rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white"
           >
             로그아웃
           </button>
@@ -240,174 +240,158 @@ export default function AdminEventNewPage() {
   }
 
   return (
-    <main className="w-full bg-neutral-100 px-4 pb-4 pt-5 sm:pb-5 sm:pt-6">
-      <section className="mx-auto w-full max-w-md sm:max-w-lg">
-        <div className="overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-          <header className="border-b border-neutral-200/70 bg-[linear-gradient(135deg,#efe7ff_0%,#d8efff_48%,#ffe1f2_100%)] p-5">
-            <div className="mb-6 flex items-center justify-between gap-3">
-              <Link
-                href="/admin/events"
-                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
-              >
-                ← 행사 목록
-              </Link>
-
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="rounded-full border border-white/70 bg-white/75 px-4 py-2 text-xs font-bold text-neutral-600 shadow-[0_4px_12px_rgba(15,23,42,0.025)] transition hover:border-white hover:bg-white hover:text-neutral-950"
-              >
-                로그아웃
-              </button>
-            </div>
-
-            <div className="mt-6">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-500">
-                Popup & Callabo Cafe Trade Board
-              </p>
-              <h1 className="mt-1 text-2xl font-bold text-neutral-950">행사 등록</h1>
-              <p className="mt-2 text-sm leading-6 text-neutral-500">
-                팝업 & 콜라보 카페 굿즈 교환판에 노출할 새 행사를 등록합니다.
-              </p>
-            </div>
-          </header>
-
-          {message ? (
-            <p className="mx-5 mt-5 rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3 text-sm leading-6 text-neutral-700">
-              {message}
-            </p>
-          ) : null}
-
-          <form onSubmit={handleCreateEvent} className="p-5">
-            <div className="space-y-5">
-              <label className="block">
-                <span className="text-sm font-semibold text-neutral-800">행사 제목</span>
-                <input
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-950"
-                  placeholder="예: 2026 여름 팝업 & 콜카 굿즈 교환판"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-semibold text-neutral-800">Slug</span>
-                <input
-                  value={slug}
-                  onChange={(event) => setSlug(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-950"
-                  placeholder="예: summer-event-2026"
-                />
-                <p className="mt-2 text-xs leading-5 text-neutral-400">
-                  실제 주소는 /trade/{normalizedSlug || "slug"} 형태입니다.
-                </p>
-              </label>
-
-              <div className="grid grid-cols-2 gap-3">
-                <label className="block">
-                  <span className="text-sm font-semibold text-neutral-800">시작일</span>
-                  <input
-                    type="date"
-                    value={eventStartDate}
-                    onChange={(event) => setEventStartDate(event.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none transition focus:border-neutral-950"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-semibold text-neutral-800">종료일</span>
-                  <input
-                    type="date"
-                    value={eventEndDate}
-                    onChange={(event) => setEventEndDate(event.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none transition focus:border-neutral-950"
-                  />
-                </label>
-              </div>
-
-              <label className="block">
-                <span className="text-sm font-semibold text-neutral-800">행사 장소</span>
-                <input
-                  value={eventLocation}
-                  onChange={(event) => setEventLocation(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-950"
-                  placeholder="예: 서울 · 더현대 서울 5F / 온라인"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-semibold text-neutral-800">행사 기간 메모</span>
-                <input
-                  value={periodNote}
-                  onChange={(event) => setPeriodNote(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-950"
-                  placeholder="선택 입력"
-                />
-              </label>
-
-              <label className="block">
-                <span className="text-sm font-semibold text-neutral-800">정렬 순서</span>
-                <input
-                  type="number"
-                  value={sortOrder}
-                  onChange={(event) => setSortOrder(event.target.value)}
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-neutral-950"
-                  placeholder="0"
-                />
-              </label>
-
-              <label className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-200/70 bg-neutral-50/80 px-4 py-3">
-                <span>
-                  <span className="block text-sm font-semibold text-neutral-800">공개 여부</span>
-                  <span className="mt-1 block text-xs text-neutral-500">
-                    공개 상태여야 메인 페이지에 노출됩니다.
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  checked={isPublic}
-                  onChange={(event) => setIsPublic(event.target.checked)}
-                  className="h-5 w-5"
-                />
-              </label>
-
-              <div>
-                <span className="text-sm font-semibold text-neutral-800">행사 썸네일</span>
-                <label className="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50/80 px-4 py-8 text-center transition hover:border-neutral-950 hover:bg-white">
-                  {thumbnailPreviewUrl ? (
-                    <img
-                      src={thumbnailPreviewUrl}
-                      alt="썸네일 미리보기"
-                      className="aspect-[32/45] w-44 rounded-2xl object-cover shadow-[0_10px_30px_rgba(15,23,42,0.05)]"
-                    />
-                  ) : (
-                    <>
-                      <span className="text-sm font-bold text-neutral-700">썸네일 이미지 선택</span>
-                      <span className="mt-2 text-xs leading-5 text-neutral-400">
-                        포스터형 이미지는 32:45 비율을 추천합니다.
-                      </span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleThumbnailChange}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmittingEvent}
-                className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-bold text-white transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:bg-neutral-300"
-              >
-                {isSubmittingEvent ? "등록 중..." : "행사 등록"}
-              </button>
-            </div>
-          </form>
-        </div>
+    <main className="w-full bg-[#fafafa]">
+      <section className="border-b border-neutral-100 bg-white px-5 py-4">
+        <p className="text-[12px] font-black tracking-[0.04em] text-[#7C5CFC]">
+          NEW EVENT
+        </p>
+        <h1 className="mt-1 break-keep text-[24px] font-black leading-tight tracking-[-0.03em] text-neutral-950">
+          새 행사 등록
+        </h1>
+        <p className="mt-2 text-[13px] font-medium leading-5 text-neutral-500">
+          메인 화면과 굿즈 교환판에 노출할 행사를 등록합니다.
+        </p>
       </section>
+
+      <div className="space-y-4 px-5 py-4">
+        {message ? (
+          <p className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm leading-6 text-neutral-600">
+            {message}
+          </p>
+        ) : null}
+
+        <form
+          onSubmit={handleCreateEvent}
+          className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4"
+        >
+          <div className="space-y-4">
+            <label className="block">
+              <span className="text-xs font-black text-neutral-500">행사 제목</span>
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
+                placeholder="예: 2026 여름 팝업 & 콜카 굿즈 교환판"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-black text-neutral-500">Slug</span>
+              <input
+                value={slug}
+                onChange={(event) => setSlug(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
+                placeholder="예: summer-event-2026"
+              />
+              <p className="mt-2 text-xs leading-5 text-neutral-400">
+                실제 주소는 /trade/{normalizedSlug || "slug"} 형태입니다.
+              </p>
+            </label>
+
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block min-w-0">
+                <span className="text-xs font-black text-neutral-500">시작일</span>
+                <input
+                  type="date"
+                  value={eventStartDate}
+                  onChange={(event) => setEventStartDate(event.target.value)}
+                  className="mt-1 w-full min-w-0 rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#7C5CFC]"
+                />
+              </label>
+
+              <label className="block min-w-0">
+                <span className="text-xs font-black text-neutral-500">종료일</span>
+                <input
+                  type="date"
+                  value={eventEndDate}
+                  onChange={(event) => setEventEndDate(event.target.value)}
+                  className="mt-1 w-full min-w-0 rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-[#7C5CFC]"
+                />
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="text-xs font-black text-neutral-500">행사 장소</span>
+              <input
+                value={eventLocation}
+                onChange={(event) => setEventLocation(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
+                placeholder="예: 서울 · 더현대 서울 5F / 온라인"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-black text-neutral-500">행사 기간 메모</span>
+              <input
+                value={periodNote}
+                onChange={(event) => setPeriodNote(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
+                placeholder="선택 입력"
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-xs font-black text-neutral-500">정렬 순서</span>
+              <input
+                type="number"
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value)}
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
+                placeholder="0"
+              />
+            </label>
+
+            <label className="flex items-center justify-between gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3">
+              <span>
+                <span className="block text-sm font-black text-neutral-950">공개 여부</span>
+                <span className="mt-1 block text-xs leading-5 text-neutral-400">
+                  공개 상태여야 메인 페이지에 노출됩니다.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={isPublic}
+                onChange={(event) => setIsPublic(event.target.checked)}
+                className="h-5 w-5 accent-[#7C5CFC]"
+              />
+            </label>
+
+            <div>
+              <span className="text-xs font-black text-neutral-500">행사 썸네일</span>
+              <label className="mt-1 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-white px-4 py-7 text-center transition hover:border-[#7C5CFC]">
+                {thumbnailPreviewUrl ? (
+                  <img
+                    src={thumbnailPreviewUrl}
+                    alt="썸네일 미리보기"
+                    className="aspect-[32/45] w-40 rounded-xl object-cover"
+                  />
+                ) : (
+                  <>
+                    <span className="text-sm font-black text-neutral-700">썸네일 이미지 선택</span>
+                    <span className="mt-2 text-xs leading-5 text-neutral-400">
+                      포스터형 이미지는 32:45 비율을 추천합니다.
+                    </span>
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleThumbnailChange}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isSubmittingEvent}
+              className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+            >
+              {isSubmittingEvent ? "등록 중..." : "행사 등록"}
+            </button>
+          </div>
+        </form>
+      </div>
     </main>
   );
 }
