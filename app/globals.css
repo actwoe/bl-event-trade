@@ -35,45 +35,196 @@ body {
     sans-serif;
 }
 
-.admin-app-content > main {
+
+.admin-app-content {
   min-height: 100%;
+  background: #fafafa;
+  color: #171717;
+}
+
+.admin-app-content > main {
+  min-height: 100% !important;
   width: 100%;
-  background: transparent;
-  padding: 1.25rem 1rem 1.5rem;
+  background: #fafafa !important;
+  padding: 0 !important;
 }
 
 .admin-app-content > main > section {
-  width: 100%;
-  max-width: none;
-  margin-left: auto;
-  margin-right: auto;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.admin-app-content > main > section[class*="rounded"] {
+  width: auto !important;
+  margin: 1rem !important;
+  border: 1px solid #e5e5e5 !important;
+  border-radius: 1rem !important;
+  background: #ffffff !important;
+  padding: 1.25rem !important;
+  box-shadow: none !important;
 }
 
 .admin-app-content > main > section > div:first-child {
-  border-color: rgb(229 229 229);
-  border-radius: 1.5rem;
-  box-shadow: none;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .admin-app-content > main > section > div:first-child > header {
-  border-color: rgb(229 229 229);
-  background: #ffffff;
+  border: 0 !important;
+  border-bottom: 1px solid #f5f5f5 !important;
+  border-radius: 0 !important;
+  background: #ffffff !important;
+  padding: 1.5rem 1.25rem 1.25rem !important;
+  box-shadow: none !important;
 }
 
-.admin-app-content > main > section > div:first-child > header > div:first-child {
-  margin-bottom: 0;
-  justify-content: flex-end;
-}
-
-.admin-app-content > main > section > div:first-child > header > div:first-child > a:first-child,
-.admin-app-content > main > section > div:first-child > header > div:first-child > button:last-child,
-.admin-app-content > main > section > div:first-child > header > div:first-child > div > button:last-child,
+.admin-app-content > main > section > div:first-child > header > div:first-child:has(> a),
+.admin-app-content > main > section > div:first-child > header > div:first-child:has(> button),
 .admin-app-content > main > section > div:first-child > header > a:first-child {
-  display: none;
+  display: none !important;
+}
+
+.admin-app-content header p[class*="uppercase"] {
+  margin-top: 0 !important;
+  color: #7c5cfc !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.18em !important;
+}
+
+.admin-app-content header h1 {
+  margin-top: 0.25rem !important;
+  color: #171717 !important;
+  font-size: 25px !important;
+  font-weight: 900 !important;
+  line-height: 1.25 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.admin-app-content header h1 + p {
+  margin-top: 0.5rem !important;
+  color: #737373 !important;
+  font-size: 14px !important;
+  line-height: 1.5rem !important;
+}
+
+.admin-app-content > main > section > div:first-child > header > div[class*="mt-6"] {
+  margin-top: 0 !important;
+}
+
+.admin-app-content > main > section > div:first-child > header > div[class*="rounded-2xl"] {
+  margin-top: 1rem !important;
+  border: 1px solid #e5e5e5 !important;
+  border-radius: 1rem !important;
+  background: #fafafa !important;
+  box-shadow: none !important;
+}
+
+.admin-app-content > main > section > div:first-child > p,
+.admin-app-content > main > section > div:first-child > header ~ p {
+  margin: 0.75rem 1rem 0 !important;
+  border: 1px solid #e5e5e5 !important;
+  border-radius: 1rem !important;
+  background: #ffffff !important;
+  padding: 0.75rem 1rem !important;
+  color: #525252 !important;
+}
+
+.admin-app-content > main > section > div:first-child > form,
+.admin-app-content > main > section > div:first-child > header ~ div,
+.admin-app-content > main > section > form,
+.admin-app-content > main > section > section {
+  margin: 0.75rem 1rem 0 !important;
+  border: 1px solid #e5e5e5 !important;
+  border-radius: 1rem !important;
+  background: #ffffff !important;
+  padding: 1.25rem !important;
+  box-shadow: none !important;
+}
+
+.admin-app-content > main > section > section:last-child,
+.admin-app-content > main > section > form:last-child,
+.admin-app-content > main > section > div:first-child:last-child {
+  margin-bottom: 1rem !important;
+}
+
+.admin-app-content h2 {
+  color: #171717 !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.02em;
+}
+
+.admin-app-content h3 {
+  color: #171717 !important;
+  font-weight: 900 !important;
+}
+
+.admin-app-content input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.admin-app-content select,
+.admin-app-content textarea {
+  border-color: #e5e5e5 !important;
+  border-radius: 1rem !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.admin-app-content input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+.admin-app-content select:focus,
+.admin-app-content textarea:focus {
+  border-color: #7c5cfc !important;
+  outline: none !important;
+}
+
+.admin-app-content label[class*="bg-neutral-100"],
+.admin-app-content label[class*="bg-neutral-50"] {
+  border: 1px solid #e5e5e5 !important;
+  border-radius: 1rem !important;
+  background: #fafafa !important;
+}
+
+.admin-app-content article {
+  overflow: hidden;
+  border: 1px solid #e5e5e5 !important;
+  border-radius: 1rem !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.admin-app-content article > div[class*="bg-neutral-50"] {
+  background: #ffffff !important;
+}
+
+.admin-app-content button[class*="bg-neutral-950"],
+.admin-app-content a[class*="bg-neutral-950"] {
+  border-radius: 1rem !important;
+}
+
+.admin-app-content button[class*="focus:border-neutral-950"],
+.admin-app-content input[class*="focus:border-neutral-950"],
+.admin-app-content select[class*="focus:border-neutral-950"],
+.admin-app-content textarea[class*="focus:border-neutral-950"] {
+  --tw-border-opacity: 1;
+}
+
+.admin-app-content [class*="shadow-["],
+.admin-app-content .shadow-sm {
+  box-shadow: none !important;
 }
 
 @media (min-width: 640px) {
-  .admin-app-content > main {
-    padding: 1.25rem 1rem 1.5rem;
+  .admin-app-content > main > section > div:first-child > form,
+  .admin-app-content > main > section > div:first-child > header ~ div,
+  .admin-app-content > main > section > form,
+  .admin-app-content > main > section > section {
+    margin-left: 1rem !important;
+    margin-right: 1rem !important;
   }
 }
