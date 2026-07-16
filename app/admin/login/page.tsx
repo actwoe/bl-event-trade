@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -88,15 +87,8 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-100 px-4 py-10">
-      <section className="mx-auto max-w-md rounded-3xl bg-white p-6 shadow-sm">
-        <Link
-          href="/"
-          className="inline-flex rounded-full border border-neutral-200 px-4 py-2 text-xs font-bold text-neutral-600"
-        >
-          ← 메인으로
-        </Link>
-
+    <main>
+      <section className="mx-auto w-full rounded-3xl border border-neutral-200 bg-white p-6">
         <div className="mt-8">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-neutral-500">
             Admin

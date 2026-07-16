@@ -34,3 +34,46 @@ body {
     'Malgun Gothic',
     sans-serif;
 }
+
+.admin-app-content > main {
+  min-height: 100%;
+  width: 100%;
+  background: transparent;
+  padding: 1.25rem 1rem 1.5rem;
+}
+
+.admin-app-content > main > section {
+  width: 100%;
+  max-width: none;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.admin-app-content > main > section > div:first-child {
+  border-color: rgb(229 229 229);
+  border-radius: 1.5rem;
+  box-shadow: none;
+}
+
+.admin-app-content > main > section > div:first-child > header {
+  border-color: rgb(229 229 229);
+  background: #ffffff;
+}
+
+.admin-app-content > main > section > div:first-child > header > div:first-child {
+  margin-bottom: 0;
+  justify-content: flex-end;
+}
+
+.admin-app-content > main > section > div:first-child > header > div:first-child > a:first-child,
+.admin-app-content > main > section > div:first-child > header > div:first-child > button:last-child,
+.admin-app-content > main > section > div:first-child > header > div:first-child > div > button:last-child,
+.admin-app-content > main > section > div:first-child > header > a:first-child {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .admin-app-content > main {
+    padding: 1.25rem 1rem 1.5rem;
+  }
+}
