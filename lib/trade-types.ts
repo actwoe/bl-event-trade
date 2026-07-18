@@ -29,6 +29,7 @@ export type TradeCard = {
   imageRatio?: TradeImageRatio | null;
   benefitSubcategory?: string | null;
   benefitSubcategorySortOrder?: number | null;
+  registeredSortOrder?: number | null;
 };
 
 export type TradeBoard = {

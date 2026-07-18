@@ -18,6 +18,13 @@ import {
   getBenefitSubcategorySortOrder,
 } from '@/lib/trade-benefit-subcategory-order';
 import {
+  COLLECTION_PHOTO_CARD_VARIANTS,
+  CollectionPhotoCardVariant,
+  getCollectionPhotoCardSortOrder,
+  getCollectionPhotoCardVariant,
+  normalizeCollectionPhotoCardSortOrder,
+} from '@/lib/trade-collection-photo-card-order';
+import {
   TRADE_CATEGORIES,
   TradeCategory,
   TradeImageRatio,
@@ -166,6 +173,10 @@ function getTradeItemMetaLabel(item: TradeItemRow) {
     return `${categoryLabel} · ${subcategory}`;
   }
 
+  if (item.category === 'collection_photo_card') {
+    return `${categoryLabel} · ${getCollectionPhotoCardVariant(item.sort_order)}`;
+  }
+
   return categoryLabel;
 }
 
@@ -209,6 +220,19 @@ function sortTradeItems(
 
     if (titleDiff !== 0) {
       return titleDiff;
+    }
+
+    if (
+      a.category === 'collection_photo_card' &&
+      b.category === 'collection_photo_card'
+    ) {
+      const collectionOrderDiff =
+        normalizeCollectionPhotoCardSortOrder(a.sort_order) -
+        normalizeCollectionPhotoCardSortOrder(b.sort_order);
+
+      if (collectionOrderDiff !== 0) {
+        return collectionOrderDiff;
+      }
     }
 
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
@@ -263,6 +287,8 @@ export default function AdminEventManagePage() {
   const [selectedWorkTitle, setSelectedWorkTitle] = useState('');
   const [category, setCategory] = useState<TradeCategory>('benefit');
   const [benefitSubcategory, setBenefitSubcategory] = useState('');
+  const [collectionPhotoCardVariant, setCollectionPhotoCardVariant] =
+    useState<CollectionPhotoCardVariant>('A');
   const [imageRatio, setImageRatio] = useState<TradeImageRatio>('square');
   const [itemIsVisible, setItemIsVisible] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -277,6 +303,8 @@ export default function AdminEventManagePage() {
     useState<TradeCategory>('benefit');
   const [editingItemBenefitSubcategory, setEditingItemBenefitSubcategory] =
     useState('');
+  const [editingItemCollectionPhotoCardVariant, setEditingItemCollectionPhotoCardVariant] =
+    useState<CollectionPhotoCardVariant>('A');
   const [editingItemImageRatio, setEditingItemImageRatio] =
     useState<TradeImageRatio>('square');
   const [editingItemIsVisible, setEditingItemIsVisible] = useState(true);
@@ -1335,7 +1363,10 @@ export default function AdminEventManagePage() {
         benefit_subcategory:
           category === 'benefit' ? benefitSubcategory.trim() || null : null,
         is_visible: itemIsVisible,
-        sort_order: 0,
+        sort_order:
+          category === 'collection_photo_card'
+            ? getCollectionPhotoCardSortOrder(collectionPhotoCardVariant)
+            : 0,
       });
 
       if (insertError) {
@@ -1347,6 +1378,7 @@ export default function AdminEventManagePage() {
       setImageFile(null);
       setImagePreviewUrl('');
       setBenefitSubcategory('');
+      setCollectionPhotoCardVariant('A');
       setImageRatio('square');
       setItemIsVisible(true);
 
@@ -1377,6 +1409,9 @@ export default function AdminEventManagePage() {
     setEditingItemWorkTitle(item.work_title);
     setEditingItemCategory(item.category);
     setEditingItemBenefitSubcategory(item.benefit_subcategory ?? '');
+    setEditingItemCollectionPhotoCardVariant(
+      getCollectionPhotoCardVariant(item.sort_order),
+    );
     setEditingItemImageRatio(getSafeImageRatio(item.image_ratio));
     setEditingItemIsVisible(item.is_visible);
   }
@@ -1387,6 +1422,7 @@ export default function AdminEventManagePage() {
     setEditingItemWorkTitle('');
     setEditingItemCategory('benefit');
     setEditingItemBenefitSubcategory('');
+    setEditingItemCollectionPhotoCardVariant('A');
     setEditingItemImageRatio('square');
     setEditingItemIsVisible(true);
   }
@@ -1450,6 +1486,12 @@ export default function AdminEventManagePage() {
             editingItemCategory === 'benefit'
               ? editingItemBenefitSubcategory.trim() || null
               : null,
+          sort_order:
+            editingItemCategory === 'collection_photo_card'
+              ? getCollectionPhotoCardSortOrder(
+                  editingItemCollectionPhotoCardVariant,
+                )
+              : 0,
           is_visible: editingItemIsVisible,
         })
         .eq('id', item.id);
@@ -2535,40 +2577,76 @@ export default function AdminEventManagePage() {
                 </select>
               </label>
 
-              <label className="block">
-                <span className="text-sm font-bold text-neutral-800">
-                  특전 하위 분류
-                </span>
+              {category === 'benefit' ? (
+                <label className="block">
+                  <span className="text-sm font-bold text-neutral-800">
+                    특전 하위 분류
+                  </span>
 
-                <select
-                  value={benefitSubcategory}
-                  onChange={(event) => setBenefitSubcategory(event.target.value)}
-                  disabled={
-                    category !== 'benefit' || visibleBenefitSubcategories.length === 0
-                  }
-                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-950 disabled:bg-neutral-100 disabled:text-neutral-400"
-                >
-                  {category !== 'benefit' ? (
-                    <option value="">해당 없음</option>
-                  ) : visibleBenefitSubcategories.length === 0 ? (
-                    <option value="">등록된 하위 분류 없음</option>
-                  ) : (
-                    <>
-                      <option value="">하위 분류 없음</option>
+                  <select
+                    value={benefitSubcategory}
+                    onChange={(event) =>
+                      setBenefitSubcategory(event.target.value)
+                    }
+                    disabled={visibleBenefitSubcategories.length === 0}
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-950 disabled:bg-neutral-100 disabled:text-neutral-400"
+                  >
+                    {visibleBenefitSubcategories.length === 0 ? (
+                      <option value="">등록된 하위 분류 없음</option>
+                    ) : (
+                      <>
+                        <option value="">하위 분류 없음</option>
 
-                      {visibleBenefitSubcategories.map((subcategory) => (
-                        <option key={subcategory.id} value={subcategory.name}>
-                          {subcategory.name}
-                        </option>
-                      ))}
-                    </>
-                  )}
-                </select>
-              </label>
+                        {visibleBenefitSubcategories.map((subcategory) => (
+                          <option key={subcategory.id} value={subcategory.name}>
+                            {subcategory.name}
+                          </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                </label>
+              ) : category === 'collection_photo_card' ? (
+                <label className="block">
+                  <span className="text-sm font-bold text-neutral-800">
+                    컬렉션 하위 분류
+                  </span>
+
+                  <select
+                    value={collectionPhotoCardVariant}
+                    onChange={(event) =>
+                      setCollectionPhotoCardVariant(
+                        event.target.value as CollectionPhotoCardVariant,
+                      )
+                    }
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-3 py-3 text-sm outline-none focus:border-neutral-950"
+                  >
+                    {COLLECTION_PHOTO_CARD_VARIANTS.map((variant) => (
+                      <option key={variant} value={variant}>
+                        {variant}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <label className="block">
+                  <span className="text-sm font-bold text-neutral-800">
+                    하위 분류
+                  </span>
+                  <select
+                    disabled
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-neutral-100 px-3 py-3 text-sm text-neutral-400"
+                  >
+                    <option>해당 없음</option>
+                  </select>
+                </label>
+              )}
             </div>
 
             <p className="-mt-3 text-xs leading-5 text-neutral-400">
-              특전 하위 분류는 굿즈 종류가 특전이고 등록된 하위 분류가 있을 때만 선택할 수 있습니다.
+              {category === 'collection_photo_card'
+                ? 'A/B는 관리자 정렬용 값이며 일반 사용자 화면에는 표시되지 않습니다.'
+                : '특전 하위 분류는 굿즈 종류가 특전이고 등록된 하위 분류가 있을 때만 선택할 수 있습니다.'}
             </p>
 
             <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
@@ -2883,6 +2961,31 @@ export default function AdminEventManagePage() {
                                     </option>
                                   ))}
                                 </select>
+                              </label>
+                            ) : editingItemCategory === 'collection_photo_card' ? (
+                              <label className="block">
+                                <span className="text-[10px] font-bold text-neutral-500">
+                                  컬렉션 하위 분류
+                                </span>
+
+                                <select
+                                  value={editingItemCollectionPhotoCardVariant}
+                                  onChange={(event) =>
+                                    setEditingItemCollectionPhotoCardVariant(
+                                      event.target.value as CollectionPhotoCardVariant,
+                                    )
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
+                                >
+                                  {COLLECTION_PHOTO_CARD_VARIANTS.map((variant) => (
+                                    <option key={variant} value={variant}>
+                                      {variant}
+                                    </option>
+                                  ))}
+                                </select>
+                                <span className="mt-1 block text-[10px] leading-4 text-neutral-400">
+                                  일반 사용자에게는 표시되지 않고 정렬에만 사용됩니다.
+                                </span>
                               </label>
                             ) : null}
 

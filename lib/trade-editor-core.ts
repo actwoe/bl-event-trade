@@ -9,7 +9,7 @@ import { sortTradeCardsBySideAndGroup } from "@/lib/trade-card-order";
 export type QuantityTradeCard = TradeCard & {
   quantity?: number;
   registeredItemId?: string;
-  registeredSortOrder?: number;
+  registeredSortOrder?: number | null;
 };
 
 export const TRADE_CONDITIONS = [

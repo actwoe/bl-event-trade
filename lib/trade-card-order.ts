@@ -5,6 +5,7 @@ import {
   TradeSide,
 } from "@/lib/trade-types";
 import { normalizeBenefitSubcategorySortOrder } from "@/lib/trade-benefit-subcategory-order";
+import { normalizeCollectionPhotoCardSortOrder } from "@/lib/trade-collection-photo-card-order";
 
 function getTradeSideSortIndex(side: TradeSide) {
   return side === "have" ? 0 : 1;
@@ -13,6 +14,28 @@ function getTradeSideSortIndex(side: TradeSide) {
 function getTradeCategorySortIndex(category: TradeCategory) {
   const index = TRADE_CATEGORIES.findIndex((option) => option.id === category);
   return index === -1 ? TRADE_CATEGORIES.length : index;
+}
+
+function compareCollectionPhotoCards(left: TradeCard, right: TradeCard) {
+  const leftHasRegisteredOrder = Number.isFinite(left.registeredSortOrder);
+  const rightHasRegisteredOrder = Number.isFinite(right.registeredSortOrder);
+
+  if (!leftHasRegisteredOrder && !rightHasRegisteredOrder) return 0;
+
+  const workTitleDiff = left.workTitle.localeCompare(right.workTitle, "ko-KR", {
+    numeric: true,
+    sensitivity: "base",
+  });
+  if (workTitleDiff !== 0) return workTitleDiff;
+
+  if (leftHasRegisteredOrder !== rightHasRegisteredOrder) {
+    return leftHasRegisteredOrder ? -1 : 1;
+  }
+
+  return (
+    normalizeCollectionPhotoCardSortOrder(left.registeredSortOrder) -
+    normalizeCollectionPhotoCardSortOrder(right.registeredSortOrder)
+  );
 }
 
 export function getTradeCardGroupKey(card: TradeCard) {
@@ -123,6 +146,14 @@ export function sortTradeCardsBySideAndGroup(cards: TradeCard[]) {
         (sharedGroupOrder.get(getTradeCardGroupKey(b.card)) ??
           Number.MAX_SAFE_INTEGER);
       if (groupDiff !== 0) return groupDiff;
+
+      if (
+        a.card.category === "collection_photo_card" &&
+        b.card.category === "collection_photo_card"
+      ) {
+        const collectionCardDiff = compareCollectionPhotoCards(a.card, b.card);
+        if (collectionCardDiff !== 0) return collectionCardDiff;
+      }
 
       return a.index - b.index;
     })

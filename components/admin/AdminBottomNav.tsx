@@ -56,7 +56,7 @@ function NavIcon({ id }: { id: AdminBottomNavItem }) {
 
 export function AdminBottomNav({ active }: AdminBottomNavProps) {
   return (
-    <nav className="relative z-20 grid min-h-[88px] shrink-0 grid-cols-4 border-t border-neutral-200 bg-white px-2 pb-[max(22px,calc(env(safe-area-inset-bottom)+14px))] pt-3.5 sm:min-h-0 sm:pb-3 sm:pt-3">
+    <nav className="relative z-20 grid min-h-[72px] shrink-0 grid-cols-4 border-t border-neutral-200 bg-white px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2.5 sm:min-h-0 sm:pb-3 sm:pt-3">
       {ITEMS.map((item) => {
         const isActive = item.id === active;
 

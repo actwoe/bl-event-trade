@@ -101,6 +101,7 @@ function restoreSavedTradeGroupBoard(
           item.benefitSubcategorySortOrder ?? null,
         quantity: savedCard.quantity,
         registeredItemId: item.id,
+        registeredSortOrder: item.sortOrder,
       },
     ];
   });

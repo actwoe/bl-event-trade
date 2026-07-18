@@ -8,6 +8,7 @@ import {
 import {
   compareBenefitSubcategoryValues,
 } from "@/lib/trade-benefit-subcategory-order";
+import { normalizeCollectionPhotoCardSortOrder } from "@/lib/trade-collection-photo-card-order";
 
 export function sortKoreanTitles(titles: string[]) {
   return [...titles].sort((a, b) =>
@@ -65,6 +66,22 @@ export function sortRegisteredItems(items: RegisteredTradeItem[]) {
         b.benefitSubcategorySortOrder,
       );
       if (subcategoryDiff !== 0) return subcategoryDiff;
+    }
+
+    if (
+      a.category === "collection_photo_card" &&
+      b.category === "collection_photo_card"
+    ) {
+      const workTitleDiff = a.workTitle.localeCompare(b.workTitle, "ko-KR", {
+        numeric: true,
+        sensitivity: "base",
+      });
+      if (workTitleDiff !== 0) return workTitleDiff;
+
+      const collectionOrderDiff =
+        normalizeCollectionPhotoCardSortOrder(a.sortOrder) -
+        normalizeCollectionPhotoCardSortOrder(b.sortOrder);
+      if (collectionOrderDiff !== 0) return collectionOrderDiff;
     }
 
     return a.itemName.localeCompare(b.itemName, "ko-KR", {
