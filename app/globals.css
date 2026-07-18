@@ -36,16 +36,16 @@ body {
 }
 
 .app-bottom-nav {
-  min-height: 64px;
-  padding-top: 0.5rem;
-  padding-bottom: max(4px, env(safe-area-inset-bottom));
+  min-height: 56px;
+  padding-top: 0.25rem;
+  padding-bottom: max(2px, calc(env(safe-area-inset-bottom) - 6px));
 }
 
 @media (display-mode: standalone) {
   .app-bottom-nav {
-    min-height: 88px;
-    padding-top: 0.875rem;
-    padding-bottom: max(22px, calc(env(safe-area-inset-bottom) + 14px));
+    min-height: 96px;
+    padding-top: 0.75rem;
+    padding-bottom: max(28px, calc(env(safe-area-inset-bottom) + 20px));
   }
 }
 
