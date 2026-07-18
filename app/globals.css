@@ -35,6 +35,28 @@ body {
     sans-serif;
 }
 
+.app-bottom-nav {
+  min-height: 64px;
+  padding-top: 0.5rem;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+}
+
+@media (display-mode: standalone) {
+  .app-bottom-nav {
+    min-height: 88px;
+    padding-top: 0.875rem;
+    padding-bottom: max(22px, calc(env(safe-area-inset-bottom) + 14px));
+  }
+}
+
+@media (min-width: 640px) {
+  .app-bottom-nav {
+    min-height: 0;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+}
+
 
 .admin-app-content {
   min-height: 100%;

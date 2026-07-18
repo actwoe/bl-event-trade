@@ -55,7 +55,7 @@ function NavIcon({ id }: { id: AppBottomNavItem }) {
 
 export function AppBottomNav({ active, homeHref = "/" }: AppBottomNavProps) {
   return (
-    <nav className="relative z-20 grid min-h-[72px] shrink-0 grid-cols-4 border-t border-neutral-200 bg-white px-2 pb-[max(8px,env(safe-area-inset-bottom))] pt-2.5 sm:min-h-0 sm:pb-3 sm:pt-3">
+    <nav className="app-bottom-nav relative z-20 grid shrink-0 grid-cols-4 border-t border-neutral-200 bg-white px-2">
       {ITEMS.map((item) => {
         const href = item.id === "home" ? homeHref : item.href;
         const isActive = item.id === active;
