@@ -46,7 +46,7 @@ html {
   html {
     --app-bottom-nav-min-height: 96px;
     --app-bottom-nav-padding-top: 4px;
-    --app-bottom-nav-padding-bottom: max(28px, calc(env(safe-area-inset-bottom) + 20px));
+    --app-bottom-nav-padding-bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px));
     --app-bottom-nav-item-shift: 6px;
   }
 }
@@ -54,7 +54,7 @@ html {
 html[data-app-display-mode="standalone"] {
   --app-bottom-nav-min-height: 96px;
   --app-bottom-nav-padding-top: 4px;
-  --app-bottom-nav-padding-bottom: max(28px, calc(env(safe-area-inset-bottom) + 20px));
+  --app-bottom-nav-padding-bottom: max(24px, calc(env(safe-area-inset-bottom) + 16px));
   --app-bottom-nav-item-shift: 6px;
 }
 
