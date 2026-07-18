@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import './globals.css';
 import { SiteHeader } from '@/components/shared/SiteHeader';
 
@@ -15,6 +16,19 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="min-h-screen bg-neutral-100 text-neutral-950 antialiased">
+        <Script id="detect-app-display-mode" strategy="beforeInteractive">
+          {`
+            (() => {
+              const isStandalone =
+                window.matchMedia('(display-mode: standalone)').matches ||
+                window.navigator.standalone === true;
+
+              document.documentElement.dataset.appDisplayMode = isStandalone
+                ? 'standalone'
+                : 'browser';
+            })();
+          `}
+        </Script>
         <SiteHeader />
         {children}
       </body>

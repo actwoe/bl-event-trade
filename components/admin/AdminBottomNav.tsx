@@ -66,8 +66,8 @@ export function AdminBottomNav({ active }: AdminBottomNavProps) {
             href={item.href}
             className={
               isActive
-                ? "flex flex-col items-center gap-1 py-1 text-[#7C5CFC]"
-                : "flex flex-col items-center gap-1 py-1 text-neutral-500"
+                ? "app-bottom-nav-item flex flex-col items-center gap-1 py-1 text-[#7C5CFC]"
+                : "app-bottom-nav-item flex flex-col items-center gap-1 py-1 text-neutral-500"
             }
           >
             <NavIcon id={item.id} />
