@@ -129,6 +129,7 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
     const hasProfile = Boolean(nickname || account);
     const memoChips = getMemoChips(board.memo);
     const grouped = board.categoryDisplayMode !== "simple";
+    const previewWidth = boardMode === "trade" ? 840 : 600;
     const boardEyebrow =
       boardMode === "sell"
         ? "BL GOODS SELL BOARD"
@@ -148,7 +149,7 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
 
       const updateSize = () => {
         const availableWidth = container.clientWidth;
-        const nextScale = Math.min(1, availableWidth / 840);
+        const nextScale = Math.min(1, availableWidth / previewWidth);
         setPreviewScale(nextScale);
         setPreviewHeight(preview.scrollHeight * nextScale);
       };
@@ -158,7 +159,7 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
       resizeObserver.observe(container);
       resizeObserver.observe(preview);
       return () => resizeObserver.disconnect();
-    }, [responsive, board, collectionTitle]);
+    }, [responsive, board, collectionTitle, previewWidth]);
 
     const assignPreviewRef = (node: HTMLDivElement | null) => {
       previewRef.current = node;
@@ -170,8 +171,9 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
       <div
         ref={assignPreviewRef}
         data-ui-lab-preview-version="2026-07-13-dom-export"
-        className="box-border w-[840px] bg-transparent p-5 text-neutral-950"
+        className="box-border bg-transparent p-5 text-neutral-950"
         style={{
+          width: previewWidth,
           fontFamily: "'Pretendard', Arial, sans-serif",
           transform: responsive ? `scale(${previewScale})` : undefined,
           transformOrigin: responsive ? "top left" : undefined,
@@ -385,7 +387,7 @@ function SingleBoardRows({
 
             <CardGrid
               cards={group.cards}
-              columns={6}
+              columns={4}
               showMeta={false}
               boardMode={boardMode}
               centerIncompleteRow
