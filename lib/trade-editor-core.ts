@@ -1,6 +1,7 @@
 import {
   RegisteredTradeItem,
   TradeBoard,
+  TradeBoardMode,
   TradeCard,
   TradeSide,
 } from "@/lib/trade-types";
@@ -20,6 +21,34 @@ function normalizeTradeCardStatus(card: QuantityTradeCard): QuantityTradeCard {
   };
 }
 
+export const TRADE_BOARD_MODES: Array<{
+  id: TradeBoardMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    id: "trade",
+    label: "교환판",
+    description: "있어요와 구해요를 함께 구성합니다.",
+  },
+  {
+    id: "sell",
+    label: "양도판",
+    description: "양도할 굿즈만 한쪽에 모아 표시합니다.",
+  },
+  {
+    id: "wanted",
+    label: "구해요판",
+    description: "구하는 굿즈만 한쪽에 모아 표시합니다.",
+  },
+];
+
+export function getTradeBoardModeSide(mode: TradeBoardMode): TradeSide | null {
+  if (mode === "sell") return "have";
+  if (mode === "wanted") return "want";
+  return null;
+}
+
 export const TRADE_CONDITIONS = [
   "같은 종류끼리만 교환",
   "교차 교환 가능",
@@ -35,6 +64,7 @@ export function createInitialTradeBoard(): TradeBoard {
     contact: "",
     memo: "",
     cards: [],
+    boardMode: "trade",
     categoryDisplayMode: "grouped",
   };
 }

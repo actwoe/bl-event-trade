@@ -1,5 +1,6 @@
 import {
   TradeCategory,
+  TradeBoardMode,
   TradeCategoryDisplayMode,
   TradeImageRatio,
   TradeSide,
@@ -25,6 +26,7 @@ export type SavedTradeGroupBoard = {
   nickname: string;
   contact: string;
   selectedConditions: string[];
+  boardMode?: TradeBoardMode;
   categoryDisplayMode: TradeCategoryDisplayMode;
   cards: SavedTradeGroupCard[];
 };
@@ -63,6 +65,10 @@ function isTradeCategoryDisplayMode(
   return value === 'grouped' || value === 'simple';
 }
 
+function isTradeBoardMode(value: unknown): value is TradeBoardMode {
+  return value === 'trade' || value === 'sell' || value === 'wanted';
+}
+
 function isSavedTradeGroupCard(value: unknown): value is SavedTradeGroupCard {
   if (!value || typeof value !== 'object') return false;
 
@@ -99,6 +105,7 @@ export function parseSavedTradeGroupBoard(
     typeof board.contact !== 'string' ||
     !Array.isArray(board.selectedConditions) ||
     !board.selectedConditions.every((item) => typeof item === 'string') ||
+    (board.boardMode !== undefined && !isTradeBoardMode(board.boardMode)) ||
     !isTradeCategoryDisplayMode(board.categoryDisplayMode) ||
     !Array.isArray(board.cards) ||
     !board.cards.every(isSavedTradeGroupCard)

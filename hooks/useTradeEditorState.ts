@@ -8,7 +8,9 @@ import {
   createInitialTradeBoard,
   getCardQuantity,
   getRegisteredItemQuantity,
+  getTradeBoardModeSide,
   isSameRegisteredCard,
+  isSameTradeItem,
   QuantityTradeCard,
   updateTradeCardList,
 } from "@/lib/trade-editor-core";
@@ -26,6 +28,7 @@ import {
 import type {
   RegisteredTradeItem,
   TradeBoard,
+  TradeBoardMode,
   TradeCategory,
   TradeCategoryDisplayMode,
   TradeSide,
@@ -35,6 +38,38 @@ export const ALL_WORKS_VALUE = "all";
 export const ALL_CATEGORIES_VALUE = "all";
 export const ALL_BENEFIT_SUBCATEGORIES_VALUE = "all";
 export const NO_BENEFIT_SUBCATEGORY_VALUE = "__none__";
+
+function convertCardsToSingleSide(
+  cards: TradeBoard["cards"],
+  side: TradeSide,
+) {
+  const mergedCards: QuantityTradeCard[] = [];
+
+  for (const card of cards) {
+    const nextCard: QuantityTradeCard = {
+      ...card,
+      side,
+      isPriority: side === "want" && card.isPriority === true,
+      isForSale: false,
+    };
+    const duplicate = mergedCards.find((item) =>
+      isSameTradeItem(item, nextCard),
+    );
+
+    if (duplicate) {
+      duplicate.quantity =
+        getCardQuantity(duplicate) + getCardQuantity(nextCard);
+      duplicate.isPriority =
+        side === "want" &&
+        (duplicate.isPriority === true || nextCard.isPriority === true);
+      continue;
+    }
+
+    mergedCards.push(nextCard);
+  }
+
+  return sortTradeCardsBySideAndGroup(mergedCards);
+}
 
 export type CategoryFilterValue =
   | TradeCategory
@@ -215,6 +250,24 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
     updateBoardField("categoryDisplayMode", mode);
   }
 
+  function updateBoardMode(mode: TradeBoardMode) {
+    const singleSide = getTradeBoardModeSide(mode);
+    setAddModalSide(null);
+
+    setBoard((prev) => ({
+      ...prev,
+      boardMode: mode,
+      categoryDisplayMode:
+        singleSide === null
+          ? (prev.categoryDisplayMode ?? "grouped")
+          : "grouped",
+      cards:
+        singleSide === null
+          ? prev.cards
+          : convertCardsToSingleSide(prev.cards, singleSide),
+    }));
+  }
+
   function changeCategoryFilter(value: CategoryFilterValue) {
     setSelectedCategory(value);
     if (value !== ALL_CATEGORIES_VALUE && value !== "benefit") {
@@ -367,10 +420,15 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
   }
 
   function updateCard(cardId: string, patch: Partial<QuantityTradeCard>) {
-    setBoard((prev) => ({
-      ...prev,
-      cards: updateTradeCardList(prev.cards, cardId, patch),
-    }));
+    setBoard((prev) => {
+      const singleSide = getTradeBoardModeSide(prev.boardMode ?? "trade");
+      const nextPatch = singleSide ? { ...patch, side: singleSide } : patch;
+
+      return {
+        ...prev,
+        cards: updateTradeCardList(prev.cards, cardId, nextPatch),
+      };
+    });
   }
 
   function removeCard(cardId: string) {
@@ -426,6 +484,7 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
     updateBoardField,
     toggleCondition,
     updateCategoryDisplayMode,
+    updateBoardMode,
     changeCategoryFilter,
     changeBenefitSubcategoryFilter,
     increaseRegisteredItemQuantity,

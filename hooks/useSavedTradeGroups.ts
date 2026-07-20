@@ -67,6 +67,7 @@ function createSavedTradeGroupBoard(
     nickname: board.nickname,
     contact: board.contact,
     selectedConditions,
+    boardMode: board.boardMode ?? "trade",
     categoryDisplayMode:
       board.categoryDisplayMode === "simple" ? "simple" : "grouped",
     cards,
@@ -119,7 +120,11 @@ function restoreSavedTradeGroupBoard(
       contact: boardData.contact,
       memo: boardData.selectedConditions.join(" · "),
       cards,
-      categoryDisplayMode: boardData.categoryDisplayMode,
+      boardMode: boardData.boardMode ?? "trade",
+      categoryDisplayMode:
+        boardData.boardMode === "sell" || boardData.boardMode === "wanted"
+          ? "grouped"
+          : boardData.categoryDisplayMode,
     } satisfies TradeBoard,
     selectedConditions: boardData.selectedConditions,
     missingCardCount: boardData.cards.length - cards.length,

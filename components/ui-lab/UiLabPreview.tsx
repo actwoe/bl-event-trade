@@ -1,7 +1,12 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { TRADE_CATEGORIES, TradeBoard, TradeCard } from "@/lib/trade-types";
+import {
+  TRADE_CATEGORIES,
+  TradeBoard,
+  TradeBoardMode,
+  TradeCard,
+} from "@/lib/trade-types";
 import { QuantityBadge } from "@/components/trade/QuantityBadge";
 import { ProtectedGoodsImage } from "@/components/trade-editor/ProtectedGoodsImage";
 import { sortTradeCardsBySideAndGroup } from "@/lib/trade-card-order";
@@ -36,7 +41,15 @@ function getCardQuantity(card: TradeCard) {
   return Number.isFinite(quantity) ? Math.max(1, Math.floor(quantity)) : 1;
 }
 
-function TradeCardStatusBadge({ card }: { card: TradeCard }) {
+function TradeCardStatusBadge({
+  card,
+  boardMode,
+}: {
+  card: TradeCard;
+  boardMode: TradeBoardMode;
+}) {
+  if (boardMode === "sell") return null;
+
   if (card.side === "want" && card.isPriority === true) {
     return (
       <span
@@ -103,12 +116,25 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
     { board, collectionTitle, responsive = false },
     ref,
   ) {
-    const hasCards = board.cards.length > 0;
+    const boardMode = board.boardMode ?? "trade";
+    const visibleCards =
+      boardMode === "sell"
+        ? board.cards.filter((card) => card.side === "have")
+        : boardMode === "wanted"
+          ? board.cards.filter((card) => card.side === "want")
+          : board.cards;
+    const hasCards = visibleCards.length > 0;
     const nickname = board.nickname.trim();
     const account = board.contact.trim();
     const hasProfile = Boolean(nickname || account);
     const memoChips = getMemoChips(board.memo);
     const grouped = board.categoryDisplayMode !== "simple";
+    const boardEyebrow =
+      boardMode === "sell"
+        ? "BL GOODS SELL BOARD"
+        : boardMode === "wanted"
+          ? "BL GOODS WANTED BOARD"
+          : "BL GOODS TRADE BOARD";
     const containerRef = useRef<HTMLDivElement>(null);
     const previewRef = useRef<HTMLDivElement>(null);
     const [previewScale, setPreviewScale] = useState(1);
@@ -156,7 +182,7 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
             <div className="flex min-h-[50px] min-w-0 items-center justify-between gap-6">
               <div className="min-w-0 text-left">
                 <p className="mb-1 text-[9px] font-bold tracking-[0.18em] text-white/55">
-                  BL GOODS TRADE BOARD
+                  {boardEyebrow}
                 </p>
                 <h1 className="break-keep text-[22px] font-black leading-tight tracking-tight">
                   {collectionTitle}
@@ -197,10 +223,17 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
             ) : null}
 
             {hasCards ? (
-              grouped ? (
-                <GroupedTradeRows cards={sortTradeCardsBySideAndGroup(board.cards)} />
+              boardMode === "trade" ? (
+                grouped ? (
+                  <GroupedTradeRows cards={sortTradeCardsBySideAndGroup(visibleCards)} />
+                ) : (
+                  <SimpleTradeRows cards={sortTradeCardsBySideAndGroup(visibleCards)} />
+                )
               ) : (
-                <SimpleTradeRows cards={sortTradeCardsBySideAndGroup(board.cards)} />
+                <SingleBoardRows
+                  cards={sortTradeCardsBySideAndGroup(visibleCards)}
+                  boardMode={boardMode}
+                />
               )
             ) : (
               <div className="border-2 border-dashed border-neutral-200 px-6 py-16 text-center">
@@ -299,6 +332,7 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
                     cards={have}
                     columns={columnsPerSide}
                     showMeta={false}
+                    boardMode="trade"
                     centerIncompleteRow={have.length < want.length}
                   />
                 </div>
@@ -307,6 +341,7 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
                     cards={want}
                     columns={columnsPerSide}
                     showMeta={false}
+                    boardMode="trade"
                     centerIncompleteRow={want.length < have.length}
                   />
                 </div>
@@ -314,6 +349,49 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
             </section>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function SingleBoardRows({
+  cards,
+  boardMode,
+}: {
+  cards: TradeCard[];
+  boardMode: Exclude<TradeBoardMode, "trade">;
+}) {
+  const side = boardMode === "sell" ? "have" : "want";
+  const selectedCards = sortTradeCardsBySideAndGroup(cards).filter(
+    (card) => card.side === side,
+  );
+  const groups = getCardGroups(selectedCards);
+  const title = boardMode === "sell" ? "양도해요 (SELL)" : "구해요 (WANT)";
+
+  return (
+    <div>
+      <SideTitle title={title} count={selectedCards.length} />
+
+      <div className="mt-5 space-y-6">
+        {groups.map((group) => (
+          <section key={group.key}>
+            <div className="mb-3 flex items-center gap-3">
+              <span className="h-4 w-1 rounded-full bg-[#7C5CFC]" />
+              <h2 className="text-[12px] font-black text-neutral-800">
+                {group.label}
+              </h2>
+              <span className="h-px flex-1 bg-neutral-200" />
+            </div>
+
+            <CardGrid
+              cards={group.cards}
+              columns={6}
+              showMeta={false}
+              boardMode={boardMode}
+              centerIncompleteRow
+            />
+          </section>
+        ))}
       </div>
     </div>
   );
@@ -342,6 +420,7 @@ function SimpleTradeRows({ cards }: { cards: TradeCard[] }) {
             cards={haveCards}
             columns={columnsPerSide}
             showMeta
+            boardMode="trade"
             centerIncompleteRow={haveCards.length < wantCards.length}
           />
         </div>
@@ -350,6 +429,7 @@ function SimpleTradeRows({ cards }: { cards: TradeCard[] }) {
             cards={wantCards}
             columns={columnsPerSide}
             showMeta
+            boardMode="trade"
             centerIncompleteRow={wantCards.length < haveCards.length}
           />
         </div>
@@ -362,11 +442,13 @@ function CardGrid({
   cards,
   columns,
   showMeta,
+  boardMode,
   centerIncompleteRow = false,
 }: {
   cards: TradeCard[];
   columns: 1 | 2 | 3 | 4 | 6 | 8;
   showMeta: boolean;
+  boardMode: TradeBoardMode;
   centerIncompleteRow?: boolean;
 }) {
   if (cards.length === 0) {
@@ -401,7 +483,7 @@ function CardGrid({
                 className="min-w-0 shrink-0"
                 style={{ flexBasis: cardWidth, maxWidth: cardWidth }}
               >
-                <PreviewCard card={card} showMeta={showMeta} />
+                <PreviewCard card={card} showMeta={showMeta} boardMode={boardMode} />
               </div>
             ))}
           </div>
@@ -414,9 +496,11 @@ function CardGrid({
 function PreviewCard({
   card,
   showMeta,
+  boardMode,
 }: {
   card: TradeCard;
   showMeta: boolean;
+  boardMode: TradeBoardMode;
 }) {
   const metaLabel = getCardMetaLabel(card);
   const quantity = getCardQuantity(card);
@@ -431,7 +515,7 @@ function PreviewCard({
           decoding="async"
           className={`${card.imageRatio === "photocard" ? "aspect-[55/85]" : "aspect-square"} w-full rounded-xl bg-white object-contain`}
         />
-        <TradeCardStatusBadge card={card} />
+        <TradeCardStatusBadge card={card} boardMode={boardMode} />
         <QuantityBadge quantity={quantity} />
       </div>
 

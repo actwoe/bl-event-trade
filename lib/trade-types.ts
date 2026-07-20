@@ -11,6 +11,8 @@ export type TradeImageRatio = 'square' | 'photocard';
 
 export type TradeCategoryDisplayMode = 'grouped' | 'simple';
 
+export type TradeBoardMode = 'trade' | 'sell' | 'wanted';
+
 export const TRADE_CATEGORIES: { id: TradeCategory; label: string }[] = [
   { id: 'benefit', label: '특전' },
   { id: 'deco_photo_pack', label: '데코 포토팩' },
@@ -40,6 +42,7 @@ export type TradeBoard = {
   contact: string;
   memo: string;
   cards: TradeCard[];
+  boardMode?: TradeBoardMode;
   categoryDisplayMode?: TradeCategoryDisplayMode;
 };
 

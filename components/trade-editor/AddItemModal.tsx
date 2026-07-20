@@ -14,6 +14,7 @@ import {
 } from "@/lib/trade-editor-display";
 import {
   RegisteredTradeItem,
+  TradeBoardMode,
   TradeCard,
   TradeCategory,
   TradeReferenceImage,
@@ -37,6 +38,7 @@ export type UploadedCardMetadata = {
 
 export type AddItemModalProps = {
   side: TradeSide;
+  boardMode?: TradeBoardMode;
   selectedWorkTitle: string;
   selectedCategory: CategoryFilterValue;
   selectedBenefitSubcategory: BenefitSubcategoryFilterValue;
@@ -59,6 +61,7 @@ export type AddItemModalProps = {
 
 export function AddItemModal({
   side,
+  boardMode = "trade",
   selectedWorkTitle,
   selectedCategory,
   selectedBenefitSubcategory,
@@ -78,8 +81,10 @@ export function AddItemModal({
   onUpload,
   variant = "default",
 }: AddItemModalProps) {
-  const sideKoreanLabel = side === "have" ? "있어요" : "구해요";
-  const sideEnglishLabel = side === "have" ? "Have" : "Want";
+  const sideKoreanLabel =
+    boardMode === "sell" ? "양도해요" : side === "have" ? "있어요" : "구해요";
+  const sideEnglishLabel =
+    boardMode === "sell" ? "SELL" : side === "have" ? "Have" : "Want";
   const sideLabel =
     variant === "lab"
       ? `${sideKoreanLabel} (${sideEnglishLabel})`

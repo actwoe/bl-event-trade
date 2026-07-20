@@ -2,6 +2,7 @@
 
 import {
   TRADE_CATEGORIES,
+  TradeBoardMode,
   TradeCard,
   TradeCategory,
   TradeSide,
@@ -16,8 +17,9 @@ import { ProtectedGoodsImage } from "@/components/trade-editor/ProtectedGoodsIma
 type SideLabelMode = "bilingual" | "korean";
 
 type SelectedTradeCardsProps = {
-  title: "있어요" | "구해요";
+  title: string;
   cards: TradeCard[];
+  boardMode?: TradeBoardMode;
   onUpdate: (cardId: string, patch: Partial<QuantityTradeCard>) => void;
   onRemove: (cardId: string) => void;
   sideLabelMode?: SideLabelMode;
@@ -26,6 +28,7 @@ type SelectedTradeCardsProps = {
 export function SelectedTradeCards({
   title,
   cards,
+  boardMode = "trade",
   onUpdate,
   onRemove,
   sideLabelMode = "korean",
@@ -42,6 +45,7 @@ export function SelectedTradeCards({
           <SelectedTradeCardEditor
             key={card.id}
             card={card}
+            boardMode={boardMode}
             onUpdate={(patch) => onUpdate(card.id, patch)}
             onRemove={() => onRemove(card.id)}
             sideLabelMode={sideLabelMode}
@@ -54,6 +58,7 @@ export function SelectedTradeCards({
 
 type SelectedTradeCardEditorProps = {
   card: TradeCard;
+  boardMode: TradeBoardMode;
   onUpdate: (patch: Partial<QuantityTradeCard>) => void;
   onRemove: () => void;
   sideLabelMode: SideLabelMode;
@@ -61,6 +66,7 @@ type SelectedTradeCardEditorProps = {
 
 function SelectedTradeCardEditor({
   card,
+  boardMode,
   onUpdate,
   onRemove,
   sideLabelMode,
@@ -91,25 +97,35 @@ function SelectedTradeCardEditor({
           className="h-full w-full object-contain p-1"
         />
 
-        <TradeCardStatusToggle card={card} onUpdate={onUpdate} />
+        <TradeCardStatusToggle
+          card={card}
+          boardMode={boardMode}
+          onUpdate={onUpdate}
+        />
       </div>
 
       <div className="min-w-0 space-y-2">
         <div className="flex items-start gap-2">
-          <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
-            <select
-              value={card.side}
-              onChange={(event) =>
-                onUpdate({
-                  side: event.target.value as TradeSide,
-                })
-              }
-              className="min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
-              aria-label={bilingual ? "있어요 (Have) 또는 구해요 (Want)" : "있어요 또는 구해요"}
-            >
-              <option value="have">{bilingual ? "있어요 (Have)" : "있어요"}</option>
-              <option value="want">{bilingual ? "구해요 (Want)" : "구해요"}</option>
-            </select>
+          <div
+            className={`grid min-w-0 flex-1 gap-2 ${
+              boardMode === "trade" ? "grid-cols-2" : "grid-cols-1"
+            }`}
+          >
+            {boardMode === "trade" ? (
+              <select
+                value={card.side}
+                onChange={(event) =>
+                  onUpdate({
+                    side: event.target.value as TradeSide,
+                  })
+                }
+                className="min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
+                aria-label={bilingual ? "있어요 (Have) 또는 구해요 (Want)" : "있어요 또는 구해요"}
+              >
+                <option value="have">{bilingual ? "있어요 (Have)" : "있어요"}</option>
+                <option value="want">{bilingual ? "구해요 (Want)" : "구해요"}</option>
+              </select>
+            ) : null}
 
             <select
               value={card.category}
@@ -176,11 +192,15 @@ function SelectedTradeCardEditor({
 
 function TradeCardStatusToggle({
   card,
+  boardMode,
   onUpdate,
 }: {
   card: TradeCard;
+  boardMode: TradeBoardMode;
   onUpdate: (patch: Partial<QuantityTradeCard>) => void;
 }) {
+  if (boardMode === "sell") return null;
+
   if (card.side === "want") {
     const active = card.isPriority === true;
 
