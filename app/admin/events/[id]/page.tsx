@@ -1084,6 +1084,30 @@ export default function AdminEventManagePage() {
         return;
       }
 
+      const itemOrderUpdateResults = await Promise.all(
+        normalizedRows.map((row, index) =>
+          supabase
+            .from('trade_items')
+            .update({ sort_order: index })
+            .eq('collection_id', row.collection_id)
+            .eq('category', 'benefit')
+            .eq('benefit_subcategory', row.name),
+        ),
+      );
+      const failedItemOrderResult = itemOrderUpdateResults.find(
+        (result) => result.error,
+      );
+
+      if (failedItemOrderResult?.error) {
+        console.error(failedItemOrderResult.error);
+        setMessage(
+          '특전 하위 분류 순서는 저장됐지만 굿즈 정렬값 동기화에 실패했습니다.',
+        );
+        return;
+      }
+
+      await loadItems();
+
       setMessage('특전 하위 분류 순서가 저장되었습니다.');
       router.refresh();
     } catch (error) {
@@ -1366,7 +1390,12 @@ export default function AdminEventManagePage() {
         sort_order:
           category === 'collection_photo_card'
             ? getCollectionPhotoCardSortOrder(collectionPhotoCardVariant)
-            : 0,
+            : category === 'benefit'
+              ? (getBenefitSubcategorySortOrder(
+                  benefitSubcategoryOrderMap,
+                  benefitSubcategory,
+                ) ?? 0)
+              : 0,
       });
 
       if (insertError) {
@@ -1491,7 +1520,12 @@ export default function AdminEventManagePage() {
               ? getCollectionPhotoCardSortOrder(
                   editingItemCollectionPhotoCardVariant,
                 )
-              : 0,
+              : editingItemCategory === 'benefit'
+                ? (getBenefitSubcategorySortOrder(
+                    benefitSubcategoryOrderMap,
+                    editingItemBenefitSubcategory,
+                  ) ?? 0)
+                : 0,
           is_visible: editingItemIsVisible,
         })
         .eq('id', item.id);

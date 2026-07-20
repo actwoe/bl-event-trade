@@ -1,4 +1,3 @@
-import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import { TradeBuilder } from '@/components/trade/TradeBuilder';
 import { AppBottomNav } from '@/components/ui/AppBottomNav';
@@ -12,6 +11,7 @@ import {
 } from '@/lib/event-status';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
 import {
+  addBenefitSubcategoryItemOrderFallback,
   createBenefitSubcategoryOrderMap,
   getBenefitSubcategorySortOrder,
 } from '@/lib/trade-benefit-subcategory-order';
@@ -23,7 +23,7 @@ import {
   TradeReferenceImage,
 } from '@/lib/trade-types';
 
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 
 type TradePageProps = {
   params: Promise<{
@@ -67,8 +67,7 @@ function getSafeImageRatio(value?: string | null): TradeImageRatio {
   return value === 'photocard' ? 'photocard' : 'square';
 }
 
-const getTradePageData = unstable_cache(
-  async (slug: string) => {
+async function getTradePageData(slug: string) {
     const { data: collectionData, error: collectionError } = await supabase
       .from('trade_collections')
       .select(
@@ -117,10 +116,7 @@ const getTradePageData = unstable_cache(
       subcategoryData: subcategoriesResult.data,
       subcategoryError: subcategoriesResult.error,
     };
-  },
-  ['trade-page-data'],
-  { revalidate: 300 },
-);
+}
 
 export default async function TradePage({ params }: TradePageProps) {
   const { slug } = await params;
@@ -170,6 +166,10 @@ export default async function TradePage({ params }: TradePageProps) {
 
   const benefitSubcategoryOrderMap = createBenefitSubcategoryOrderMap(
     (subcategoryData ?? []) as TradeBenefitSubcategoryRow[],
+  );
+  addBenefitSubcategoryItemOrderFallback(
+    benefitSubcategoryOrderMap,
+    (itemData ?? []) as TradeItemRow[],
   );
 
   const registeredItems: RegisteredTradeItem[] = (
