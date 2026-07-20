@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   RegisteredTradeItem,
   TradeReferenceImage,
@@ -51,6 +51,8 @@ export function TradeEditorView({
   saveSection,
   onReset,
 }: TradeEditorViewProps) {
+  const [isSelectedImagesOpen, setIsSelectedImagesOpen] = useState(true);
+
   const {
     board,
     selectedConditions,
@@ -300,45 +302,62 @@ export function TradeEditorView({
           </div>
 
           <div className="mt-6 border-t border-neutral-100 pt-5">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-black text-neutral-950">
-                선택된 이미지
-              </h2>
-
-              <p className="text-xs font-bold text-neutral-400">
-                총 {totalSelectedCount}개
-              </p>
-            </div>
-
-            <div className="mt-4 space-y-5">
-              {board.cards.length > 0 ? (
-                <>
-                  {haveCards.length > 0 ? (
-                    <SelectedTradeCards
-                      title="있어요"
-                      cards={haveCards}
-                      onUpdate={updateCard}
-                      onRemove={removeCard}
-                      sideLabelMode="bilingual"
-                    />
-                  ) : null}
-
-                  {wantCards.length > 0 ? (
-                    <SelectedTradeCards
-                      title="구해요"
-                      cards={wantCards}
-                      onUpdate={updateCard}
-                      onRemove={removeCard}
-                      sideLabelMode="bilingual"
-                    />
-                  ) : null}
-                </>
-              ) : (
-                <p className="rounded-xl bg-neutral-50 px-3 py-6 text-center text-xs text-neutral-400">
-                  아직 선택된 이미지가 없습니다.
+            <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setIsSelectedImagesOpen((prev) => !prev)}
+                className="min-w-0 flex-1 text-left"
+                aria-expanded={isSelectedImagesOpen}
+              >
+                <h2 className="text-sm font-black text-neutral-950">
+                  선택된 이미지
+                </h2>
+                <p className="mt-1 text-xs font-bold text-neutral-400">
+                  총 {totalSelectedCount}개
                 </p>
-              )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSelectedImagesOpen((prev) => !prev)}
+                className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-neutral-500 ring-1 ring-neutral-200"
+                aria-expanded={isSelectedImagesOpen}
+              >
+                {isSelectedImagesOpen ? "접기" : "펼치기"}
+              </button>
             </div>
+
+            {isSelectedImagesOpen ? (
+              <div className="mt-4 space-y-5">
+                {board.cards.length > 0 ? (
+                  <>
+                    {haveCards.length > 0 ? (
+                      <SelectedTradeCards
+                        title="있어요"
+                        cards={haveCards}
+                        onUpdate={updateCard}
+                        onRemove={removeCard}
+                        sideLabelMode="bilingual"
+                      />
+                    ) : null}
+
+                    {wantCards.length > 0 ? (
+                      <SelectedTradeCards
+                        title="구해요"
+                        cards={wantCards}
+                        onUpdate={updateCard}
+                        onRemove={removeCard}
+                        sideLabelMode="bilingual"
+                      />
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="rounded-xl bg-neutral-50 px-3 py-6 text-center text-xs text-neutral-400">
+                    아직 선택된 이미지가 없습니다.
+                  </p>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {saveSection}
