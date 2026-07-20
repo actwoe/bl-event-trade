@@ -170,9 +170,6 @@ export function TradeEditorView({
                 <h2 className="text-sm font-black text-neutral-950">
                   만들 판 유형
                 </h2>
-                <p className="mt-1 text-xs leading-5 text-neutral-400">
-                  용도에 맞는 판을 선택해 주세요. 선택한 굿즈는 유형에 맞게 한쪽으로 정리됩니다.
-                </p>
               </div>
 
               <div

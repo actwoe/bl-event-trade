@@ -215,7 +215,7 @@ export default async function TradePage({ params }: TradePageProps) {
 
   return (
     <AppFrame>
-      <AppTopBar title="교환판 만들기" backHref="/" />
+      <AppTopBar title="교환/양도판 만들기" backHref="/" />
 
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
         <section className="border-b border-neutral-100 bg-white px-5 py-4">

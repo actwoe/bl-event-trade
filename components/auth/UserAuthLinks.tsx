@@ -79,7 +79,7 @@ export function UserAuthLinks({
     return (
       <Link
         href={authState === 'signed-in' ? '/my-trades' : '/login'}
-        aria-label={authState === 'signed-in' ? '내 교환판' : '로그인'}
+        aria-label={authState === 'signed-in' ? '내 교환/양도판' : '로그인'}
         className={accountClassName}
       >
         <AccountIcon />
@@ -104,7 +104,7 @@ export function UserAuthLinks({
           href="/my-trades"
           className="rounded-full border border-white/70 bg-white/75 px-3 py-2 text-[11px] font-bold text-neutral-600 transition hover:bg-white hover:text-neutral-950"
         >
-          내 교환판
+          내 교환/양도판
         </Link>
         <button
           type="button"

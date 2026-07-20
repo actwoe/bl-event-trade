@@ -10,7 +10,7 @@ type AppBottomNavProps = {
 const ITEMS = [
   { id: "home" as const, label: "홈", href: "/" },
   { id: "submit" as const, label: "이미지 제보", href: "/cardform" },
-  { id: "trades" as const, label: "내 교환판", href: "/my-trades" },
+  { id: "trades" as const, label: "내 교환/양도판", href: "/my-trades" },
   { id: "login" as const, label: "로그인", href: "/login" },
 ];
 

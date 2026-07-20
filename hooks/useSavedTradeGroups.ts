@@ -210,7 +210,7 @@ export function useSavedTradeGroups({
 
       if (groupData.collection_id !== collection.id) {
         setGroupSaveMessage(
-          "이 저장 그룹은 다른 행사 교환판입니다. 내 교환판에서 다시 열어 주세요.",
+          "이 저장 그룹은 다른 행사 교환판입니다. 내 교환/양도판에서 다시 열어 주세요.",
         );
         return;
       }

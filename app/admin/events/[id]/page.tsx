@@ -2425,7 +2425,7 @@ export default function AdminEventManagePage() {
                 공지용 이미지 등록
               </h2>
               <p className="mt-2 text-sm leading-6 text-neutral-500">
-                행사 공지에 올라온 특전 안내 이미지를 그대로 등록합니다. 교환판 만들기에서 “내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?” 영역에 순서대로 표시됩니다.
+                행사 공지에 올라온 특전 안내 이미지를 그대로 등록합니다. 교환/양도판 만들기에서 “내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?” 영역에 순서대로 표시됩니다.
               </p>
               <p className="mt-1 text-xs font-bold text-neutral-400">
                 등록된 공지 이미지 {referenceImages.length}개

@@ -290,7 +290,7 @@ export default function MyTradesPage() {
   if (authState === "checking" || isLoadingGroups) {
     return (
       <AppFrame>
-      <AppTopBar title="내 교환판" backHref="/" />
+      <AppTopBar title="내 교환/양도판" backHref="/" />
         <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-sm text-neutral-500">
           저장한 교환판을 불러오는 중입니다.
         </div>
@@ -302,7 +302,7 @@ export default function MyTradesPage() {
   if (authState === "signed-out") {
     return (
       <AppFrame>
-      <AppTopBar title="내 교환판" backHref="/" />
+      <AppTopBar title="내 교환/양도판" backHref="/" />
       <div className="min-h-0 flex-1 overflow-y-auto p-5">
           <section className="rounded-3xl border border-dashed border-neutral-200 bg-neutral-50 px-5 py-12 text-center">
             <h1 className="text-xl font-black text-neutral-950">
@@ -327,7 +327,7 @@ export default function MyTradesPage() {
   return (
     <AppFrame>
       <AppTopBar
-          title="내 교환판"
+          title="내 교환/양도판"
           backHref="/"
           onAccountClick={handleLogout}
           accountLabel="로그아웃"
@@ -339,7 +339,7 @@ export default function MyTradesPage() {
               BL GOODS TRADE
             </p>
             <h2 className="mt-1 text-[24px] font-black leading-tight tracking-[-0.03em] text-neutral-950">
-              내 교환판
+              내 교환/양도판
             </h2>
             <p className="mt-2 text-sm leading-6 text-neutral-500">
               저장한 그룹을 선택해 교환판을 바로 수정할 수 있습니다.
@@ -379,7 +379,7 @@ export default function MyTradesPage() {
                     <Link
                       href="/"
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-dashed border-neutral-300 text-lg font-light text-neutral-500"
-                      aria-label="새 교환판 만들기"
+                      aria-label="새 교환/양도판 만들기"
                     >
                       +
                     </Link>
@@ -422,7 +422,7 @@ export default function MyTradesPage() {
                   href="/"
                   className="mt-5 inline-flex rounded-2xl bg-neutral-950 px-5 py-3 text-xs font-black text-white"
                 >
-                  새 교환판 만들기
+                  새 교환/양도판 만들기
                 </Link>
               </div>
             </div>

@@ -347,7 +347,7 @@ function AdminUiLabCreatePageContent() {
   return (
     <main className="flex h-[100dvh] w-full items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
       <section className="flex h-full max-h-[860px] w-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.04)]">
-        <AppTopBar title="교환판 만들기" backHref="/admin/ui-lab" />
+        <AppTopBar title="교환/양도판 만들기" backHref="/admin/ui-lab" />
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <section className="border-b border-neutral-100 bg-white px-5 py-4">
             <p className="text-[12px] font-black tracking-[0.04em] text-[#7C5CFC]">
@@ -355,7 +355,7 @@ function AdminUiLabCreatePageContent() {
             </p>
             <div className="mt-1 flex items-start justify-between gap-3">
               <h2 className="min-w-0 break-keep text-[24px] font-black leading-tight tracking-[-0.03em] text-neutral-950">
-                {collection?.title ?? "교환판 만들기"}
+                {collection?.title ?? "교환/양도판 만들기"}
               </h2>
               {collection ? (
                 <span className={
@@ -424,7 +424,7 @@ function AdminUiLabCreatePageFallback() {
   return (
     <main className="flex h-[100dvh] w-full items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
       <section className="w-full max-w-[520px] rounded-[28px] border border-neutral-200/70 bg-white p-5 text-sm text-neutral-500 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-        교환판 만들기 화면을 불러오는 중입니다.
+        교환/양도판 만들기 화면을 불러오는 중입니다.
       </section>
     </main>
   );
