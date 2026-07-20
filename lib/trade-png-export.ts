@@ -18,6 +18,8 @@ type ExportBadgeSnapshot = {
   text: string;
   backgroundColor: string;
   color: string;
+  borderColor: string;
+  borderWidth: number;
   fontFamily: string;
   fontSize: string;
   fontWeight: string;
@@ -29,7 +31,8 @@ type ExportImageSnapshot = {
   objectUrl: string;
   rect: DOMRect;
   borderRadius: number;
-  badge: ExportBadgeSnapshot | null;
+  quantityBadge: ExportBadgeSnapshot | null;
+  statusBadge: ExportBadgeSnapshot | null;
   previousVisibility: string;
 };
 
@@ -154,6 +157,37 @@ function getQuantityBadge(image: HTMLImageElement) {
   ) as HTMLElement | null;
 }
 
+function getStatusBadge(image: HTMLImageElement) {
+  const parent = image.parentElement;
+  if (!parent) return null;
+
+  return (
+    Array.from(parent.children).find(
+      (child) =>
+        child instanceof HTMLElement &&
+        child.dataset.tradeStatusBadge === "true",
+    ) ?? null
+  ) as HTMLElement | null;
+}
+
+function createBadgeSnapshot(element: HTMLElement | null) {
+  if (!element) return null;
+
+  const style = window.getComputedStyle(element);
+
+  return {
+    rect: element.getBoundingClientRect(),
+    text: element.textContent?.trim() ?? "",
+    backgroundColor: style.backgroundColor,
+    color: style.color,
+    borderColor: style.borderColor,
+    borderWidth: Number.parseFloat(style.borderTopWidth) || 0,
+    fontFamily: style.fontFamily,
+    fontSize: style.fontSize,
+    fontWeight: style.fontWeight,
+  } satisfies ExportBadgeSnapshot;
+}
+
 async function prepareExportImages(node: HTMLElement) {
   const images = Array.from(node.querySelectorAll("img"));
   const snapshots: ExportImageSnapshot[] = [];
@@ -175,10 +209,8 @@ async function prepareExportImages(node: HTMLElement) {
 
       const { image: drawable, objectUrl } = await drawablePromise;
       const style = window.getComputedStyle(element);
-      const badgeElement = getQuantityBadge(element);
-      const badgeStyle = badgeElement
-        ? window.getComputedStyle(badgeElement)
-        : null;
+      const quantityBadgeElement = getQuantityBadge(element);
+      const statusBadgeElement = getStatusBadge(element);
 
       snapshots.push({
         element,
@@ -186,18 +218,8 @@ async function prepareExportImages(node: HTMLElement) {
         objectUrl,
         rect: element.getBoundingClientRect(),
         borderRadius: Number.parseFloat(style.borderTopLeftRadius) || 0,
-        badge:
-          badgeElement && badgeStyle
-            ? {
-                rect: badgeElement.getBoundingClientRect(),
-                text: badgeElement.textContent?.trim() ?? "",
-                backgroundColor: badgeStyle.backgroundColor,
-                color: badgeStyle.color,
-                fontFamily: badgeStyle.fontFamily,
-                fontSize: badgeStyle.fontSize,
-                fontWeight: badgeStyle.fontWeight,
-              }
-            : null,
+        quantityBadge: createBadgeSnapshot(quantityBadgeElement),
+        statusBadge: createBadgeSnapshot(statusBadgeElement),
         previousVisibility: element.style.visibility,
       });
     }
@@ -298,7 +320,7 @@ function drawContainedImage(
   context.restore();
 }
 
-function drawQuantityBadge(
+function drawExportBadge(
   context: CanvasRenderingContext2D,
   badge: ExportBadgeSnapshot,
   nodeRect: DOMRect,
@@ -315,6 +337,11 @@ function drawQuantityBadge(
   createRoundedRectPath(context, x, y, width, height, height / 2);
   context.fillStyle = badge.backgroundColor || "rgb(10, 10, 10)";
   context.fill();
+  if (badge.borderWidth > 0) {
+    context.lineWidth = badge.borderWidth;
+    context.strokeStyle = badge.borderColor || "transparent";
+    context.stroke();
+  }
   context.shadowColor = "transparent";
   context.fillStyle = badge.color || "#ffffff";
   context.font = `${badge.fontWeight || "900"} ${badge.fontSize || "9px"} ${badge.fontFamily || TRADE_FONT_FAMILY}`;
@@ -435,8 +462,12 @@ function compositeExportImages(
   }
 
   for (const snapshot of snapshots) {
-    if (snapshot.badge) {
-      drawQuantityBadge(context, snapshot.badge, nodeRect);
+    if (snapshot.statusBadge) {
+      drawExportBadge(context, snapshot.statusBadge, nodeRect);
+    }
+
+    if (snapshot.quantityBadge) {
+      drawExportBadge(context, snapshot.quantityBadge, nodeRect);
     }
   }
 

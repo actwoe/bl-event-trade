@@ -36,6 +36,36 @@ function getCardQuantity(card: TradeCard) {
   return Number.isFinite(quantity) ? Math.max(1, Math.floor(quantity)) : 1;
 }
 
+function TradeCardStatusBadge({ card }: { card: TradeCard }) {
+  if (card.side === "want" && card.isPriority === true) {
+    return (
+      <span
+        aria-hidden="true"
+        data-trade-status-badge="true"
+        data-trade-status-kind="priority"
+        className="pointer-events-none absolute left-1.5 top-1.5 z-[4] flex h-[22px] w-[22px] items-center justify-center rounded-full border border-red-200 bg-white/95 text-[13px] font-black leading-none text-red-500 shadow-sm"
+      >
+        ♥
+      </span>
+    );
+  }
+
+  if (card.side === "have" && card.isForSale === true) {
+    return (
+      <span
+        aria-hidden="true"
+        data-trade-status-badge="true"
+        data-trade-status-kind="sell"
+        className="pointer-events-none absolute left-1.5 top-1.5 z-[4] flex h-[22px] min-w-[34px] items-center justify-center rounded-full bg-[#7C5CFC] px-1.5 text-[8px] font-black leading-none tracking-[0.04em] text-white shadow-sm"
+      >
+        SELL
+      </span>
+    );
+  }
+
+  return null;
+}
+
 function getCardMetaLabel(card: TradeCard) {
   const categoryLabel =
     TRADE_CATEGORIES.find((category) => category.id === card.category)?.label ??
@@ -401,6 +431,7 @@ function PreviewCard({
           decoding="async"
           className={`${card.imageRatio === "photocard" ? "aspect-[55/85]" : "aspect-square"} w-full rounded-xl bg-white object-contain`}
         />
+        <TradeCardStatusBadge card={card} />
         <QuantityBadge quantity={quantity} />
       </div>
 

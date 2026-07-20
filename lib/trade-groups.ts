@@ -16,6 +16,8 @@ export type SavedTradeGroupCard = {
   memo: string;
   imageRatio: TradeImageRatio;
   benefitSubcategory: string | null;
+  isPriority?: boolean;
+  isForSale?: boolean;
 };
 
 export type SavedTradeGroupBoard = {
@@ -78,7 +80,9 @@ function isSavedTradeGroupCard(value: unknown): value is SavedTradeGroupCard {
     typeof card.memo === 'string' &&
     isTradeImageRatio(card.imageRatio) &&
     (card.benefitSubcategory === null ||
-      typeof card.benefitSubcategory === 'string')
+      typeof card.benefitSubcategory === 'string') &&
+    (card.isPriority === undefined || typeof card.isPriority === 'boolean') &&
+    (card.isForSale === undefined || typeof card.isForSale === 'boolean')
   );
 }
 

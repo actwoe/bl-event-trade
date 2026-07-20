@@ -12,6 +12,14 @@ export type QuantityTradeCard = TradeCard & {
   registeredSortOrder?: number | null;
 };
 
+function normalizeTradeCardStatus(card: QuantityTradeCard): QuantityTradeCard {
+  return {
+    ...card,
+    isPriority: card.side === "want" && card.isPriority === true,
+    isForSale: card.side === "have" && card.isForSale === true,
+  };
+}
+
 export const TRADE_CONDITIONS = [
   "같은 종류끼리만 교환",
   "교차 교환 가능",
@@ -103,7 +111,10 @@ export function updateTradeCardList(
   const currentCard = cards.find((card) => card.id === cardId);
   if (!currentCard) return cards;
 
-  const updatedCard: QuantityTradeCard = { ...currentCard, ...patch };
+  const updatedCard = normalizeTradeCardStatus({
+    ...currentCard,
+    ...patch,
+  });
 
   if (patch.side && patch.side !== currentCard.side) {
     const duplicateCard = cards.find(

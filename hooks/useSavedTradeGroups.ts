@@ -56,6 +56,8 @@ function createSavedTradeGroupBoard(
         memo: card.memo,
         imageRatio: card.imageRatio === "photocard" ? "photocard" : "square",
         benefitSubcategory: card.benefitSubcategory ?? null,
+        isPriority: card.side === "want" && card.isPriority === true,
+        isForSale: card.side === "have" && card.isForSale === true,
       },
     ];
   });
@@ -103,6 +105,10 @@ function restoreSavedTradeGroupBoard(
         registeredItemId: item.id,
         registeredSortOrder: item.sortOrder,
         registeredCatalogOrder: item.catalogOrder ?? null,
+        isPriority:
+          savedCard.side === "want" && savedCard.isPriority === true,
+        isForSale:
+          savedCard.side === "have" && savedCard.isForSale === true,
       },
     ];
   });

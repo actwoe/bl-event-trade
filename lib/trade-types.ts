@@ -31,6 +31,8 @@ export type TradeCard = {
   benefitSubcategorySortOrder?: number | null;
   registeredSortOrder?: number | null;
   registeredCatalogOrder?: number | null;
+  isPriority?: boolean;
+  isForSale?: boolean;
 };
 
 export type TradeBoard = {

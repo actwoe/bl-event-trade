@@ -90,6 +90,8 @@ function SelectedTradeCardEditor({
           alt={card.memo || card.workTitle || "굿즈 이미지"}
           className="h-full w-full object-contain p-1"
         />
+
+        <TradeCardStatusToggle card={card} onUpdate={onUpdate} />
       </div>
 
       <div className="min-w-0 space-y-2">
@@ -169,5 +171,51 @@ function SelectedTradeCardEditor({
         </div>
       </div>
     </div>
+  );
+}
+
+function TradeCardStatusToggle({
+  card,
+  onUpdate,
+}: {
+  card: TradeCard;
+  onUpdate: (patch: Partial<QuantityTradeCard>) => void;
+}) {
+  if (card.side === "want") {
+    const active = card.isPriority === true;
+
+    return (
+      <button
+        type="button"
+        onClick={() => onUpdate({ isPriority: !active })}
+        aria-label={active ? "우선 구함 표시 해제" : "우선 구함으로 표시"}
+        aria-pressed={active}
+        className={
+          active
+            ? "absolute left-1 top-1 z-[4] flex h-6 w-6 items-center justify-center rounded-full border border-red-200 bg-white/95 text-[14px] font-black leading-none text-red-500 shadow-sm"
+            : "absolute left-1 top-1 z-[4] flex h-6 w-6 items-center justify-center rounded-full border border-neutral-200 bg-white/90 text-[14px] font-black leading-none text-neutral-300 shadow-sm"
+        }
+      >
+        {active ? "♥" : "♡"}
+      </button>
+    );
+  }
+
+  const active = card.isForSale === true;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onUpdate({ isForSale: !active })}
+      aria-label={active ? "SELL 표시 해제" : "SELL로 표시"}
+      aria-pressed={active}
+      className={
+        active
+          ? "absolute left-1 top-1 z-[4] flex h-6 min-w-9 items-center justify-center rounded-full bg-[#7C5CFC] px-1.5 text-[8px] font-black leading-none tracking-[0.04em] text-white shadow-sm"
+          : "absolute left-1 top-1 z-[4] flex h-6 min-w-9 items-center justify-center rounded-full border border-neutral-200 bg-white/90 px-1.5 text-[8px] font-black leading-none tracking-[0.04em] text-neutral-400 shadow-sm"
+      }
+    >
+      SELL
+    </button>
   );
 }
