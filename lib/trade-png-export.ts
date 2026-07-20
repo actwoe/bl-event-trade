@@ -332,74 +332,61 @@ function drawRepeatedGoodsWatermark(
   height: number,
   borderRadius: number,
 ) {
-  if (width <= 0 || height <= 0) return;
+  if (width <= 1 || height <= 1) return;
 
   const angle = (GOODS_WATERMARK_ANGLE_DEG * Math.PI) / 180;
   const absoluteCosine = Math.abs(Math.cos(angle));
   const absoluteSine = Math.abs(Math.sin(angle));
-  const edgeInset = Math.max(5, Math.min(12, borderRadius * 0.75));
-  const availableWidth = Math.max(0, width - edgeInset * 2);
-  const availableHeight = Math.max(0, height - edgeInset * 2);
+  const fontSize = 8;
 
   context.save();
   createRoundedRectPath(context, x, y, width, height, borderRadius);
   context.clip();
   context.fillStyle = GOODS_WATERMARK_FILL;
+  context.font = `700 ${fontSize}px Arial, sans-serif`;
   context.textAlign = "center";
   context.textBaseline = "middle";
 
-  let fontSize = Math.max(6, Math.min(10, Math.round(Math.min(width, height) / 7.2)));
-  let textWidth = 0;
-  let textHeight = 0;
-  let rotatedWidth = 0;
-  let rotatedHeight = 0;
-
-  while (fontSize >= 5) {
-    context.font = `700 ${fontSize}px Arial, sans-serif`;
-    textWidth = context.measureText(GOODS_WATERMARK_TEXT).width;
-    textHeight = fontSize * 1.2;
-    rotatedWidth = textWidth * absoluteCosine + textHeight * absoluteSine;
-    rotatedHeight = textWidth * absoluteSine + textHeight * absoluteCosine;
-
-    if (rotatedWidth <= availableWidth && rotatedHeight <= availableHeight) {
-      break;
-    }
-
-    fontSize -= 0.5;
-  }
-
-  if (fontSize < 5 || rotatedWidth <= 0 || rotatedHeight <= 0) {
-    context.restore();
-    return;
-  }
-
-  const horizontalGap = Math.max(10, fontSize * 1.8);
-  const verticalGap = Math.max(8, fontSize * 1.4);
-  const columnCount = Math.max(
+  const textWidth = Math.max(
     1,
-    Math.floor((availableWidth + horizontalGap) / (rotatedWidth + horizontalGap)),
+    context.measureText(GOODS_WATERMARK_TEXT).width,
   );
-  const rowCount = Math.max(
-    1,
-    Math.floor((availableHeight + verticalGap) / (rotatedHeight + verticalGap)),
-  );
-  const gridWidth =
-    columnCount * rotatedWidth + Math.max(0, columnCount - 1) * horizontalGap;
-  const gridHeight =
-    rowCount * rotatedHeight + Math.max(0, rowCount - 1) * verticalGap;
-  const startX = x + (width - gridWidth) / 2 + rotatedWidth / 2;
-  const startY = y + (height - gridHeight) / 2 + rotatedHeight / 2;
+  const textHeight = fontSize * 1.25;
+  const horizontalStep = textWidth + Math.max(10, fontSize * 1.5);
+  const verticalStep = textHeight + Math.max(8, fontSize * 1.25);
 
-  for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
-    for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
-      const centerX = startX + columnIndex * (rotatedWidth + horizontalGap);
-      const centerY = startY + rowIndex * (rotatedHeight + verticalGap);
+  // Rotate one shared grid instead of rotating each phrase independently.
+  // Every image therefore uses the same font size and spacing. The grid is
+  // extended beyond the image bounds so even small thumbnails receive
+  // multiple watermark fragments, while the step sizes keep phrases apart.
+  const rotatedSpanWidth =
+    width * absoluteCosine + height * absoluteSine;
+  const rotatedSpanHeight =
+    width * absoluteSine + height * absoluteCosine;
+  const halfSpanX = rotatedSpanWidth / 2 + horizontalStep;
+  const halfSpanY = rotatedSpanHeight / 2 + verticalStep;
+  const firstRow = Math.floor(-halfSpanY / verticalStep);
+  const lastRow = Math.ceil(halfSpanY / verticalStep);
 
-      context.save();
-      context.translate(centerX, centerY);
-      context.rotate(angle);
-      context.fillText(GOODS_WATERMARK_TEXT, 0, 0);
-      context.restore();
+  context.translate(x + width / 2, y + height / 2);
+  context.rotate(angle);
+
+  for (let row = firstRow; row <= lastRow; row += 1) {
+    const rowY = row * verticalStep;
+    const staggerOffset = Math.abs(row) % 2 === 1 ? horizontalStep / 2 : 0;
+    const firstColumn = Math.floor(
+      (-halfSpanX - staggerOffset) / horizontalStep,
+    );
+    const lastColumn = Math.ceil(
+      (halfSpanX - staggerOffset) / horizontalStep,
+    );
+
+    for (let column = firstColumn; column <= lastColumn; column += 1) {
+      context.fillText(
+        GOODS_WATERMARK_TEXT,
+        column * horizontalStep + staggerOffset,
+        rowY,
+      );
     }
   }
 
