@@ -8,6 +8,11 @@ import { AppFrame } from "@/components/ui/AppFrame";
 import { AppTopBar } from "@/components/ui/AppTopBar";
 import { TradeBuilder } from "@/components/trade/TradeBuilder";
 import { getTradeAssetUrl, supabase } from "@/lib/supabase";
+import {
+  addBenefitSubcategoryItemOrderFallback,
+  createBenefitSubcategoryOrderMap,
+  getBenefitSubcategorySortOrder,
+} from "@/lib/trade-benefit-subcategory-order";
 import { MAX_TRADE_GROUPS, TradeGroupRow } from "@/lib/trade-groups";
 import {
   RegisteredTradeItem,
@@ -38,6 +43,11 @@ type TradeItemRow = {
   sort_order: number | null;
   image_ratio: TradeImageRatio | null;
   benefit_subcategory: string | null;
+};
+
+type TradeBenefitSubcategoryRow = {
+  name: string;
+  sort_order: number | null;
 };
 
 type TradeReferenceImageRow = {
@@ -139,7 +149,12 @@ export default function MyTradesPage() {
       setIsLoadingEditor(true);
       setMessage("");
 
-      const [collectionResult, itemResult, referenceResult] = await Promise.all([
+      const [
+        collectionResult,
+        itemResult,
+        referenceResult,
+        subcategoryResult,
+      ] = await Promise.all([
         supabase
           .from("trade_collections")
           .select("id, slug, title, description, event_start_date, event_end_date, event_location")
@@ -159,6 +174,13 @@ export default function MyTradesPage() {
           .eq("collection_id", activeGroup.collection_id)
           .order("sort_order", { ascending: true })
           .order("created_at", { ascending: true }),
+        supabase
+          .from("trade_benefit_subcategories")
+          .select("name, sort_order")
+          .eq("collection_id", activeGroup.collection_id)
+          .eq("is_visible", true)
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true }),
       ]);
 
       if (!isMounted) return;
@@ -173,6 +195,7 @@ export default function MyTradesPage() {
 
       if (itemResult.error) console.error(itemResult.error);
       if (referenceResult.error) console.error(referenceResult.error);
+      if (subcategoryResult.error) console.error(subcategoryResult.error);
 
       const collectionRow = collectionResult.data as CollectionRow;
       const collection: TradeCollectionSummary = {
@@ -185,19 +208,31 @@ export default function MyTradesPage() {
         location: collectionRow.event_location,
       };
 
-      const registeredItems: RegisteredTradeItem[] = (
-        (itemResult.data ?? []) as TradeItemRow[]
-      )
+      const itemRows = (itemResult.data ?? []) as TradeItemRow[];
+      const benefitSubcategoryOrderMap = createBenefitSubcategoryOrderMap(
+        (subcategoryResult.data ?? []) as TradeBenefitSubcategoryRow[],
+      );
+      addBenefitSubcategoryItemOrderFallback(
+        benefitSubcategoryOrderMap,
+        itemRows,
+      );
+
+      const registeredItems: RegisteredTradeItem[] = itemRows
         .filter((item) => item.image_path)
-        .map((item) => ({
+        .map((item, catalogOrder) => ({
           id: item.id,
           category: item.category,
           workTitle: item.work_title,
           itemName: item.item_name || "",
           imageUrl: getTradeAssetUrl(item.image_path),
           sortOrder: item.sort_order ?? 0,
+          catalogOrder,
           imageRatio: getSafeImageRatio(item.image_ratio),
           benefitSubcategory: item.benefit_subcategory ?? null,
+          benefitSubcategorySortOrder: getBenefitSubcategorySortOrder(
+            benefitSubcategoryOrderMap,
+            item.benefit_subcategory,
+          ),
         }));
 
       const referenceImages: TradeReferenceImage[] = (
