@@ -5,8 +5,6 @@ import {
   GOODS_WATERMARK_ANGLE_DEG,
   GOODS_WATERMARK_FILL,
   GOODS_WATERMARK_TEXT,
-  GOODS_WATERMARK_TILE_HEIGHT,
-  GOODS_WATERMARK_TILE_WIDTH,
 } from "@/lib/goods-watermark";
 
 const TRADE_PREVIEW_WIDTH = 840;
@@ -336,26 +334,72 @@ function drawRepeatedGoodsWatermark(
 ) {
   if (width <= 0 || height <= 0) return;
 
-  const diagonal = Math.sqrt(width * width + height * height);
-  const fontSize = Math.max(6, Math.min(10, Math.round(Math.min(width, height) / 7.2)));
-  const stepX = Math.max(GOODS_WATERMARK_TILE_WIDTH * 0.62, fontSize * 4.8);
-  const stepY = Math.max(GOODS_WATERMARK_TILE_HEIGHT * 0.62, fontSize * 2.35);
+  const angle = (GOODS_WATERMARK_ANGLE_DEG * Math.PI) / 180;
+  const absoluteCosine = Math.abs(Math.cos(angle));
+  const absoluteSine = Math.abs(Math.sin(angle));
+  const edgeInset = Math.max(5, Math.min(12, borderRadius * 0.75));
+  const availableWidth = Math.max(0, width - edgeInset * 2);
+  const availableHeight = Math.max(0, height - edgeInset * 2);
 
   context.save();
   createRoundedRectPath(context, x, y, width, height, borderRadius);
   context.clip();
-  context.translate(x + width / 2, y + height / 2);
-  context.rotate((GOODS_WATERMARK_ANGLE_DEG * Math.PI) / 180);
   context.fillStyle = GOODS_WATERMARK_FILL;
-  context.font = `700 ${fontSize}px Arial, sans-serif`;
   context.textAlign = "center";
   context.textBaseline = "middle";
 
-  for (let row = -diagonal; row <= diagonal; row += stepY) {
-    const offsetX = Math.round(row / stepY) % 2 === 0 ? 0 : stepX / 2;
+  let fontSize = Math.max(6, Math.min(10, Math.round(Math.min(width, height) / 7.2)));
+  let textWidth = 0;
+  let textHeight = 0;
+  let rotatedWidth = 0;
+  let rotatedHeight = 0;
 
-    for (let col = -diagonal; col <= diagonal; col += stepX) {
-      context.fillText(GOODS_WATERMARK_TEXT, col + offsetX, row);
+  while (fontSize >= 5) {
+    context.font = `700 ${fontSize}px Arial, sans-serif`;
+    textWidth = context.measureText(GOODS_WATERMARK_TEXT).width;
+    textHeight = fontSize * 1.2;
+    rotatedWidth = textWidth * absoluteCosine + textHeight * absoluteSine;
+    rotatedHeight = textWidth * absoluteSine + textHeight * absoluteCosine;
+
+    if (rotatedWidth <= availableWidth && rotatedHeight <= availableHeight) {
+      break;
+    }
+
+    fontSize -= 0.5;
+  }
+
+  if (fontSize < 5 || rotatedWidth <= 0 || rotatedHeight <= 0) {
+    context.restore();
+    return;
+  }
+
+  const horizontalGap = Math.max(10, fontSize * 1.8);
+  const verticalGap = Math.max(8, fontSize * 1.4);
+  const columnCount = Math.max(
+    1,
+    Math.floor((availableWidth + horizontalGap) / (rotatedWidth + horizontalGap)),
+  );
+  const rowCount = Math.max(
+    1,
+    Math.floor((availableHeight + verticalGap) / (rotatedHeight + verticalGap)),
+  );
+  const gridWidth =
+    columnCount * rotatedWidth + Math.max(0, columnCount - 1) * horizontalGap;
+  const gridHeight =
+    rowCount * rotatedHeight + Math.max(0, rowCount - 1) * verticalGap;
+  const startX = x + (width - gridWidth) / 2 + rotatedWidth / 2;
+  const startY = y + (height - gridHeight) / 2 + rotatedHeight / 2;
+
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+    for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+      const centerX = startX + columnIndex * (rotatedWidth + horizontalGap);
+      const centerY = startY + rowIndex * (rotatedHeight + verticalGap);
+
+      context.save();
+      context.translate(centerX, centerY);
+      context.rotate(angle);
+      context.fillText(GOODS_WATERMARK_TEXT, 0, 0);
+      context.restore();
     }
   }
 
