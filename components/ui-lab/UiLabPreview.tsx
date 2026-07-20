@@ -43,7 +43,7 @@ function TradeCardStatusBadge({ card }: { card: TradeCard }) {
         aria-hidden="true"
         data-trade-status-badge="true"
         data-trade-status-kind="priority"
-        className="pointer-events-none absolute left-1.5 top-1.5 z-[4] flex h-[22px] w-[22px] items-center justify-center rounded-full border border-red-200 bg-white/95 text-[13px] font-black leading-none text-red-500 shadow-sm"
+        className="pointer-events-none absolute left-1.5 top-1.5 z-[4] flex h-[22px] w-[22px] items-center justify-center rounded-full border border-red-500 bg-red-500 text-[13px] font-black leading-none text-white shadow-sm"
       >
         ♥
       </span>

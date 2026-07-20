@@ -192,7 +192,7 @@ function TradeCardStatusToggle({
         aria-pressed={active}
         className={
           active
-            ? "absolute left-1 top-1 z-[4] flex h-6 w-6 items-center justify-center rounded-full border border-red-200 bg-white/95 text-[14px] font-black leading-none text-red-500 shadow-sm"
+            ? "absolute left-1 top-1 z-[4] flex h-6 w-6 items-center justify-center rounded-full border border-red-500 bg-red-500 text-[14px] font-black leading-none text-white shadow-sm"
             : "absolute left-1 top-1 z-[4] flex h-6 w-6 items-center justify-center rounded-full border border-neutral-200 bg-white/90 text-[14px] font-black leading-none text-neutral-300 shadow-sm"
         }
       >
