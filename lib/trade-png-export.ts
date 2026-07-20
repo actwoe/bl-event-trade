@@ -9,6 +9,7 @@ import {
 
 const TRADE_PREVIEW_WIDTH = 840;
 const TRADE_EXPORT_WIDTH = 2000;
+const TRADE_EXPORT_SCALE = TRADE_EXPORT_WIDTH / TRADE_PREVIEW_WIDTH;
 const TRADE_FONT_FAMILY = "'Pretendard', Arial, sans-serif";
 const IMAGE_READY_TIMEOUT_MS = 10_000;
 const EXPORT_RETRY_DELAY_MS = 250;
@@ -424,6 +425,7 @@ function compositeExportImages(
   canvas: HTMLCanvasElement,
   node: HTMLElement,
   snapshots: ExportImageSnapshot[],
+  exportWidth: number,
   exportHeight: number,
 ) {
   const context = canvas.getContext("2d");
@@ -432,7 +434,7 @@ function compositeExportImages(
   }
 
   const nodeRect = node.getBoundingClientRect();
-  const scaleX = canvas.width / TRADE_PREVIEW_WIDTH;
+  const scaleX = canvas.width / Math.max(1, exportWidth);
   const scaleY = canvas.height / Math.max(1, exportHeight);
 
   context.save();
@@ -491,19 +493,18 @@ async function createTradePngBlob(
   node: HTMLDivElement,
   snapshots: ExportImageSnapshot[],
 ) {
-  const height = Math.max(
-    node.scrollHeight,
-    Math.ceil(node.getBoundingClientRect().height),
-  );
+  const nodeRect = node.getBoundingClientRect();
+  const width = Math.max(node.offsetWidth, Math.ceil(nodeRect.width));
+  const height = Math.max(node.scrollHeight, Math.ceil(nodeRect.height));
 
-  if (height <= 0) {
-    throw new Error("미리보기 높이를 계산하지 못했습니다.");
+  if (width <= 0 || height <= 0) {
+    throw new Error("미리보기 크기를 계산하지 못했습니다.");
   }
 
   const canvas = await toCanvas(node, {
     cacheBust: false,
-    pixelRatio: TRADE_EXPORT_WIDTH / TRADE_PREVIEW_WIDTH,
-    width: TRADE_PREVIEW_WIDTH,
+    pixelRatio: TRADE_EXPORT_SCALE,
+    width,
     height,
     backgroundColor: "transparent",
     style: {
@@ -512,7 +513,7 @@ async function createTradePngBlob(
     },
   });
 
-  compositeExportImages(canvas, node, snapshots, height);
+  compositeExportImages(canvas, node, snapshots, width, height);
   return canvasToBlob(canvas);
 }
 
