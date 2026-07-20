@@ -16,6 +16,27 @@ function getTradeCategorySortIndex(category: TradeCategory) {
   return index === -1 ? TRADE_CATEGORIES.length : index;
 }
 
+function normalizeCatalogOrder(value?: number | null) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : Number.MAX_SAFE_INTEGER;
+}
+
+function compareRegisteredBenefitCards(left: TradeCard, right: TradeCard) {
+  const leftHasCatalogOrder = Number.isFinite(left.registeredCatalogOrder);
+  const rightHasCatalogOrder = Number.isFinite(right.registeredCatalogOrder);
+
+  if (!leftHasCatalogOrder && !rightHasCatalogOrder) return 0;
+  if (leftHasCatalogOrder !== rightHasCatalogOrder) {
+    return leftHasCatalogOrder ? -1 : 1;
+  }
+
+  return (
+    normalizeCatalogOrder(left.registeredCatalogOrder) -
+    normalizeCatalogOrder(right.registeredCatalogOrder)
+  );
+}
+
 function compareCollectionPhotoCards(left: TradeCard, right: TradeCard) {
   const leftHasRegisteredOrder = Number.isFinite(left.registeredSortOrder);
   const rightHasRegisteredOrder = Number.isFinite(right.registeredSortOrder);
@@ -127,7 +148,7 @@ function createSharedGroupOrder(cards: TradeCard[]) {
  *
  * 1. 행사 관리에서 지정한 특전 하위 분류 순서를 우선합니다.
  * 2. 순서가 없는 직접 업로드 그룹은 사용자가 처음 선택한 순서를 유지합니다.
- * 3. 각 특전 종류 안에서는 사용자가 선택한 순서를 유지합니다.
+ * 3. 각 특전 종류 안에서는 관리자 굿즈 등록 순서를 우선합니다.
  * 4. 최종 목록에서는 있어요를 먼저, 구해요를 뒤에 배치합니다.
  */
 export function sortTradeCardsBySideAndGroup(cards: TradeCard[]) {
@@ -146,6 +167,11 @@ export function sortTradeCardsBySideAndGroup(cards: TradeCard[]) {
         (sharedGroupOrder.get(getTradeCardGroupKey(b.card)) ??
           Number.MAX_SAFE_INTEGER);
       if (groupDiff !== 0) return groupDiff;
+
+      if (a.card.category === "benefit" && b.card.category === "benefit") {
+        const benefitCardDiff = compareRegisteredBenefitCards(a.card, b.card);
+        if (benefitCardDiff !== 0) return benefitCardDiff;
+      }
 
       if (
         a.card.category === "collection_photo_card" &&

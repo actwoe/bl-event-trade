@@ -30,6 +30,7 @@ export type TradeCard = {
   benefitSubcategory?: string | null;
   benefitSubcategorySortOrder?: number | null;
   registeredSortOrder?: number | null;
+  registeredCatalogOrder?: number | null;
 };
 
 export type TradeBoard = {
@@ -47,6 +48,7 @@ export type RegisteredTradeItem = {
   itemName: string;
   imageUrl: string;
   sortOrder: number;
+  catalogOrder?: number | null;
   benefitType?: string | null;
   imageRatio?: TradeImageRatio | null;
   benefitSubcategory?: string | null;

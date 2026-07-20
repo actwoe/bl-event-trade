@@ -176,13 +176,14 @@ export default async function TradePage({ params }: TradePageProps) {
     (itemData ?? []) as TradeItemRow[]
   )
     .filter((item) => item.image_path)
-    .map((item) => ({
+    .map((item, catalogOrder) => ({
       id: item.id,
       category: item.category,
       workTitle: item.work_title,
       itemName: item.item_name || '',
       imageUrl: getTradeAssetUrl(item.image_path),
       sortOrder: item.sort_order ?? 0,
+      catalogOrder,
       imageRatio: getSafeImageRatio(item.image_ratio),
       benefitSubcategory: item.benefit_subcategory ?? null,
       benefitSubcategorySortOrder: getBenefitSubcategorySortOrder(

@@ -53,6 +53,12 @@ function getCategorySortIndex(category: TradeCategory) {
   return index === -1 ? TRADE_CATEGORIES.length : index;
 }
 
+function normalizeCatalogOrder(value?: number | null) {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : Number.MAX_SAFE_INTEGER;
+}
+
 export function sortRegisteredItems(items: RegisteredTradeItem[]) {
   return [...items].sort((a, b) => {
     const categoryDiff = getCategorySortIndex(a.category) - getCategorySortIndex(b.category);
@@ -66,6 +72,11 @@ export function sortRegisteredItems(items: RegisteredTradeItem[]) {
         b.benefitSubcategorySortOrder,
       );
       if (subcategoryDiff !== 0) return subcategoryDiff;
+
+      const catalogOrderDiff =
+        normalizeCatalogOrder(a.catalogOrder) -
+        normalizeCatalogOrder(b.catalogOrder);
+      if (catalogOrderDiff !== 0) return catalogOrderDiff;
     }
 
     if (

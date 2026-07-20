@@ -102,6 +102,7 @@ function restoreSavedTradeGroupBoard(
         quantity: savedCard.quantity,
         registeredItemId: item.id,
         registeredSortOrder: item.sortOrder,
+        registeredCatalogOrder: item.catalogOrder ?? null,
       },
     ];
   });

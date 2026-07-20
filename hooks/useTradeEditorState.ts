@@ -268,6 +268,7 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
                     quantity: safeQuantity,
                     registeredItemId: item.id,
                     registeredSortOrder: item.sortOrder,
+                    registeredCatalogOrder: item.catalogOrder ?? null,
                   }
                 : card,
             ),
@@ -289,6 +290,7 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
         quantity: safeQuantity,
         registeredItemId: item.id,
         registeredSortOrder: item.sortOrder,
+        registeredCatalogOrder: item.catalogOrder ?? null,
       };
 
       return {
@@ -350,6 +352,7 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
             : null,
         quantity: 1,
         registeredSortOrder: Number.MAX_SAFE_INTEGER,
+        registeredCatalogOrder: null,
       }));
 
     if (newCards.length === 0) return;
