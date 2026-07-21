@@ -437,38 +437,36 @@ export function TradeEditorView({
             </p>
           </div>
 
-          {boardMode === "trade" ? (
-            <div className="mb-4 mt-3 grid grid-cols-2 rounded-full bg-neutral-100 p-1">
-              <button
-                type="button"
-                onClick={() => updateCategoryDisplayMode("grouped")}
-                aria-pressed={board.categoryDisplayMode !== "simple"}
-                className={
-                  board.categoryDisplayMode !== "simple"
-                    ? "rounded-full bg-white px-3 py-2.5 text-xs font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200"
-                    : "rounded-full px-3 py-2.5 text-xs font-bold text-neutral-500"
-                }
-              >
-                같은 종류끼리 교환
-              </button>
-              <button
-                type="button"
-                onClick={() => updateCategoryDisplayMode("simple")}
-                aria-pressed={board.categoryDisplayMode === "simple"}
-                className={
-                  board.categoryDisplayMode === "simple"
-                    ? "rounded-full bg-white px-3 py-2.5 text-xs font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200"
-                    : "rounded-full px-3 py-2.5 text-xs font-bold text-neutral-500"
-                }
-              >
-                종류 구분 없이 교환 (교차)
-              </button>
-            </div>
-          ) : (
-            <p className="mb-4 mt-3 rounded-2xl bg-neutral-50 px-4 py-3 text-center text-xs font-bold leading-5 text-neutral-500 ring-1 ring-neutral-200">
-              특전 하위 분류와 굿즈 종류별로 자동 구분됩니다.
-            </p>
-          )}
+          <div
+            className="mb-4 mt-3 grid grid-cols-2 rounded-full bg-neutral-100 p-1"
+            role="group"
+            aria-label="굿즈 보기 방식"
+          >
+            <button
+              type="button"
+              onClick={() => updateCategoryDisplayMode("grouped")}
+              aria-pressed={board.categoryDisplayMode !== "simple"}
+              className={
+                board.categoryDisplayMode !== "simple"
+                  ? "rounded-full bg-white px-2 py-2.5 text-[11px] font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200"
+                  : "rounded-full px-2 py-2.5 text-[11px] font-bold text-neutral-500"
+              }
+            >
+              종류별로 구분해서 보기
+            </button>
+            <button
+              type="button"
+              onClick={() => updateCategoryDisplayMode("simple")}
+              aria-pressed={board.categoryDisplayMode === "simple"}
+              className={
+                board.categoryDisplayMode === "simple"
+                  ? "rounded-full bg-white px-2 py-2.5 text-[11px] font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200"
+                  : "rounded-full px-2 py-2.5 text-[11px] font-bold text-neutral-500"
+              }
+            >
+              종류 구분없이 보기
+            </button>
+          </div>
 
           <div className="w-full min-w-0 max-w-full overflow-hidden bg-white">
             <UiLabPreview

@@ -231,8 +231,13 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
                 ) : (
                   <SimpleTradeRows cards={sortTradeCardsBySideAndGroup(visibleCards)} />
                 )
-              ) : (
+              ) : grouped ? (
                 <SingleBoardRows
+                  cards={sortTradeCardsBySideAndGroup(visibleCards)}
+                  boardMode={boardMode}
+                />
+              ) : (
+                <SimpleSingleBoardRows
                   cards={sortTradeCardsBySideAndGroup(visibleCards)}
                   boardMode={boardMode}
                 />
@@ -394,6 +399,36 @@ function SingleBoardRows({
             />
           </section>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function SimpleSingleBoardRows({
+  cards,
+  boardMode,
+}: {
+  cards: TradeCard[];
+  boardMode: Exclude<TradeBoardMode, "trade">;
+}) {
+  const side = boardMode === "sell" ? "have" : "want";
+  const selectedCards = sortTradeCardsBySideAndGroup(cards).filter(
+    (card) => card.side === side,
+  );
+  const title = boardMode === "sell" ? "양도해요 (SELL)" : "구해요 (WANT)";
+
+  return (
+    <div>
+      <SideTitle title={title} count={selectedCards.length} />
+
+      <div className="mt-5">
+        <CardGrid
+          cards={selectedCards}
+          columns={4}
+          showMeta
+          boardMode={boardMode}
+          centerIncompleteRow
+        />
       </div>
     </div>
   );

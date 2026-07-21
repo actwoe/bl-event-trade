@@ -257,10 +257,7 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
     setBoard((prev) => ({
       ...prev,
       boardMode: mode,
-      categoryDisplayMode:
-        singleSide === null
-          ? (prev.categoryDisplayMode ?? "grouped")
-          : "grouped",
+      categoryDisplayMode: prev.categoryDisplayMode ?? "grouped",
       cards:
         singleSide === null
           ? prev.cards
