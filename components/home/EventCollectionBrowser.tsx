@@ -29,7 +29,8 @@ const FILTERS: Array<{ id: EventFilter; label: string }> = [
   { id: 'ended', label: '종료' },
 ];
 
-function getEmptyMessage(filter: EventFilter) {
+function getEmptyMessage(filter: EventFilter, locationFilter: string) {
+  if (locationFilter !== 'all') return '조건에 맞는 행사가 없습니다.';
   if (filter === 'scheduled') return '예정된 행사가 없습니다.';
   if (filter === 'ongoing') return '현재 진행 중인 행사가 없습니다.';
   if (filter === 'ended') return '종료된 행사가 없습니다.';
@@ -42,29 +43,53 @@ export function EventCollectionBrowser({
   error = '',
 }: EventCollectionBrowserProps) {
   const [filter, setFilter] = useState<EventFilter>('all');
+  const [locationFilter, setLocationFilter] = useState('all');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  const locationOptions = useMemo(() => {
+    return Array.from(
+      new Set(
+        collections
+          .map((collection) => collection.location?.trim())
+          .filter((location): location is string => Boolean(location)),
+      ),
+    ).sort((left, right) =>
+      left.localeCompare(right, 'ko-KR', {
+        numeric: true,
+        sensitivity: 'base',
+      }),
+    );
+  }, [collections]);
 
   const filteredCollections = useMemo(() => {
     return collections
       .filter((collection) => {
-        if (filter === 'all') return true;
-
-        return (
+        const matchesStatus =
+          filter === 'all' ||
           getEventStatus(
             collection.eventStartDate,
             collection.eventEndDate,
             today,
-          ) === filter
-        );
+          ) === filter;
+        const matchesLocation =
+          locationFilter === 'all' ||
+          collection.location?.trim() === locationFilter;
+
+        return matchesStatus && matchesLocation;
       })
       .sort((left, right) => compareEventsByStatus(left, right, today));
-  }, [collections, filter, today]);
+  }, [collections, filter, locationFilter, today]);
 
   const visibleCollections = filteredCollections.slice(0, visibleCount);
   const hasMore = visibleCount < filteredCollections.length;
 
   function changeFilter(nextFilter: EventFilter) {
     setFilter(nextFilter);
+    setVisibleCount(PAGE_SIZE);
+  }
+
+  function changeLocationFilter(nextLocation: string) {
+    setLocationFilter(nextLocation);
     setVisibleCount(PAGE_SIZE);
   }
 
@@ -91,31 +116,66 @@ export function EventCollectionBrowser({
           <UserAuthLinks variant="icon" />
         </div>
 
-        <div
-          className="mt-5 flex flex-wrap gap-2"
-          role="tablist"
-          aria-label="행사 상태 필터"
-        >
-          {FILTERS.map((item) => {
-            const selected = filter === item.id;
+        <div className="mt-5">
+          <p className="text-[11px] font-black text-neutral-400">행사 상태</p>
+          <div
+            className="mt-2 flex flex-wrap gap-2"
+            role="tablist"
+            aria-label="행사 상태 필터"
+          >
+            {FILTERS.map((item) => {
+              const selected = filter === item.id;
 
-            return (
-              <button
-                key={item.id}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                onClick={() => changeFilter(item.id)}
-                className={
-                  selected
-                    ? 'rounded-full bg-neutral-950 px-4 py-2 text-[11px] font-black leading-none text-white'
-                    : 'rounded-full border border-neutral-200 bg-white px-4 py-2 text-[11px] font-bold leading-none text-neutral-500 transition hover:border-neutral-300 hover:text-neutral-950'
-                }
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => changeFilter(item.id)}
+                  className={
+                    selected
+                      ? 'rounded-full bg-neutral-950 px-4 py-2 text-[11px] font-black leading-none text-white'
+                      : 'rounded-full border border-neutral-200 bg-white px-4 py-2 text-[11px] font-bold leading-none text-neutral-500 transition hover:border-neutral-300 hover:text-neutral-950'
+                  }
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-4">
+            <p className="text-[11px] font-black text-neutral-400">장소</p>
+            <div className="-mx-5 mt-2 overflow-x-auto px-5 pb-1">
+              <div
+                className="flex w-max gap-2"
+                role="group"
+                aria-label="행사 장소 필터"
               >
-                {item.label}
-              </button>
-            );
-          })}
+                {['all', ...locationOptions].map((location) => {
+                  const selected = locationFilter === location;
+                  const label = location === 'all' ? '전체' : location;
+
+                  return (
+                    <button
+                      key={location}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => changeLocationFilter(location)}
+                      className={
+                        selected
+                          ? 'shrink-0 rounded-full bg-[#7C5CFC] px-4 py-2 text-[11px] font-black leading-none text-white'
+                          : 'shrink-0 rounded-full border border-neutral-200 bg-white px-4 py-2 text-[11px] font-bold leading-none text-neutral-500 transition hover:border-neutral-300 hover:text-neutral-950'
+                      }
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -127,7 +187,7 @@ export function EventCollectionBrowser({
         ) : visibleCollections.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-neutral-200 bg-white px-6 py-14 text-center">
             <p className="text-sm font-bold text-neutral-400">
-              {getEmptyMessage(filter)}
+              {getEmptyMessage(filter, locationFilter)}
             </p>
           </div>
         ) : (
