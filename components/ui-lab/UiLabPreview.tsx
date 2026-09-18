@@ -1,7 +1,8 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState } from "react";
-import { TRADE_CATEGORIES, TradeBoard, TradeCard } from "@/lib/trade-types";
+import { TradeBoard, TradeBoardMode, TradeCard } from "@/lib/trade-types";
+import { getFallbackCategoryLabel } from "@/lib/trade-item-categories";
 import { QuantityBadge } from "@/components/trade/QuantityBadge";
 import { ProtectedGoodsImage } from "@/components/trade-editor/ProtectedGoodsImage";
 import { sortTradeCardsBySideAndGroup } from "@/lib/trade-card-order";
@@ -36,15 +37,52 @@ function getCardQuantity(card: TradeCard) {
   return Number.isFinite(quantity) ? Math.max(1, Math.floor(quantity)) : 1;
 }
 
+function TradeCardStatusBadge({
+  card,
+  boardMode,
+}: {
+  card: TradeCard;
+  boardMode: TradeBoardMode;
+}) {
+  if (boardMode === "sell") return null;
+
+  if (card.side === "want" && card.isPriority === true) {
+    return (
+      <span
+        aria-hidden="true"
+        data-trade-status-badge="true"
+        data-trade-status-kind="priority"
+        className="pointer-events-none absolute left-1.5 top-1.5 z-[4] flex h-[22px] w-[22px] items-center justify-center rounded-full border border-red-500 bg-red-500 text-[13px] font-black leading-none text-white shadow-sm"
+      >
+        ♥
+      </span>
+    );
+  }
+
+  if (card.side === "have" && card.isForSale === true) {
+    return (
+      <span
+        aria-hidden="true"
+        data-trade-status-badge="true"
+        data-trade-status-kind="sell"
+        className="pointer-events-none absolute left-1.5 top-1.5 z-[4] flex h-[22px] min-w-[34px] items-center justify-center rounded-full bg-[#7C5CFC] px-1.5 text-[8px] font-black leading-none tracking-[0.04em] text-white shadow-sm"
+      >
+        SELL
+      </span>
+    );
+  }
+
+  return null;
+}
+
 function getCardMetaLabel(card: TradeCard) {
   const categoryLabel =
-    TRADE_CATEGORIES.find((category) => category.id === card.category)?.label ??
-    card.category;
+    card.categoryLabel?.trim() || getFallbackCategoryLabel(card.category);
   const subcategory =
     typeof card.benefitSubcategory === "string"
       ? card.benefitSubcategory.trim()
       : "";
-  return card.category === "benefit" && subcategory
+  return (card.categoryKind === "benefit" || card.category === "benefit") && subcategory
     ? subcategory
     : categoryLabel;
 }
@@ -53,9 +91,14 @@ function getCardGroups(cards: TradeCard[]): CardGroup[] {
   const groups: CardGroup[] = [];
 
   for (const card of sortTradeCardsBySideAndGroup(cards)) {
-    const label = getCardMetaLabel(card);
+    const metaLabel = getCardMetaLabel(card);
+    const collectionTitle = card.collectionTitle?.trim() ?? "";
+    const label = collectionTitle ? `${collectionTitle} · ${metaLabel}` : metaLabel;
+    const collectionKey = card.collectionId?.trim() || "__single_collection__";
     const key =
-      card.category === "benefit" ? `benefit:${label}` : card.category;
+      card.categoryKind === "benefit" || card.category === "benefit"
+        ? `${collectionKey}:benefit:${metaLabel}`
+        : `${collectionKey}:${card.category}`;
     const existing = groups.find((group) => group.key === key);
 
     if (existing) {
@@ -73,12 +116,26 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
     { board, collectionTitle, responsive = false },
     ref,
   ) {
-    const hasCards = board.cards.length > 0;
+    const boardMode = board.boardMode ?? "trade";
+    const visibleCards =
+      boardMode === "sell"
+        ? board.cards.filter((card) => card.side === "have")
+        : boardMode === "wanted"
+          ? board.cards.filter((card) => card.side === "want")
+          : board.cards;
+    const hasCards = visibleCards.length > 0;
     const nickname = board.nickname.trim();
     const account = board.contact.trim();
     const hasProfile = Boolean(nickname || account);
     const memoChips = getMemoChips(board.memo);
     const grouped = board.categoryDisplayMode !== "simple";
+    const previewWidth = boardMode === "trade" ? 840 : 600;
+    const boardEyebrow =
+      boardMode === "sell"
+        ? "BL GOODS SELL BOARD"
+        : boardMode === "wanted"
+          ? "BL GOODS WANTED BOARD"
+          : "BL GOODS TRADE BOARD";
     const containerRef = useRef<HTMLDivElement>(null);
     const previewRef = useRef<HTMLDivElement>(null);
     const [previewScale, setPreviewScale] = useState(1);
@@ -92,7 +149,7 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
 
       const updateSize = () => {
         const availableWidth = container.clientWidth;
-        const nextScale = Math.min(1, availableWidth / 840);
+        const nextScale = Math.min(1, availableWidth / previewWidth);
         setPreviewScale(nextScale);
         setPreviewHeight(preview.scrollHeight * nextScale);
       };
@@ -102,7 +159,7 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
       resizeObserver.observe(container);
       resizeObserver.observe(preview);
       return () => resizeObserver.disconnect();
-    }, [responsive, board, collectionTitle]);
+    }, [responsive, board, collectionTitle, previewWidth]);
 
     const assignPreviewRef = (node: HTMLDivElement | null) => {
       previewRef.current = node;
@@ -114,8 +171,9 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
       <div
         ref={assignPreviewRef}
         data-ui-lab-preview-version="2026-07-13-dom-export"
-        className="box-border w-[840px] bg-transparent p-5 text-neutral-950"
+        className="box-border bg-transparent p-5 text-neutral-950"
         style={{
+          width: previewWidth,
           fontFamily: "'Pretendard', Arial, sans-serif",
           transform: responsive ? `scale(${previewScale})` : undefined,
           transformOrigin: responsive ? "top left" : undefined,
@@ -126,7 +184,7 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
             <div className="flex min-h-[50px] min-w-0 items-center justify-between gap-6">
               <div className="min-w-0 text-left">
                 <p className="mb-1 text-[9px] font-bold tracking-[0.18em] text-white/55">
-                  BL GOODS TRADE BOARD
+                  {boardEyebrow}
                 </p>
                 <h1 className="break-keep text-[22px] font-black leading-tight tracking-tight">
                   {collectionTitle}
@@ -167,10 +225,22 @@ export const UiLabPreview = forwardRef<HTMLDivElement, UiLabPreviewProps>(
             ) : null}
 
             {hasCards ? (
-              grouped ? (
-                <GroupedTradeRows cards={sortTradeCardsBySideAndGroup(board.cards)} />
+              boardMode === "trade" ? (
+                grouped ? (
+                  <GroupedTradeRows cards={sortTradeCardsBySideAndGroup(visibleCards)} />
+                ) : (
+                  <SimpleTradeRows cards={sortTradeCardsBySideAndGroup(visibleCards)} />
+                )
+              ) : grouped ? (
+                <SingleBoardRows
+                  cards={sortTradeCardsBySideAndGroup(visibleCards)}
+                  boardMode={boardMode}
+                />
               ) : (
-                <SimpleTradeRows cards={sortTradeCardsBySideAndGroup(board.cards)} />
+                <SimpleSingleBoardRows
+                  cards={sortTradeCardsBySideAndGroup(visibleCards)}
+                  boardMode={boardMode}
+                />
               )
             ) : (
               <div className="border-2 border-dashed border-neutral-200 px-6 py-16 text-center">
@@ -269,6 +339,7 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
                     cards={have}
                     columns={columnsPerSide}
                     showMeta={false}
+                    boardMode="trade"
                     centerIncompleteRow={have.length < want.length}
                   />
                 </div>
@@ -277,6 +348,7 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
                     cards={want}
                     columns={columnsPerSide}
                     showMeta={false}
+                    boardMode="trade"
                     centerIncompleteRow={want.length < have.length}
                   />
                 </div>
@@ -284,6 +356,79 @@ function GroupedTradeRows({ cards }: { cards: TradeCard[] }) {
             </section>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function SingleBoardRows({
+  cards,
+  boardMode,
+}: {
+  cards: TradeCard[];
+  boardMode: Exclude<TradeBoardMode, "trade">;
+}) {
+  const side = boardMode === "sell" ? "have" : "want";
+  const selectedCards = sortTradeCardsBySideAndGroup(cards).filter(
+    (card) => card.side === side,
+  );
+  const groups = getCardGroups(selectedCards);
+  const title = boardMode === "sell" ? "양도해요 (SELL)" : "구해요 (WANT)";
+
+  return (
+    <div>
+      <SideTitle title={title} count={selectedCards.length} />
+
+      <div className="mt-5 space-y-6">
+        {groups.map((group) => (
+          <section key={group.key}>
+            <div className="mb-3 flex items-center gap-3">
+              <span className="h-4 w-1 rounded-full bg-[#7C5CFC]" />
+              <h2 className="text-[12px] font-black text-neutral-800">
+                {group.label}
+              </h2>
+              <span className="h-px flex-1 bg-neutral-200" />
+            </div>
+
+            <CardGrid
+              cards={group.cards}
+              columns={4}
+              showMeta={false}
+              boardMode={boardMode}
+              centerIncompleteRow
+            />
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SimpleSingleBoardRows({
+  cards,
+  boardMode,
+}: {
+  cards: TradeCard[];
+  boardMode: Exclude<TradeBoardMode, "trade">;
+}) {
+  const side = boardMode === "sell" ? "have" : "want";
+  const selectedCards = sortTradeCardsBySideAndGroup(cards).filter(
+    (card) => card.side === side,
+  );
+  const title = boardMode === "sell" ? "양도해요 (SELL)" : "구해요 (WANT)";
+
+  return (
+    <div>
+      <SideTitle title={title} count={selectedCards.length} />
+
+      <div className="mt-5">
+        <CardGrid
+          cards={selectedCards}
+          columns={4}
+          showMeta
+          boardMode={boardMode}
+          centerIncompleteRow
+        />
       </div>
     </div>
   );
@@ -312,6 +457,7 @@ function SimpleTradeRows({ cards }: { cards: TradeCard[] }) {
             cards={haveCards}
             columns={columnsPerSide}
             showMeta
+            boardMode="trade"
             centerIncompleteRow={haveCards.length < wantCards.length}
           />
         </div>
@@ -320,6 +466,7 @@ function SimpleTradeRows({ cards }: { cards: TradeCard[] }) {
             cards={wantCards}
             columns={columnsPerSide}
             showMeta
+            boardMode="trade"
             centerIncompleteRow={wantCards.length < haveCards.length}
           />
         </div>
@@ -332,11 +479,13 @@ function CardGrid({
   cards,
   columns,
   showMeta,
+  boardMode,
   centerIncompleteRow = false,
 }: {
   cards: TradeCard[];
   columns: 1 | 2 | 3 | 4 | 6 | 8;
   showMeta: boolean;
+  boardMode: TradeBoardMode;
   centerIncompleteRow?: boolean;
 }) {
   if (cards.length === 0) {
@@ -371,7 +520,7 @@ function CardGrid({
                 className="min-w-0 shrink-0"
                 style={{ flexBasis: cardWidth, maxWidth: cardWidth }}
               >
-                <PreviewCard card={card} showMeta={showMeta} />
+                <PreviewCard card={card} showMeta={showMeta} boardMode={boardMode} />
               </div>
             ))}
           </div>
@@ -384,12 +533,19 @@ function CardGrid({
 function PreviewCard({
   card,
   showMeta,
+  boardMode,
 }: {
   card: TradeCard;
   showMeta: boolean;
+  boardMode: TradeBoardMode;
 }) {
   const metaLabel = getCardMetaLabel(card);
   const quantity = getCardQuantity(card);
+  const visibleItemName = card.showItemName !== false
+    ? (card.itemName ?? card.memo ?? '').trim()
+    : '';
+  const primaryLabel = card.workTitle.trim() || visibleItemName;
+  const secondaryItemName = card.workTitle.trim() ? visibleItemName : '';
 
   return (
     <article className="min-w-0 bg-white">
@@ -401,21 +557,29 @@ function PreviewCard({
           decoding="async"
           className={`${card.imageRatio === "photocard" ? "aspect-[55/85]" : "aspect-square"} w-full rounded-xl bg-white object-contain`}
         />
+        <TradeCardStatusBadge card={card} boardMode={boardMode} />
         <QuantityBadge quantity={quantity} />
       </div>
 
       <div className="pt-1.5">
-        <p className="line-clamp-1 text-center text-[9px] font-black leading-4 text-neutral-950">
-          {card.workTitle || "작품명"}
-        </p>
+        {showMeta && card.collectionTitle ? (
+          <p className="line-clamp-1 text-center text-[7px] font-black leading-3 text-[#7C5CFC]">
+            {card.collectionTitle}
+          </p>
+        ) : null}
+        {primaryLabel ? (
+          <p className="line-clamp-1 text-center text-[9px] font-black leading-4 text-neutral-950">
+            {primaryLabel}
+          </p>
+        ) : null}
         {showMeta ? (
           <p className="line-clamp-1 text-center text-[8px] font-bold leading-3 text-neutral-500">
             {metaLabel}
           </p>
         ) : null}
-        {card.memo ? (
+        {secondaryItemName ? (
           <p className="line-clamp-1 text-center text-[8px] font-bold leading-3 text-neutral-400">
-            {card.memo}
+            {secondaryItemName}
           </p>
         ) : null}
       </div>

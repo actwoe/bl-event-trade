@@ -15,26 +15,39 @@ type TradeBuilderProps = {
   collection: TradeCollectionSummary;
   registeredItems: RegisteredTradeItem[];
   referenceImages: TradeReferenceImage[];
+  collectionOptions?: TradeCollectionSummary[];
+  globalGroupMode?: boolean;
   initialGroupId?: string;
   embedded?: boolean;
-  onSavedGroupChange?: (group: { id: string; name: string }) => void;
+  onSavedGroupChange?: (group: {
+    id: string;
+    name: string;
+    collectionId: string | null;
+  }) => void;
 };
 
 export function TradeBuilder({
   collection,
   registeredItems,
   referenceImages,
+  collectionOptions = [],
+  globalGroupMode = false,
   initialGroupId,
   embedded = false,
   onSavedGroupChange,
 }: TradeBuilderProps) {
-  const editorState = useTradeEditorState(registeredItems);
+  const editorState = useTradeEditorState(
+    registeredItems,
+    collection.categoryOptions,
+    collectionOptions,
+  );
   const savedGroups = useSavedTradeGroups({
     collection,
     registeredItems,
     initialGroupId,
     editorState,
     onSavedGroupChange,
+    globalMode: globalGroupMode,
   });
 
   function resetBoard() {
@@ -88,6 +101,7 @@ export function TradeBuilder({
       isSavingGroup={savedGroups.isSavingGroup}
       isLoadingGroup={savedGroups.isLoadingGroup}
       directUploadCardCount={editorState.directUploadCardCount}
+      globalMode={globalGroupMode}
       onGroupNameChange={savedGroups.setGroupName}
       onSave={savedGroups.saveTradeGroup}
       onStartNew={savedGroups.startNewTradeGroup}
@@ -99,6 +113,7 @@ export function TradeBuilder({
       collection={collection}
       registeredItems={registeredItems}
       referenceImages={referenceImages}
+      collectionOptions={collectionOptions}
       editorState={editorState}
       variant="production"
       embedded={embedded}

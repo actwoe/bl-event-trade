@@ -5,12 +5,11 @@ import {
   GOODS_WATERMARK_ANGLE_DEG,
   GOODS_WATERMARK_FILL,
   GOODS_WATERMARK_TEXT,
-  GOODS_WATERMARK_TILE_HEIGHT,
-  GOODS_WATERMARK_TILE_WIDTH,
 } from "@/lib/goods-watermark";
 
 const TRADE_PREVIEW_WIDTH = 840;
 const TRADE_EXPORT_WIDTH = 2000;
+const TRADE_EXPORT_SCALE = TRADE_EXPORT_WIDTH / TRADE_PREVIEW_WIDTH;
 const TRADE_FONT_FAMILY = "'Pretendard', Arial, sans-serif";
 const IMAGE_READY_TIMEOUT_MS = 10_000;
 const EXPORT_RETRY_DELAY_MS = 250;
@@ -20,6 +19,8 @@ type ExportBadgeSnapshot = {
   text: string;
   backgroundColor: string;
   color: string;
+  borderColor: string;
+  borderWidth: number;
   fontFamily: string;
   fontSize: string;
   fontWeight: string;
@@ -31,7 +32,8 @@ type ExportImageSnapshot = {
   objectUrl: string;
   rect: DOMRect;
   borderRadius: number;
-  badge: ExportBadgeSnapshot | null;
+  quantityBadge: ExportBadgeSnapshot | null;
+  statusBadge: ExportBadgeSnapshot | null;
   previousVisibility: string;
 };
 
@@ -156,6 +158,37 @@ function getQuantityBadge(image: HTMLImageElement) {
   ) as HTMLElement | null;
 }
 
+function getStatusBadge(image: HTMLImageElement) {
+  const parent = image.parentElement;
+  if (!parent) return null;
+
+  return (
+    Array.from(parent.children).find(
+      (child) =>
+        child instanceof HTMLElement &&
+        child.dataset.tradeStatusBadge === "true",
+    ) ?? null
+  ) as HTMLElement | null;
+}
+
+function createBadgeSnapshot(element: HTMLElement | null) {
+  if (!element) return null;
+
+  const style = window.getComputedStyle(element);
+
+  return {
+    rect: element.getBoundingClientRect(),
+    text: element.textContent?.trim() ?? "",
+    backgroundColor: style.backgroundColor,
+    color: style.color,
+    borderColor: style.borderColor,
+    borderWidth: Number.parseFloat(style.borderTopWidth) || 0,
+    fontFamily: style.fontFamily,
+    fontSize: style.fontSize,
+    fontWeight: style.fontWeight,
+  } satisfies ExportBadgeSnapshot;
+}
+
 async function prepareExportImages(node: HTMLElement) {
   const images = Array.from(node.querySelectorAll("img"));
   const snapshots: ExportImageSnapshot[] = [];
@@ -177,10 +210,8 @@ async function prepareExportImages(node: HTMLElement) {
 
       const { image: drawable, objectUrl } = await drawablePromise;
       const style = window.getComputedStyle(element);
-      const badgeElement = getQuantityBadge(element);
-      const badgeStyle = badgeElement
-        ? window.getComputedStyle(badgeElement)
-        : null;
+      const quantityBadgeElement = getQuantityBadge(element);
+      const statusBadgeElement = getStatusBadge(element);
 
       snapshots.push({
         element,
@@ -188,18 +219,8 @@ async function prepareExportImages(node: HTMLElement) {
         objectUrl,
         rect: element.getBoundingClientRect(),
         borderRadius: Number.parseFloat(style.borderTopLeftRadius) || 0,
-        badge:
-          badgeElement && badgeStyle
-            ? {
-                rect: badgeElement.getBoundingClientRect(),
-                text: badgeElement.textContent?.trim() ?? "",
-                backgroundColor: badgeStyle.backgroundColor,
-                color: badgeStyle.color,
-                fontFamily: badgeStyle.fontFamily,
-                fontSize: badgeStyle.fontSize,
-                fontWeight: badgeStyle.fontWeight,
-              }
-            : null,
+        quantityBadge: createBadgeSnapshot(quantityBadgeElement),
+        statusBadge: createBadgeSnapshot(statusBadgeElement),
         previousVisibility: element.style.visibility,
       });
     }
@@ -300,7 +321,7 @@ function drawContainedImage(
   context.restore();
 }
 
-function drawQuantityBadge(
+function drawExportBadge(
   context: CanvasRenderingContext2D,
   badge: ExportBadgeSnapshot,
   nodeRect: DOMRect,
@@ -317,6 +338,11 @@ function drawQuantityBadge(
   createRoundedRectPath(context, x, y, width, height, height / 2);
   context.fillStyle = badge.backgroundColor || "rgb(10, 10, 10)";
   context.fill();
+  if (badge.borderWidth > 0) {
+    context.lineWidth = badge.borderWidth;
+    context.strokeStyle = badge.borderColor || "transparent";
+    context.stroke();
+  }
   context.shadowColor = "transparent";
   context.fillStyle = badge.color || "#ffffff";
   context.font = `${badge.fontWeight || "900"} ${badge.fontSize || "9px"} ${badge.fontFamily || TRADE_FONT_FAMILY}`;
@@ -334,28 +360,61 @@ function drawRepeatedGoodsWatermark(
   height: number,
   borderRadius: number,
 ) {
-  if (width <= 0 || height <= 0) return;
+  if (width <= 1 || height <= 1) return;
 
-  const diagonal = Math.sqrt(width * width + height * height);
-  const fontSize = Math.max(6, Math.min(10, Math.round(Math.min(width, height) / 7.2)));
-  const stepX = Math.max(GOODS_WATERMARK_TILE_WIDTH * 0.62, fontSize * 4.8);
-  const stepY = Math.max(GOODS_WATERMARK_TILE_HEIGHT * 0.62, fontSize * 2.35);
+  const angle = (GOODS_WATERMARK_ANGLE_DEG * Math.PI) / 180;
+  const absoluteCosine = Math.abs(Math.cos(angle));
+  const absoluteSine = Math.abs(Math.sin(angle));
+  const fontSize = 8;
 
   context.save();
   createRoundedRectPath(context, x, y, width, height, borderRadius);
   context.clip();
-  context.translate(x + width / 2, y + height / 2);
-  context.rotate((GOODS_WATERMARK_ANGLE_DEG * Math.PI) / 180);
   context.fillStyle = GOODS_WATERMARK_FILL;
   context.font = `700 ${fontSize}px Arial, sans-serif`;
   context.textAlign = "center";
   context.textBaseline = "middle";
 
-  for (let row = -diagonal; row <= diagonal; row += stepY) {
-    const offsetX = Math.round(row / stepY) % 2 === 0 ? 0 : stepX / 2;
+  const textWidth = Math.max(
+    1,
+    context.measureText(GOODS_WATERMARK_TEXT).width,
+  );
+  const textHeight = fontSize * 1.25;
+  const horizontalStep = textWidth + Math.max(10, fontSize * 1.5);
+  const verticalStep = textHeight + Math.max(8, fontSize * 1.25);
 
-    for (let col = -diagonal; col <= diagonal; col += stepX) {
-      context.fillText(GOODS_WATERMARK_TEXT, col + offsetX, row);
+  // Rotate one shared grid instead of rotating each phrase independently.
+  // Every image therefore uses the same font size and spacing. The grid is
+  // extended beyond the image bounds so even small thumbnails receive
+  // multiple watermark fragments, while the step sizes keep phrases apart.
+  const rotatedSpanWidth =
+    width * absoluteCosine + height * absoluteSine;
+  const rotatedSpanHeight =
+    width * absoluteSine + height * absoluteCosine;
+  const halfSpanX = rotatedSpanWidth / 2 + horizontalStep;
+  const halfSpanY = rotatedSpanHeight / 2 + verticalStep;
+  const firstRow = Math.floor(-halfSpanY / verticalStep);
+  const lastRow = Math.ceil(halfSpanY / verticalStep);
+
+  context.translate(x + width / 2, y + height / 2);
+  context.rotate(angle);
+
+  for (let row = firstRow; row <= lastRow; row += 1) {
+    const rowY = row * verticalStep;
+    const staggerOffset = Math.abs(row) % 2 === 1 ? horizontalStep / 2 : 0;
+    const firstColumn = Math.floor(
+      (-halfSpanX - staggerOffset) / horizontalStep,
+    );
+    const lastColumn = Math.ceil(
+      (halfSpanX - staggerOffset) / horizontalStep,
+    );
+
+    for (let column = firstColumn; column <= lastColumn; column += 1) {
+      context.fillText(
+        GOODS_WATERMARK_TEXT,
+        column * horizontalStep + staggerOffset,
+        rowY,
+      );
     }
   }
 
@@ -366,6 +425,7 @@ function compositeExportImages(
   canvas: HTMLCanvasElement,
   node: HTMLElement,
   snapshots: ExportImageSnapshot[],
+  exportWidth: number,
   exportHeight: number,
 ) {
   const context = canvas.getContext("2d");
@@ -374,7 +434,7 @@ function compositeExportImages(
   }
 
   const nodeRect = node.getBoundingClientRect();
-  const scaleX = canvas.width / TRADE_PREVIEW_WIDTH;
+  const scaleX = canvas.width / Math.max(1, exportWidth);
   const scaleY = canvas.height / Math.max(1, exportHeight);
 
   context.save();
@@ -404,8 +464,12 @@ function compositeExportImages(
   }
 
   for (const snapshot of snapshots) {
-    if (snapshot.badge) {
-      drawQuantityBadge(context, snapshot.badge, nodeRect);
+    if (snapshot.statusBadge) {
+      drawExportBadge(context, snapshot.statusBadge, nodeRect);
+    }
+
+    if (snapshot.quantityBadge) {
+      drawExportBadge(context, snapshot.quantityBadge, nodeRect);
     }
   }
 
@@ -429,19 +493,18 @@ async function createTradePngBlob(
   node: HTMLDivElement,
   snapshots: ExportImageSnapshot[],
 ) {
-  const height = Math.max(
-    node.scrollHeight,
-    Math.ceil(node.getBoundingClientRect().height),
-  );
+  const nodeRect = node.getBoundingClientRect();
+  const width = Math.max(node.offsetWidth, Math.ceil(nodeRect.width));
+  const height = Math.max(node.scrollHeight, Math.ceil(nodeRect.height));
 
-  if (height <= 0) {
-    throw new Error("미리보기 높이를 계산하지 못했습니다.");
+  if (width <= 0 || height <= 0) {
+    throw new Error("미리보기 크기를 계산하지 못했습니다.");
   }
 
   const canvas = await toCanvas(node, {
     cacheBust: false,
-    pixelRatio: TRADE_EXPORT_WIDTH / TRADE_PREVIEW_WIDTH,
-    width: TRADE_PREVIEW_WIDTH,
+    pixelRatio: TRADE_EXPORT_SCALE,
+    width,
     height,
     backgroundColor: "transparent",
     style: {
@@ -450,7 +513,7 @@ async function createTradePngBlob(
     },
   });
 
-  compositeExportImages(canvas, node, snapshots, height);
+  compositeExportImages(canvas, node, snapshots, width, height);
   return canvasToBlob(canvas);
 }
 

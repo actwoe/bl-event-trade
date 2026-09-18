@@ -1,9 +1,11 @@
 "use client";
 
 import {
-  TRADE_CATEGORIES,
+  TradeBoardMode,
   TradeCard,
   TradeCategory,
+  TradeCategoryOption,
+  TradeCollectionSummary,
   TradeSide,
 } from "@/lib/trade-types";
 import {
@@ -16,8 +18,12 @@ import { ProtectedGoodsImage } from "@/components/trade-editor/ProtectedGoodsIma
 type SideLabelMode = "bilingual" | "korean";
 
 type SelectedTradeCardsProps = {
-  title: "있어요" | "구해요";
+  title: string;
   cards: TradeCard[];
+  boardMode?: TradeBoardMode;
+  categoryOptions: TradeCategoryOption[];
+  collectionOptions?: TradeCollectionSummary[];
+  showCommonWorkLabel?: boolean;
   onUpdate: (cardId: string, patch: Partial<QuantityTradeCard>) => void;
   onRemove: (cardId: string) => void;
   sideLabelMode?: SideLabelMode;
@@ -26,6 +32,10 @@ type SelectedTradeCardsProps = {
 export function SelectedTradeCards({
   title,
   cards,
+  boardMode = "trade",
+  categoryOptions,
+  collectionOptions = [],
+  showCommonWorkLabel = false,
   onUpdate,
   onRemove,
   sideLabelMode = "korean",
@@ -42,6 +52,10 @@ export function SelectedTradeCards({
           <SelectedTradeCardEditor
             key={card.id}
             card={card}
+            boardMode={boardMode}
+            categoryOptions={categoryOptions}
+            collectionOptions={collectionOptions}
+            showCommonWorkLabel={showCommonWorkLabel}
             onUpdate={(patch) => onUpdate(card.id, patch)}
             onRemove={() => onRemove(card.id)}
             sideLabelMode={sideLabelMode}
@@ -54,6 +68,10 @@ export function SelectedTradeCards({
 
 type SelectedTradeCardEditorProps = {
   card: TradeCard;
+  boardMode: TradeBoardMode;
+  categoryOptions: TradeCategoryOption[];
+  collectionOptions: TradeCollectionSummary[];
+  showCommonWorkLabel: boolean;
   onUpdate: (patch: Partial<QuantityTradeCard>) => void;
   onRemove: () => void;
   sideLabelMode: SideLabelMode;
@@ -61,12 +79,31 @@ type SelectedTradeCardEditorProps = {
 
 function SelectedTradeCardEditor({
   card,
+  boardMode,
+  categoryOptions,
+  collectionOptions,
+  showCommonWorkLabel,
   onUpdate,
   onRemove,
   sideLabelMode,
 }: SelectedTradeCardEditorProps) {
   const quantity = getCardQuantity(card);
-  const metaLabel = getCardMetaLabel(card);
+  const cardCategoryOptions =
+    collectionOptions.find((collection) => collection.id === card.collectionId)
+      ?.categoryOptions ?? categoryOptions;
+  const categoryOption = cardCategoryOptions.find(
+    (option) => option.id === card.category,
+  );
+  const metaLabel = getCardMetaLabel({
+    ...card,
+    categoryLabel: categoryOption?.label ?? card.categoryLabel,
+  });
+  const visibleItemName =
+    card.showItemName !== false ? (card.itemName ?? card.memo ?? "").trim() : "";
+  const primaryLabel =
+    card.workTitle.trim() ||
+    visibleItemName ||
+    (showCommonWorkLabel ? "행사 공통" : "");
   const bilingual = sideLabelMode === "bilingual";
 
   function decreaseQuantity() {
@@ -90,36 +127,59 @@ function SelectedTradeCardEditor({
           alt={card.memo || card.workTitle || "굿즈 이미지"}
           className="h-full w-full object-contain p-1"
         />
+
+        <TradeCardStatusToggle
+          card={card}
+          boardMode={boardMode}
+          onUpdate={onUpdate}
+        />
       </div>
 
       <div className="min-w-0 space-y-2">
         <div className="flex items-start gap-2">
-          <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
-            <select
-              value={card.side}
-              onChange={(event) =>
-                onUpdate({
-                  side: event.target.value as TradeSide,
-                })
-              }
-              className="min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
-              aria-label={bilingual ? "있어요 (Have) 또는 구해요 (Want)" : "있어요 또는 구해요"}
-            >
-              <option value="have">{bilingual ? "있어요 (Have)" : "있어요"}</option>
-              <option value="want">{bilingual ? "구해요 (Want)" : "구해요"}</option>
-            </select>
+          <div
+            className={`grid min-w-0 flex-1 gap-2 ${
+              boardMode === "trade" ? "grid-cols-2" : "grid-cols-1"
+            }`}
+          >
+            {boardMode === "trade" ? (
+              <select
+                value={card.side}
+                onChange={(event) =>
+                  onUpdate({
+                    side: event.target.value as TradeSide,
+                  })
+                }
+                className="min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
+                aria-label={bilingual ? "있어요 (Have) 또는 구해요 (Want)" : "있어요 또는 구해요"}
+              >
+                <option value="have">{bilingual ? "있어요 (Have)" : "있어요"}</option>
+                <option value="want">{bilingual ? "구해요 (Want)" : "구해요"}</option>
+              </select>
+            ) : null}
 
             <select
               value={card.category}
-              onChange={(event) =>
+              onChange={(event) => {
+                const nextCategory = event.target.value as TradeCategory;
+                const option = cardCategoryOptions.find(
+                  (category) => category.id === nextCategory,
+                );
                 onUpdate({
-                  category: event.target.value as TradeCategory,
-                })
-              }
+                  category: nextCategory,
+                  categoryLabel: option?.label,
+                  categorySortOrder: option?.sortOrder ?? null,
+                  categoryKind: option?.kind,
+                  benefitSubcategory:
+                    option?.kind === "benefit" || nextCategory === "benefit"
+                      ? card.benefitSubcategory
+                      : null,
+                });
+              }}
               className="min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
               aria-label="굿즈 종류"
             >
-              {TRADE_CATEGORIES.map((category) => (
+              {cardCategoryOptions.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.label}
                 </option>
@@ -139,9 +199,16 @@ function SelectedTradeCardEditor({
 
         <div className="flex min-w-0 items-start gap-2">
           <div className="min-w-0 flex-1 space-y-0.5 text-xs leading-5">
-            <p className="truncate font-black text-neutral-950">
-              {card.workTitle || "작품명 없음"}
-            </p>
+            {card.collectionTitle ? (
+              <p className="truncate text-[10px] font-black text-[#7C5CFC]">
+                {card.collectionTitle}
+              </p>
+            ) : null}
+            {primaryLabel ? (
+              <p className="truncate font-black text-neutral-950">
+                {primaryLabel}
+              </p>
+            ) : null}
             <p className="truncate text-neutral-500">{metaLabel}</p>
           </div>
 
@@ -169,5 +236,55 @@ function SelectedTradeCardEditor({
         </div>
       </div>
     </div>
+  );
+}
+
+function TradeCardStatusToggle({
+  card,
+  boardMode,
+  onUpdate,
+}: {
+  card: TradeCard;
+  boardMode: TradeBoardMode;
+  onUpdate: (patch: Partial<QuantityTradeCard>) => void;
+}) {
+  if (boardMode === "sell") return null;
+
+  if (card.side === "want") {
+    const active = card.isPriority === true;
+
+    return (
+      <button
+        type="button"
+        onClick={() => onUpdate({ isPriority: !active })}
+        aria-label={active ? "우선 구함 표시 해제" : "우선 구함으로 표시"}
+        aria-pressed={active}
+        className={
+          active
+            ? "absolute left-1 top-1 z-[4] flex h-6 w-6 items-center justify-center rounded-full border border-red-500 bg-red-500 text-[14px] font-black leading-none text-white shadow-sm"
+            : "absolute left-1 top-1 z-[4] flex h-6 w-6 items-center justify-center rounded-full border border-neutral-200 bg-white/90 text-[14px] font-black leading-none text-neutral-300 shadow-sm"
+        }
+      >
+        {active ? "♥" : "♡"}
+      </button>
+    );
+  }
+
+  const active = card.isForSale === true;
+
+  return (
+    <button
+      type="button"
+      onClick={() => onUpdate({ isForSale: !active })}
+      aria-label={active ? "SELL 표시 해제" : "SELL로 표시"}
+      aria-pressed={active}
+      className={
+        active
+          ? "absolute left-1 top-1 z-[4] flex h-6 min-w-9 items-center justify-center rounded-full bg-[#7C5CFC] px-1.5 text-[8px] font-black leading-none tracking-[0.04em] text-white shadow-sm"
+          : "absolute left-1 top-1 z-[4] flex h-6 min-w-9 items-center justify-center rounded-full border border-neutral-200 bg-white/90 px-1.5 text-[8px] font-black leading-none tracking-[0.04em] text-neutral-400 shadow-sm"
+      }
+    >
+      SELL
+    </button>
   );
 }

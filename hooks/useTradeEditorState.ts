@@ -8,7 +8,9 @@ import {
   createInitialTradeBoard,
   getCardQuantity,
   getRegisteredItemQuantity,
+  getTradeBoardModeSide,
   isSameRegisteredCard,
+  isSameTradeItem,
   QuantityTradeCard,
   updateTradeCardList,
 } from "@/lib/trade-editor-core";
@@ -23,11 +25,16 @@ import {
   compareBenefitSubcategoryValues,
   normalizeBenefitSubcategorySortOrder,
 } from "@/lib/trade-benefit-subcategory-order";
+import { getFallbackCategoryLabel } from "@/lib/trade-item-categories";
+import { TRADE_CATEGORIES } from "@/lib/trade-types";
 import type {
   RegisteredTradeItem,
   TradeBoard,
+  TradeBoardMode,
   TradeCategory,
   TradeCategoryDisplayMode,
+  TradeCategoryOption,
+  TradeCollectionSummary,
   TradeSide,
 } from "@/lib/trade-types";
 
@@ -36,12 +43,52 @@ export const ALL_CATEGORIES_VALUE = "all";
 export const ALL_BENEFIT_SUBCATEGORIES_VALUE = "all";
 export const NO_BENEFIT_SUBCATEGORY_VALUE = "__none__";
 
+function convertCardsToSingleSide(
+  cards: TradeBoard["cards"],
+  side: TradeSide,
+) {
+  const mergedCards: QuantityTradeCard[] = [];
+
+  for (const card of cards) {
+    const nextCard: QuantityTradeCard = {
+      ...card,
+      side,
+      isPriority: side === "want" && card.isPriority === true,
+      isForSale: false,
+    };
+    const duplicate = mergedCards.find((item) =>
+      isSameTradeItem(item, nextCard),
+    );
+
+    if (duplicate) {
+      duplicate.quantity =
+        getCardQuantity(duplicate) + getCardQuantity(nextCard);
+      duplicate.isPriority =
+        side === "want" &&
+        (duplicate.isPriority === true || nextCard.isPriority === true);
+      continue;
+    }
+
+    mergedCards.push(nextCard);
+  }
+
+  return sortTradeCardsBySideAndGroup(mergedCards);
+}
+
 export type CategoryFilterValue =
   | TradeCategory
   | typeof ALL_CATEGORIES_VALUE;
 export type BenefitSubcategoryFilterValue = string;
 
-export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
+function isBenefitItem(item: RegisteredTradeItem) {
+  return item.categoryKind === "benefit" || item.category === "benefit";
+}
+
+export function useTradeEditorState(
+  registeredItems: RegisteredTradeItem[],
+  providedCategoryOptions?: TradeCategoryOption[],
+  collectionOptions?: TradeCollectionSummary[],
+) {
   const [board, setBoard] = useState<TradeBoard>(() => createInitialTradeBoard());
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -57,20 +104,74 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+  const normalizedCollectionOptions = useMemo(
+    () => collectionOptions ?? [],
+    [collectionOptions],
+  );
+  const [selectedCollectionId, setSelectedCollectionId] = useState(
+    () => normalizedCollectionOptions[0]?.id ?? "",
+  );
+
+  const activeCollection = useMemo(
+    () =>
+      normalizedCollectionOptions.find(
+        (collection) => collection.id === selectedCollectionId,
+      ) ?? normalizedCollectionOptions[0] ?? null,
+    [normalizedCollectionOptions, selectedCollectionId],
+  );
+
+  const scopedRegisteredItems = useMemo(() => {
+    if (!activeCollection) return registeredItems;
+    return registeredItems.filter(
+      (item) => !item.collectionId || item.collectionId === activeCollection.id,
+    );
+  }, [activeCollection, registeredItems]);
+
+  const activeProvidedCategoryOptions =
+    activeCollection?.categoryOptions ?? providedCategoryOptions;
+
+  const categoryOptions = useMemo<TradeCategoryOption[]>(() => {
+    if (activeProvidedCategoryOptions !== undefined) {
+      return [...activeProvidedCategoryOptions].sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, "ko-KR"),
+      );
+    }
+
+    const optionMap = new Map<string, TradeCategoryOption>();
+    for (const item of scopedRegisteredItems) {
+      if (!optionMap.has(item.category)) {
+        optionMap.set(item.category, {
+          id: item.category,
+          label:
+            item.categoryLabel?.trim() || getFallbackCategoryLabel(item.category),
+          sortOrder:
+            typeof item.categorySortOrder === "number"
+              ? item.categorySortOrder
+              : Number.MAX_SAFE_INTEGER,
+          kind: item.categoryKind,
+        });
+      }
+    }
+
+    const derived = [...optionMap.values()].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, "ko-KR"),
+    );
+    return derived.length > 0 ? derived : TRADE_CATEGORIES;
+  }, [activeProvidedCategoryOptions, scopedRegisteredItems]);
 
   const workTitleOptions = useMemo(() => {
-    const titles = registeredItems
+    const titles = scopedRegisteredItems
       .map((item) => item.workTitle)
       .filter((title) => title.trim().length > 0);
 
     return sortKoreanTitles(Array.from(new Set(titles)));
-  }, [registeredItems]);
+  }, [scopedRegisteredItems]);
 
   const benefitSubcategoryOrderMap = useMemo(() => {
     const orderMap = new Map<string, number>();
 
-    for (const item of registeredItems) {
-      if (item.category !== "benefit") continue;
+    for (const item of scopedRegisteredItems) {
+      if (!isBenefitItem(item)) continue;
 
       const subcategory = getBenefitSubcategoryLabel(item.benefitSubcategory);
       if (!subcategory) continue;
@@ -86,7 +187,7 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
     }
 
     return orderMap;
-  }, [registeredItems]);
+  }, [scopedRegisteredItems]);
 
   const benefitSubcategoryOptions = useMemo(() => {
     return [...benefitSubcategoryOrderMap.entries()]
@@ -102,15 +203,15 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
   }, [benefitSubcategoryOrderMap]);
 
   const hasBenefitItemsWithoutSubcategory = useMemo(() => {
-    return registeredItems.some(
+    return scopedRegisteredItems.some(
       (item) =>
-        item.category === "benefit" &&
+        isBenefitItem(item) &&
         !getBenefitSubcategoryLabel(item.benefitSubcategory),
     );
-  }, [registeredItems]);
+  }, [scopedRegisteredItems]);
 
   const filteredItems = useMemo(() => {
-    const nextItems = registeredItems.filter((item) => {
+    const nextItems = scopedRegisteredItems.filter((item) => {
       const matchesWorkTitle =
         selectedWorkTitle === ALL_WORKS_VALUE ||
         item.workTitle === selectedWorkTitle;
@@ -122,10 +223,10 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
       );
       const matchesBenefitSubcategory =
         selectedBenefitSubcategory === ALL_BENEFIT_SUBCATEGORIES_VALUE ||
-        (item.category === "benefit" &&
+        (isBenefitItem(item) &&
           selectedBenefitSubcategory === NO_BENEFIT_SUBCATEGORY_VALUE &&
           benefitSubcategory.length === 0) ||
-        (item.category === "benefit" &&
+        (isBenefitItem(item) &&
           selectedBenefitSubcategory === benefitSubcategory);
 
       return matchesWorkTitle && matchesCategory && matchesBenefitSubcategory;
@@ -133,7 +234,7 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
 
     return sortRegisteredItems(nextItems);
   }, [
-    registeredItems,
+    scopedRegisteredItems,
     selectedWorkTitle,
     selectedCategory,
     selectedBenefitSubcategory,
@@ -173,14 +274,40 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
   );
 
   useEffect(() => {
+    if (normalizedCollectionOptions.length === 0) return;
+    if (
+      selectedCollectionId &&
+      normalizedCollectionOptions.some(
+        (collection) => collection.id === selectedCollectionId,
+      )
+    ) {
+      return;
+    }
+    setSelectedCollectionId(normalizedCollectionOptions[0]?.id ?? "");
+  }, [normalizedCollectionOptions, selectedCollectionId]);
+
+  useEffect(() => {
     if (
       selectedCategory !== ALL_CATEGORIES_VALUE &&
+      !categoryOptions.some((option) => option.id === selectedCategory)
+    ) {
+      setSelectedCategory(ALL_CATEGORIES_VALUE);
+    }
+  }, [categoryOptions, selectedCategory]);
+
+  useEffect(() => {
+    const selectedCategoryOption = categoryOptions.find(
+      (option) => option.id === selectedCategory,
+    );
+    if (
+      selectedCategory !== ALL_CATEGORIES_VALUE &&
+      selectedCategoryOption?.kind !== "benefit" &&
       selectedCategory !== "benefit" &&
       selectedBenefitSubcategory !== ALL_BENEFIT_SUBCATEGORIES_VALUE
     ) {
       setSelectedBenefitSubcategory(ALL_BENEFIT_SUBCATEGORIES_VALUE);
     }
-  }, [selectedCategory, selectedBenefitSubcategory]);
+  }, [categoryOptions, selectedCategory, selectedBenefitSubcategory]);
 
   useEffect(() => {
     if (
@@ -215,9 +342,36 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
     updateBoardField("categoryDisplayMode", mode);
   }
 
+  function updateBoardMode(mode: TradeBoardMode) {
+    const singleSide = getTradeBoardModeSide(mode);
+    setAddModalSide(null);
+
+    setBoard((prev) => ({
+      ...prev,
+      boardMode: mode,
+      categoryDisplayMode: prev.categoryDisplayMode ?? "grouped",
+      cards:
+        singleSide === null
+          ? prev.cards
+          : convertCardsToSingleSide(prev.cards, singleSide),
+    }));
+  }
+
+  function changeCollectionFilter(value: string) {
+    setSelectedCollectionId(value);
+    setSelectedWorkTitle(ALL_WORKS_VALUE);
+    setSelectedCategory(ALL_CATEGORIES_VALUE);
+    setSelectedBenefitSubcategory(ALL_BENEFIT_SUBCATEGORIES_VALUE);
+  }
+
   function changeCategoryFilter(value: CategoryFilterValue) {
     setSelectedCategory(value);
-    if (value !== ALL_CATEGORIES_VALUE && value !== "benefit") {
+    const option = categoryOptions.find((item) => item.id === value);
+    if (
+      value !== ALL_CATEGORIES_VALUE &&
+      value !== "benefit" &&
+      option?.kind !== "benefit"
+    ) {
       setSelectedBenefitSubcategory(ALL_BENEFIT_SUBCATEGORIES_VALUE);
     }
   }
@@ -258,9 +412,14 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
                 ? {
                     ...card,
                     category: item.category,
+                    categoryLabel: item.categoryLabel,
+                    categorySortOrder: item.categorySortOrder ?? null,
+                    categoryKind: item.categoryKind,
                     imageUrl: item.imageUrl,
                     workTitle: item.workTitle,
-                    memo: item.itemName,
+                    itemName: item.itemName,
+                    showItemName: item.showItemName === true,
+                    memo: item.showItemName ? item.itemName : "",
                     imageRatio: getItemImageRatio(item),
                     benefitSubcategory: item.benefitSubcategory ?? null,
                     benefitSubcategorySortOrder:
@@ -268,6 +427,10 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
                     quantity: safeQuantity,
                     registeredItemId: item.id,
                     registeredSortOrder: item.sortOrder,
+                    registeredCatalogOrder: item.catalogOrder ?? null,
+                    collectionId: item.collectionId ?? null,
+                    collectionTitle: item.collectionTitle ?? null,
+                    collectionSortOrder: item.collectionSortOrder ?? null,
                   }
                 : card,
             ),
@@ -279,9 +442,14 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
         id: nanoid(),
         side,
         category: item.category,
+        categoryLabel: item.categoryLabel,
+        categorySortOrder: item.categorySortOrder ?? null,
+        categoryKind: item.categoryKind,
         imageUrl: item.imageUrl,
         workTitle: item.workTitle,
-        memo: item.itemName,
+        itemName: item.itemName,
+        showItemName: item.showItemName === true,
+        memo: item.showItemName ? item.itemName : "",
         imageRatio: getItemImageRatio(item),
         benefitSubcategory: item.benefitSubcategory ?? null,
         benefitSubcategorySortOrder:
@@ -289,6 +457,12 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
         quantity: safeQuantity,
         registeredItemId: item.id,
         registeredSortOrder: item.sortOrder,
+        registeredCatalogOrder: item.catalogOrder ?? null,
+        collectionId: item.collectionId ?? null,
+        collectionTitle: item.collectionTitle ?? null,
+        collectionSortOrder: item.collectionSortOrder ?? null,
+        isPriority: false,
+        isForSale: false,
       };
 
       return {
@@ -326,7 +500,6 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
     metadata: UploadedCardMetadata,
   ) {
     const workTitle = metadata.workTitle.trim();
-    if (!workTitle) return;
 
     const newCards: QuantityTradeCard[] = Array.from(files)
       .filter((file) => file.type.startsWith("image/"))
@@ -334,22 +507,32 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
         id: nanoid(),
         side,
         category: metadata.category,
+        categoryLabel: metadata.categoryLabel,
+        categorySortOrder: metadata.categorySortOrder,
+        categoryKind: metadata.categoryKind,
         imageUrl: URL.createObjectURL(file),
         workTitle,
         memo: "",
         imageRatio: "square",
         benefitSubcategory:
-          metadata.category === "benefit"
+          metadata.categoryKind === "benefit" || metadata.category === "benefit"
             ? metadata.benefitSubcategory
             : null,
         benefitSubcategorySortOrder:
-          metadata.category === "benefit" && metadata.benefitSubcategory
+          (metadata.categoryKind === "benefit" || metadata.category === "benefit") &&
+          metadata.benefitSubcategory
             ? (benefitSubcategoryOrderMap.get(
                 metadata.benefitSubcategory.trim(),
               ) ?? null)
             : null,
         quantity: 1,
         registeredSortOrder: Number.MAX_SAFE_INTEGER,
+        registeredCatalogOrder: null,
+        collectionId: metadata.collectionId ?? null,
+        collectionTitle: metadata.collectionTitle ?? null,
+        collectionSortOrder: metadata.collectionSortOrder ?? null,
+        isPriority: false,
+        isForSale: false,
       }));
 
     if (newCards.length === 0) return;
@@ -360,10 +543,15 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
   }
 
   function updateCard(cardId: string, patch: Partial<QuantityTradeCard>) {
-    setBoard((prev) => ({
-      ...prev,
-      cards: updateTradeCardList(prev.cards, cardId, patch),
-    }));
+    setBoard((prev) => {
+      const singleSide = getTradeBoardModeSide(prev.boardMode ?? "trade");
+      const nextPatch = singleSide ? { ...patch, side: singleSide } : patch;
+
+      return {
+        ...prev,
+        cards: updateTradeCardList(prev.cards, cardId, nextPatch),
+      };
+    });
   }
 
   function removeCard(cardId: string) {
@@ -405,7 +593,11 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
     exportPreviewUrl,
     setExportPreviewUrl,
     previewRef,
+    selectedCollectionId,
+    activeCollection,
+    collectionOptions: normalizedCollectionOptions,
     workTitleOptions,
+    categoryOptions,
     benefitSubcategoryOptions,
     hasBenefitItemsWithoutSubcategory,
     filteredItems,
@@ -419,6 +611,8 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
     updateBoardField,
     toggleCondition,
     updateCategoryDisplayMode,
+    updateBoardMode,
+    changeCollectionFilter,
     changeCategoryFilter,
     changeBenefitSubcategoryFilter,
     increaseRegisteredItemQuantity,

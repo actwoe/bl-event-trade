@@ -159,6 +159,8 @@ export default function AdminEventNewPage() {
           event_start_date: eventStartDate || null,
           event_end_date: eventEndDate || null,
           event_location: eventLocation.trim() || null,
+          reference_section_enabled: false,
+          reference_section_title: '내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?',
           thumbnail_path: thumbnailPath,
           status_label: null,
           is_public: isPublic,

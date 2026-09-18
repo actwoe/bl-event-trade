@@ -3,6 +3,11 @@ export type TradeBenefitSubcategoryOrderRow = {
   sort_order: number | null;
 };
 
+export type TradeBenefitItemOrderRow = {
+  benefit_subcategory: string | null;
+  sort_order: number | null;
+};
+
 export function normalizeBenefitSubcategoryName(value?: string | null) {
   return value?.trim() ?? "";
 }
@@ -23,6 +28,30 @@ export function createBenefitSubcategoryOrderMap(
   for (const row of rows) {
     const name = normalizeBenefitSubcategoryName(row.name);
     if (!name) continue;
+
+    const nextOrder = normalizeBenefitSubcategorySortOrder(row.sort_order);
+    const currentOrder = orderMap.get(name);
+
+    if (currentOrder === undefined || nextOrder < currentOrder) {
+      orderMap.set(name, nextOrder);
+    }
+  }
+
+  return orderMap;
+}
+
+/**
+ * 공개 교환판에서 특전 하위 분류 테이블을 읽지 못하거나 일부 행이 숨김 처리된
+ * 경우에도 trade_items.sort_order에 동기화된 값을 보조 기준으로 사용합니다.
+ * 명시적인 하위 분류 순서가 있으면 그 값을 우선하고, 누락된 이름만 채웁니다.
+ */
+export function addBenefitSubcategoryItemOrderFallback(
+  orderMap: Map<string, number>,
+  rows: TradeBenefitItemOrderRow[],
+) {
+  for (const row of rows) {
+    const name = normalizeBenefitSubcategoryName(row.benefit_subcategory);
+    if (!name || orderMap.has(name)) continue;
 
     const nextOrder = normalizeBenefitSubcategorySortOrder(row.sort_order);
     const currentOrder = orderMap.get(name);

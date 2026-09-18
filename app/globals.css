@@ -273,3 +273,42 @@ html[data-app-display-mode="standalone"] {
     margin-right: 1rem !important;
   }
 }
+
+/* 관리자 데스크톱 작업공간: 모바일 서비스 프레임과 분리해 넓게 사용합니다. */
+@media (min-width: 1024px) {
+  .admin-app-content > main {
+    margin: 0 auto !important;
+    max-width: 1280px !important;
+    padding: 1.25rem 1.5rem 2rem !important;
+  }
+
+  .admin-app-content > main > section {
+    margin: 0 auto !important;
+    max-width: 1180px !important;
+  }
+
+  .admin-app-content > main > section > div:first-child > header {
+    padding: 1.75rem 1.5rem 1.25rem !important;
+  }
+
+  .admin-app-content > main > section > div:first-child > form,
+  .admin-app-content > main > section > div:first-child > header ~ div,
+  .admin-app-content > main > section > form,
+  .admin-app-content > main > section > section {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding: 1.5rem !important;
+  }
+}
+
+.admin-section-nav {
+  scrollbar-width: none;
+}
+
+.admin-section-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.admin-section-anchor {
+  scroll-margin-top: 5.5rem;
+}

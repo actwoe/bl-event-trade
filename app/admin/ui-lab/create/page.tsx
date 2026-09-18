@@ -7,6 +7,14 @@ import { UiLabBuilder } from "@/components/ui-lab/UiLabBuilder";
 import { AppBottomNav } from "@/components/ui/AppBottomNav";
 import { AppTopBar } from "@/components/ui/AppTopBar";
 import { getTradeAssetUrl, supabase } from "@/lib/supabase";
+import { getTradeItemImageUrl } from "@/lib/trade-item-image";
+import {
+  categoryRowsToOptions,
+  createCategoryOptionMap,
+  getFallbackCategoryLabel,
+  getFallbackCategorySortOrder,
+  TradeItemCategoryRow,
+} from "@/lib/trade-item-categories";
 import {
   createBenefitSubcategoryOrderMap,
   getBenefitSubcategorySortOrder,
@@ -33,6 +41,8 @@ type TradeCollectionRow = {
   event_start_date: string | null;
   event_end_date: string | null;
   event_location: string | null;
+  reference_section_enabled: boolean | null;
+  reference_section_title: string | null;
 };
 
 type TradeItemRow = {
@@ -40,6 +50,7 @@ type TradeItemRow = {
   category: TradeCategory;
   work_title: string;
   item_name: string | null;
+  show_item_name: boolean | null;
   image_path: string;
   sort_order: number | null;
   image_ratio: TradeImageRatio | null;
@@ -120,7 +131,7 @@ function AdminUiLabCreatePageContent() {
       const { data, error } = await supabase
         .from("trade_collections")
         .select(
-          "id, slug, title, description, is_public, sort_order, created_at, event_start_date, event_end_date, event_location",
+          "id, slug, title, description, is_public, sort_order, created_at, event_start_date, event_end_date, event_location, reference_section_enabled, reference_section_title",
         )
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: false });
@@ -171,11 +182,11 @@ function AdminUiLabCreatePageContent() {
         return;
       }
 
-      const [itemsResult, referencesResult, subcategoriesResult] = await Promise.all([
+      const [itemsResult, referencesResult, subcategoriesResult, categoriesResult] = await Promise.all([
         supabase
           .from("trade_items")
           .select(
-            "id, category, work_title, item_name, image_path, sort_order, image_ratio, benefit_subcategory",
+            "id, category, work_title, item_name, show_item_name, image_path, sort_order, image_ratio, benefit_subcategory",
           )
           .eq("collection_id", selectedCollection.id)
           .eq("is_visible", true)
@@ -193,6 +204,13 @@ function AdminUiLabCreatePageContent() {
           .eq("is_visible", true)
           .order("sort_order", { ascending: true })
           .order("name", { ascending: true }),
+        supabase
+          .from("trade_item_categories")
+          .select("category_key, label, category_kind, is_visible, sort_order")
+          .eq("collection_id", selectedCollection.id)
+          .eq("is_visible", true)
+          .order("sort_order", { ascending: true })
+          .order("created_at", { ascending: true }),
       ]);
 
       if (isCancelled) {
@@ -217,6 +235,17 @@ function AdminUiLabCreatePageContent() {
         console.error(subcategoriesResult.error);
       }
 
+      if (categoriesResult.error) {
+        console.error(categoriesResult.error);
+      }
+
+      const categoryOptions = categoriesResult.error
+        ? undefined
+        : categoryRowsToOptions(
+            (categoriesResult.data ?? []) as TradeItemCategoryRow[],
+          );
+      const categoryOptionMap = createCategoryOptionMap(categoryOptions);
+
       const benefitSubcategoryOrderMap = createBenefitSubcategoryOrderMap(
         (subcategoriesResult.data ?? []) as TradeBenefitSubcategoryRow[],
       );
@@ -229,6 +258,9 @@ function AdminUiLabCreatePageContent() {
         eventStartDate: selectedCollection.event_start_date,
         eventEndDate: selectedCollection.event_end_date,
         location: selectedCollection.event_location,
+        referenceSectionEnabled: selectedCollection.reference_section_enabled !== false,
+        referenceSectionTitle: selectedCollection.reference_section_title,
+        categoryOptions,
       } as TradeCollectionSummary & {
         eventStartDate?: string | null;
         eventEndDate?: string | null;
@@ -236,21 +268,34 @@ function AdminUiLabCreatePageContent() {
 
       setRegisteredItems(
         ((itemsResult.data ?? []) as TradeItemRow[])
-          .filter((item) => item.image_path)
-          .map((item) => ({
+          .filter((item) => categoriesResult.error || categoryOptionMap.has(item.category))
+          .map((item, catalogOrder) => {
+            const categoryOption = categoryOptionMap.get(item.category);
+            return ({
             id: item.id,
             category: item.category,
+            categoryLabel:
+              categoryOption?.label ?? getFallbackCategoryLabel(item.category),
+            categorySortOrder:
+              categoryOption?.sortOrder ?? getFallbackCategorySortOrder(item.category),
             workTitle: item.work_title,
             itemName: item.item_name || "",
-            imageUrl: getTradeAssetUrl(item.image_path),
+            showItemName: item.show_item_name === true,
+            imageUrl: getTradeItemImageUrl(
+              item.image_path,
+              item.item_name,
+              getSafeImageRatio(item.image_ratio),
+            ),
             sortOrder: item.sort_order ?? 0,
+            catalogOrder,
             imageRatio: getSafeImageRatio(item.image_ratio),
             benefitSubcategory: item.benefit_subcategory ?? null,
             benefitSubcategorySortOrder: getBenefitSubcategorySortOrder(
               benefitSubcategoryOrderMap,
               item.benefit_subcategory,
             ),
-          })),
+          });
+          }),
       );
 
       setReferenceImages(
@@ -346,7 +391,7 @@ function AdminUiLabCreatePageContent() {
   return (
     <main className="flex h-[100dvh] w-full items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
       <section className="flex h-full max-h-[860px] w-full max-w-[520px] flex-col overflow-hidden rounded-[28px] border border-neutral-200/70 bg-white shadow-[0_8px_26px_rgba(15,23,42,0.04)]">
-        <AppTopBar title="교환판 만들기" backHref="/admin/ui-lab" />
+        <AppTopBar title="교환/양도판 만들기" backHref="/admin/ui-lab" />
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <section className="border-b border-neutral-100 bg-white px-5 py-4">
             <p className="text-[12px] font-black tracking-[0.04em] text-[#7C5CFC]">
@@ -354,7 +399,7 @@ function AdminUiLabCreatePageContent() {
             </p>
             <div className="mt-1 flex items-start justify-between gap-3">
               <h2 className="min-w-0 break-keep text-[24px] font-black leading-tight tracking-[-0.03em] text-neutral-950">
-                {collection?.title ?? "교환판 만들기"}
+                {collection?.title ?? "교환/양도판 만들기"}
               </h2>
               {collection ? (
                 <span className={
@@ -423,7 +468,7 @@ function AdminUiLabCreatePageFallback() {
   return (
     <main className="flex h-[100dvh] w-full items-center justify-center bg-neutral-100 px-3 py-3 sm:px-6 sm:py-6">
       <section className="w-full max-w-[520px] rounded-[28px] border border-neutral-200/70 bg-white p-5 text-sm text-neutral-500 shadow-[0_8px_26px_rgba(15,23,42,0.032)]">
-        교환판 만들기 화면을 불러오는 중입니다.
+        교환/양도판 만들기 화면을 불러오는 중입니다.
       </section>
     </main>
   );

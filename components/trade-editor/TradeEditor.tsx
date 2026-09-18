@@ -1,13 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   RegisteredTradeItem,
   TradeReferenceImage,
   TradeCollectionSummary,
 } from "@/lib/trade-types";
 import { UiLabPreview } from "@/components/ui-lab/UiLabPreview";
-import { TRADE_CONDITIONS } from "@/lib/trade-editor-core";
+import { TRADE_BOARD_MODES, TRADE_CONDITIONS } from "@/lib/trade-editor-core";
 import {
   renderTradePreviewToPngBlob,
   saveTradePngBlob,
@@ -27,6 +27,7 @@ export type TradeEditorProps = {
   };
   registeredItems: RegisteredTradeItem[];
   referenceImages: TradeReferenceImage[];
+  collectionOptions?: TradeCollectionSummary[];
 };
 
 export type TradeEditorViewProps = TradeEditorProps & {
@@ -44,6 +45,7 @@ export function TradeEditorView({
   collection,
   registeredItems,
   referenceImages,
+  collectionOptions = [],
   editorState,
   variant,
   embedded = false,
@@ -51,6 +53,8 @@ export function TradeEditorView({
   saveSection,
   onReset,
 }: TradeEditorViewProps) {
+  const [isSelectedImagesOpen, setIsSelectedImagesOpen] = useState(true);
+
   const {
     board,
     selectedConditions,
@@ -60,6 +64,9 @@ export function TradeEditorView({
     setIsConditionsOpen,
     selectedWorkTitle,
     setSelectedWorkTitle,
+    selectedCollectionId,
+    activeCollection,
+    changeCollectionFilter,
     selectedCategory,
     selectedBenefitSubcategory,
     addModalSide,
@@ -69,6 +76,7 @@ export function TradeEditorView({
     setExportPreviewUrl,
     previewRef,
     workTitleOptions,
+    categoryOptions,
     benefitSubcategoryOptions,
     hasBenefitItemsWithoutSubcategory,
     filteredItems,
@@ -81,6 +89,7 @@ export function TradeEditorView({
     updateBoardField,
     toggleCondition,
     updateCategoryDisplayMode,
+    updateBoardMode,
     changeCategoryFilter,
     changeBenefitSubcategoryFilter,
     increaseRegisteredItemQuantity,
@@ -93,6 +102,17 @@ export function TradeEditorView({
     resetEditor,
   } = editorState;
 
+  const boardMode = board.boardMode ?? "trade";
+  const activeBoardMode =
+    TRADE_BOARD_MODES.find((mode) => mode.id === boardMode) ??
+    TRADE_BOARD_MODES[0];
+  const activeReferenceImages =
+    collectionOptions.length > 0 && activeCollection
+      ? referenceImages.filter(
+          (image) => !image.collectionId || image.collectionId === activeCollection.id,
+        )
+      : referenceImages;
+
   async function downloadImage() {
     if (!canDownload) return;
 
@@ -104,7 +124,7 @@ export function TradeEditorView({
 
       await saveTradePngBlob(
         blob,
-        `${collection.slug}-trade-board.png`,
+        `${collection.slug}-${boardMode}-board.png`,
         setExportPreviewUrl,
       );
     } catch (error) {
@@ -157,6 +177,44 @@ export function TradeEditorView({
         >
           {header}
           <div className={variant === "production" && !embedded ? "mt-6 space-y-3" : "space-y-3"}>
+            <section className="border-b border-neutral-100 pb-4">
+              <div className="mb-3">
+                <h2 className="text-sm font-black text-neutral-950">
+                  만들 판 유형
+                </h2>
+              </div>
+
+              <div
+                className="grid grid-cols-3 rounded-2xl bg-neutral-100 p-1"
+                role="group"
+                aria-label="굿즈판 유형"
+              >
+                {TRADE_BOARD_MODES.map((mode) => {
+                  const active = mode.id === boardMode;
+
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => updateBoardMode(mode.id)}
+                      aria-pressed={active}
+                      className={
+                        active
+                          ? "rounded-xl bg-white px-2 py-2.5 text-xs font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200"
+                          : "rounded-xl px-2 py-2.5 text-xs font-bold text-neutral-500"
+                      }
+                    >
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <p className="mt-2 text-center text-[11px] font-semibold leading-4 text-neutral-400">
+                {activeBoardMode.description}
+              </p>
+            </section>
+
             <section className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
               <div className="flex items-start justify-between gap-3">
                 <button
@@ -277,68 +335,105 @@ export function TradeEditorView({
 
           <div className="mt-6 border-t border-neutral-100 pt-5">
             <h2 className="text-sm font-black text-neutral-950">
-              교환 이미지 추가
+              {boardMode === "sell"
+                ? "양도 이미지 추가"
+                : boardMode === "wanted"
+                  ? "구해요 이미지 추가"
+                  : "교환 이미지 추가"}
             </h2>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <AddSideButton
-                koreanTitle="있어요"
-                englishTitle="Have"
-                iconSrc="/trade-icons/have.png"
-                count={haveCardCount}
-                onClick={() => openAddModal("have")}
-              />
+            <div
+              className={`mt-4 grid gap-3 ${
+                boardMode === "trade" ? "grid-cols-2" : "grid-cols-1"
+              }`}
+            >
+              {boardMode !== "wanted" ? (
+                <AddSideButton
+                  koreanTitle={boardMode === "sell" ? "양도해요" : "있어요"}
+                  englishTitle={boardMode === "sell" ? "SELL" : "Have"}
+                  iconSrc="/trade-icons/have.png"
+                  count={haveCardCount}
+                  onClick={() => openAddModal("have")}
+                />
+              ) : null}
 
-              <AddSideButton
-                koreanTitle="구해요"
-                englishTitle="Want"
-                iconSrc="/trade-icons/want.png"
-                count={wantCardCount}
-                onClick={() => openAddModal("want")}
-              />
+              {boardMode !== "sell" ? (
+                <AddSideButton
+                  koreanTitle="구해요"
+                  englishTitle="Want"
+                  iconSrc="/trade-icons/want.png"
+                  count={wantCardCount}
+                  onClick={() => openAddModal("want")}
+                />
+              ) : null}
             </div>
           </div>
 
           <div className="mt-6 border-t border-neutral-100 pt-5">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-black text-neutral-950">
-                선택된 이미지
-              </h2>
-
-              <p className="text-xs font-bold text-neutral-400">
-                총 {totalSelectedCount}개
-              </p>
-            </div>
-
-            <div className="mt-4 space-y-5">
-              {board.cards.length > 0 ? (
-                <>
-                  {haveCards.length > 0 ? (
-                    <SelectedTradeCards
-                      title="있어요"
-                      cards={haveCards}
-                      onUpdate={updateCard}
-                      onRemove={removeCard}
-                      sideLabelMode="bilingual"
-                    />
-                  ) : null}
-
-                  {wantCards.length > 0 ? (
-                    <SelectedTradeCards
-                      title="구해요"
-                      cards={wantCards}
-                      onUpdate={updateCard}
-                      onRemove={removeCard}
-                      sideLabelMode="bilingual"
-                    />
-                  ) : null}
-                </>
-              ) : (
-                <p className="rounded-xl bg-neutral-50 px-3 py-6 text-center text-xs text-neutral-400">
-                  아직 선택된 이미지가 없습니다.
+            <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => setIsSelectedImagesOpen((prev) => !prev)}
+                className="min-w-0 flex-1 text-left"
+                aria-expanded={isSelectedImagesOpen}
+              >
+                <h2 className="text-sm font-black text-neutral-950">
+                  선택된 이미지
+                </h2>
+                <p className="mt-1 text-xs font-bold text-neutral-400">
+                  총 {totalSelectedCount}개
                 </p>
-              )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsSelectedImagesOpen((prev) => !prev)}
+                className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-neutral-500 ring-1 ring-neutral-200"
+                aria-expanded={isSelectedImagesOpen}
+              >
+                {isSelectedImagesOpen ? "접기" : "펼치기"}
+              </button>
             </div>
+
+            {isSelectedImagesOpen ? (
+              <div className="mt-4 space-y-5">
+                {board.cards.length > 0 ? (
+                  <>
+                    {haveCards.length > 0 && boardMode !== "wanted" ? (
+                      <SelectedTradeCards
+                        title={boardMode === "sell" ? "양도해요" : "있어요"}
+                        cards={haveCards}
+                        boardMode={boardMode}
+                        categoryOptions={categoryOptions}
+                        collectionOptions={collectionOptions}
+                        showCommonWorkLabel={workTitleOptions.length > 1}
+                        onUpdate={updateCard}
+                        onRemove={removeCard}
+                        sideLabelMode="bilingual"
+                      />
+                    ) : null}
+
+                    {wantCards.length > 0 && boardMode !== "sell" ? (
+                      <SelectedTradeCards
+                        title="구해요"
+                        cards={wantCards}
+                        boardMode={boardMode}
+                        categoryOptions={categoryOptions}
+                        collectionOptions={collectionOptions}
+                        showCommonWorkLabel={workTitleOptions.length > 1}
+                        onUpdate={updateCard}
+                        onRemove={removeCard}
+                        sideLabelMode="bilingual"
+                      />
+                    ) : null}
+                  </>
+                ) : (
+                  <p className="rounded-xl bg-neutral-50 px-3 py-6 text-center text-xs text-neutral-400">
+                    아직 선택된 이미지가 없습니다.
+                  </p>
+                )}
+              </div>
+            ) : null}
           </div>
 
           {saveSection}
@@ -360,18 +455,22 @@ export function TradeEditorView({
             </p>
           </div>
 
-          <div className="mb-4 mt-3 grid grid-cols-2 rounded-full bg-neutral-100 p-1">
+          <div
+            className="mb-4 mt-3 grid grid-cols-2 rounded-full bg-neutral-100 p-1"
+            role="group"
+            aria-label="굿즈 보기 방식"
+          >
             <button
               type="button"
               onClick={() => updateCategoryDisplayMode("grouped")}
               aria-pressed={board.categoryDisplayMode !== "simple"}
               className={
                 board.categoryDisplayMode !== "simple"
-                  ? "rounded-full bg-white px-3 py-2.5 text-xs font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200"
-                  : "rounded-full px-3 py-2.5 text-xs font-bold text-neutral-500"
+                  ? "rounded-full bg-white px-2 py-2.5 text-[11px] font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200"
+                  : "rounded-full px-2 py-2.5 text-[11px] font-bold text-neutral-500"
               }
             >
-              같은 종류끼리 교환
+              종류별로 구분해서 보기
             </button>
             <button
               type="button"
@@ -379,11 +478,11 @@ export function TradeEditorView({
               aria-pressed={board.categoryDisplayMode === "simple"}
               className={
                 board.categoryDisplayMode === "simple"
-                  ? "rounded-full bg-white px-3 py-2.5 text-xs font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200"
-                  : "rounded-full px-3 py-2.5 text-xs font-bold text-neutral-500"
+                  ? "rounded-full bg-white px-2 py-2.5 text-[11px] font-black text-neutral-950 shadow-[0_1px_4px_rgba(15,23,42,0.10)] ring-1 ring-neutral-200"
+                  : "rounded-full px-2 py-2.5 text-[11px] font-bold text-neutral-500"
               }
             >
-              종류 구분 없이 교환 (교차)
+              종류 구분없이 보기
             </button>
           </div>
 
@@ -426,14 +525,22 @@ export function TradeEditorView({
       {addModalSide ? (
         <AddItemModal
           side={addModalSide}
+          boardMode={boardMode}
           variant={variant === "lab" ? "lab" : "default"}
           selectedWorkTitle={selectedWorkTitle}
           selectedCategory={selectedCategory}
           selectedBenefitSubcategory={selectedBenefitSubcategory}
+          selectedCollectionId={selectedCollectionId}
+          collectionOptions={collectionOptions}
           workTitleOptions={workTitleOptions}
+          categoryOptions={categoryOptions}
           benefitSubcategoryOptions={benefitSubcategoryOptions}
           hasBenefitItemsWithoutSubcategory={hasBenefitItemsWithoutSubcategory}
-          referenceImages={referenceImages}
+          referenceImages={activeReferenceImages}
+          referenceSectionEnabled={
+            (activeCollection ?? collection).referenceSectionEnabled === true
+          }
+          referenceSectionTitle={(activeCollection ?? collection).referenceSectionTitle}
           registeredItems={registeredItems}
           selectedCards={board.cards}
           filteredItems={filteredItems}
@@ -441,6 +548,9 @@ export function TradeEditorView({
           onChangeWorkTitle={setSelectedWorkTitle}
           onChangeCategory={changeCategoryFilter}
           onChangeBenefitSubcategory={changeBenefitSubcategoryFilter}
+          onChangeCollection={
+            collectionOptions.length > 0 ? changeCollectionFilter : undefined
+          }
           onIncreaseItem={(item) =>
             increaseRegisteredItemQuantity(item, addModalSide)
           }
@@ -465,7 +575,11 @@ export function TradeEditorView({
 
 
 export function TradeEditor(props: TradeEditorProps) {
-  const editorState = useTradeEditorState(props.registeredItems);
+  const editorState = useTradeEditorState(
+    props.registeredItems,
+    props.collection.categoryOptions,
+    props.collectionOptions,
+  );
 
   return (
     <TradeEditorView

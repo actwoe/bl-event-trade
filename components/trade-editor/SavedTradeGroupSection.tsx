@@ -14,6 +14,7 @@ type SavedTradeGroupSectionProps = {
   isSavingGroup: boolean;
   isLoadingGroup: boolean;
   directUploadCardCount: number;
+  globalMode?: boolean;
   onGroupNameChange: (value: string) => void;
   onSave: () => void;
   onStartNew: () => void;
@@ -29,6 +30,7 @@ export function SavedTradeGroupSection({
   isSavingGroup,
   isLoadingGroup,
   directUploadCardCount,
+  globalMode = false,
   onGroupNameChange,
   onSave,
   onStartNew,
@@ -37,9 +39,11 @@ export function SavedTradeGroupSection({
     <section className="mt-8 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-black text-neutral-950">내 교환판 저장</p>
+          <p className="text-sm font-black text-neutral-950">내 교환/양도판 저장</p>
           <p className="mt-1 text-xs leading-5 text-neutral-400">
-            로그인하면 그룹을 최대 {MAX_TRADE_GROUPS}개까지 저장하고 다시 수정할 수 있습니다.
+            {globalMode
+              ? `행사와 관계없이 계정당 최대 ${MAX_TRADE_GROUPS}개까지 저장할 수 있습니다. 굿즈를 추가할 때 행사를 선택합니다.`
+              : `로그인하면 그룹을 최대 ${MAX_TRADE_GROUPS}개까지 저장하고 다시 수정할 수 있습니다.`}
           </p>
         </div>
 

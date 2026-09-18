@@ -5,7 +5,7 @@ import { AppTopBar } from '@/components/ui/AppTopBar';
 export default function TradeLoadingPage() {
   return (
     <AppFrame>
-      <AppTopBar title="교환판 만들기" backHref="/" />
+      <AppTopBar title="교환/양도판 만들기" backHref="/" />
 
       <div className="min-h-0 flex-1 overflow-hidden">
         <div className="border-b border-neutral-100 px-5 py-4">

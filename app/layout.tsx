@@ -14,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    <html lang="ko" suppressHydrationWarning>
       <body className="min-h-screen bg-neutral-100 text-neutral-950 antialiased">
         <Script id="detect-app-display-mode" strategy="beforeInteractive">
           {`

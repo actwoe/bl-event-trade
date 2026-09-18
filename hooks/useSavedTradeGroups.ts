@@ -22,7 +22,11 @@ import { supabase } from "@/lib/supabase";
 
 type UserAuthState = "checking" | "signed-in" | "signed-out";
 
-type SavedGroupChangeHandler = (group: { id: string; name: string }) => void;
+type SavedGroupChangeHandler = (group: {
+  id: string;
+  name: string;
+  collectionId: string | null;
+}) => void;
 
 type UseSavedTradeGroupsOptions = {
   collection: TradeCollectionSummary;
@@ -30,6 +34,7 @@ type UseSavedTradeGroupsOptions = {
   initialGroupId?: string;
   editorState: ReturnType<typeof useTradeEditorState>;
   onSavedGroupChange?: SavedGroupChangeHandler;
+  globalMode?: boolean;
 };
 
 function createSavedTradeGroupBoard(
@@ -56,6 +61,11 @@ function createSavedTradeGroupBoard(
         memo: card.memo,
         imageRatio: card.imageRatio === "photocard" ? "photocard" : "square",
         benefitSubcategory: card.benefitSubcategory ?? null,
+        collectionId: card.collectionId ?? null,
+        collectionTitle: card.collectionTitle ?? null,
+        collectionSortOrder: card.collectionSortOrder ?? null,
+        isPriority: card.side === "want" && card.isPriority === true,
+        isForSale: card.side === "have" && card.isForSale === true,
       },
     ];
   });
@@ -65,6 +75,7 @@ function createSavedTradeGroupBoard(
     nickname: board.nickname,
     contact: board.contact,
     selectedConditions,
+    boardMode: board.boardMode ?? "trade",
     categoryDisplayMode:
       board.categoryDisplayMode === "simple" ? "simple" : "grouped",
     cards,
@@ -90,7 +101,10 @@ function restoreSavedTradeGroupBoard(
       {
         id: nanoid(),
         side: savedCard.side,
-        category: savedCard.category,
+        category: item.category,
+        categoryLabel: item.categoryLabel,
+        categorySortOrder: item.categorySortOrder ?? null,
+        categoryKind: item.categoryKind,
         imageUrl: item.imageUrl,
         workTitle: savedCard.workTitle || item.workTitle,
         memo: savedCard.memo || item.itemName,
@@ -102,6 +116,15 @@ function restoreSavedTradeGroupBoard(
         quantity: savedCard.quantity,
         registeredItemId: item.id,
         registeredSortOrder: item.sortOrder,
+        registeredCatalogOrder: item.catalogOrder ?? null,
+        collectionId: item.collectionId ?? savedCard.collectionId ?? null,
+        collectionTitle: item.collectionTitle ?? savedCard.collectionTitle ?? null,
+        collectionSortOrder:
+          item.collectionSortOrder ?? savedCard.collectionSortOrder ?? null,
+        isPriority:
+          savedCard.side === "want" && savedCard.isPriority === true,
+        isForSale:
+          savedCard.side === "have" && savedCard.isForSale === true,
       },
     ];
   });
@@ -112,7 +135,11 @@ function restoreSavedTradeGroupBoard(
       contact: boardData.contact,
       memo: boardData.selectedConditions.join(" · "),
       cards,
-      categoryDisplayMode: boardData.categoryDisplayMode,
+      boardMode: boardData.boardMode ?? "trade",
+      categoryDisplayMode:
+        boardData.boardMode === "sell" || boardData.boardMode === "wanted"
+          ? "grouped"
+          : boardData.categoryDisplayMode,
     } satisfies TradeBoard,
     selectedConditions: boardData.selectedConditions,
     missingCardCount: boardData.cards.length - cards.length,
@@ -125,6 +152,7 @@ export function useSavedTradeGroups({
   initialGroupId,
   editorState,
   onSavedGroupChange,
+  globalMode = false,
 }: UseSavedTradeGroupsOptions) {
   const { board, setBoard, selectedConditions, setSelectedConditions } =
     editorState;
@@ -196,9 +224,9 @@ export function useSavedTradeGroups({
         return;
       }
 
-      if (groupData.collection_id !== collection.id) {
+      if (!globalMode && groupData.collection_id !== collection.id) {
         setGroupSaveMessage(
-          "이 저장 그룹은 다른 행사 교환판입니다. 내 교환판에서 다시 열어 주세요.",
+          "이 저장 그룹은 다른 행사 교환판이거나 여러 행사가 섞인 교환판입니다. 내 교환/양도판에서 다시 열어 주세요.",
         );
         return;
       }
@@ -225,7 +253,7 @@ export function useSavedTradeGroups({
 
       if (restored.missingCardCount > 0) {
         setGroupSaveMessage(
-          `현재 행사에서 삭제된 굿즈 ${restored.missingCardCount}개는 제외하고 불러왔습니다.`,
+          `${globalMode ? "현재 공개 행사에서" : "현재 행사에서"} 삭제된 굿즈 ${restored.missingCardCount}개는 제외하고 불러왔습니다.`,
         );
       } else {
         setGroupSaveMessage("저장한 교환판을 불러왔습니다.");
@@ -239,6 +267,7 @@ export function useSavedTradeGroups({
     };
   }, [
     collection.id,
+    globalMode,
     initialGroupId,
     registeredItems,
     setBoard,
@@ -285,6 +314,7 @@ export function useSavedTradeGroups({
           .update({
             name: normalizedName,
             board_data: boardData,
+            ...(globalMode ? { collection_id: null } : {}),
           })
           .eq("id", activeGroupId)
           .eq("user_id", currentUserId);
@@ -296,7 +326,11 @@ export function useSavedTradeGroups({
             ? `교환판을 저장했습니다. 직접 추가 이미지 ${skippedUploadCount}개는 저장에서 제외되었습니다.`
             : "교환판을 저장했습니다.",
         );
-        onSavedGroupChange?.({ id: activeGroupId, name: normalizedName });
+        onSavedGroupChange?.({
+          id: activeGroupId,
+          name: normalizedName,
+          collectionId: globalMode ? null : collection.id,
+        });
         return;
       }
 
@@ -304,7 +338,7 @@ export function useSavedTradeGroups({
         .from("trade_groups")
         .insert({
           user_id: currentUserId,
-          collection_id: collection.id,
+          collection_id: globalMode ? null : collection.id,
           name: normalizedName,
           board_data: boardData,
         })
@@ -315,7 +349,11 @@ export function useSavedTradeGroups({
 
       setActiveGroupId(data.id);
       setSavedGroupCount((current) => current + 1);
-      onSavedGroupChange?.({ id: data.id, name: normalizedName });
+      onSavedGroupChange?.({
+        id: data.id,
+        name: normalizedName,
+        collectionId: globalMode ? null : collection.id,
+      });
 
       const nextUrl = new URL(window.location.href);
       nextUrl.searchParams.set("group", data.id);

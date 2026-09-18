@@ -37,7 +37,7 @@ export function CollectionCard({
       onPointerDown={() => router.prefetch(href)}
       onFocus={() => router.prefetch(href)}
       className="group block w-full touch-manipulation overflow-hidden rounded-[18px] border border-neutral-200 bg-white text-left transition active:scale-[0.985] hover:border-neutral-300"
-      aria-label={`${title} 교환판 만들기`}
+      aria-label={`${title} 교환/양도판 만들기`}
     >
       <div className="relative aspect-[32/45] bg-neutral-100">
         {thumbnailUrl ? (

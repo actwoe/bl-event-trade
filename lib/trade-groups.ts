@@ -1,5 +1,6 @@
 import {
   TradeCategory,
+  TradeBoardMode,
   TradeCategoryDisplayMode,
   TradeImageRatio,
   TradeSide,
@@ -16,6 +17,11 @@ export type SavedTradeGroupCard = {
   memo: string;
   imageRatio: TradeImageRatio;
   benefitSubcategory: string | null;
+  collectionId?: string | null;
+  collectionTitle?: string | null;
+  collectionSortOrder?: number | null;
+  isPriority?: boolean;
+  isForSale?: boolean;
 };
 
 export type SavedTradeGroupBoard = {
@@ -23,6 +29,7 @@ export type SavedTradeGroupBoard = {
   nickname: string;
   contact: string;
   selectedConditions: string[];
+  boardMode?: TradeBoardMode;
   categoryDisplayMode: TradeCategoryDisplayMode;
   cards: SavedTradeGroupCard[];
 };
@@ -30,7 +37,7 @@ export type SavedTradeGroupBoard = {
 export type TradeGroupRow = {
   id: string;
   user_id: string;
-  collection_id: string;
+  collection_id: string | null;
   name: string;
   board_data: SavedTradeGroupBoard;
   created_at: string;
@@ -42,13 +49,7 @@ function isTradeSide(value: unknown): value is TradeSide {
 }
 
 function isTradeCategory(value: unknown): value is TradeCategory {
-  return (
-    value === 'benefit' ||
-    value === 'deco_photo_pack' ||
-    value === 'sweets_acrylic_magnet' ||
-    value === 'heart_can_badge' ||
-    value === 'collection_photo_card'
-  );
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function isTradeImageRatio(value: unknown): value is TradeImageRatio {
@@ -59,6 +60,10 @@ function isTradeCategoryDisplayMode(
   value: unknown,
 ): value is TradeCategoryDisplayMode {
   return value === 'grouped' || value === 'simple';
+}
+
+function isTradeBoardMode(value: unknown): value is TradeBoardMode {
+  return value === 'trade' || value === 'sell' || value === 'wanted';
 }
 
 function isSavedTradeGroupCard(value: unknown): value is SavedTradeGroupCard {
@@ -78,7 +83,18 @@ function isSavedTradeGroupCard(value: unknown): value is SavedTradeGroupCard {
     typeof card.memo === 'string' &&
     isTradeImageRatio(card.imageRatio) &&
     (card.benefitSubcategory === null ||
-      typeof card.benefitSubcategory === 'string')
+      typeof card.benefitSubcategory === 'string') &&
+    (card.collectionId === undefined ||
+      card.collectionId === null ||
+      typeof card.collectionId === 'string') &&
+    (card.collectionTitle === undefined ||
+      card.collectionTitle === null ||
+      typeof card.collectionTitle === 'string') &&
+    (card.collectionSortOrder === undefined ||
+      card.collectionSortOrder === null ||
+      typeof card.collectionSortOrder === 'number') &&
+    (card.isPriority === undefined || typeof card.isPriority === 'boolean') &&
+    (card.isForSale === undefined || typeof card.isForSale === 'boolean')
   );
 }
 
@@ -95,6 +111,7 @@ export function parseSavedTradeGroupBoard(
     typeof board.contact !== 'string' ||
     !Array.isArray(board.selectedConditions) ||
     !board.selectedConditions.every((item) => typeof item === 'string') ||
+    (board.boardMode !== undefined && !isTradeBoardMode(board.boardMode)) ||
     !isTradeCategoryDisplayMode(board.categoryDisplayMode) ||
     !Array.isArray(board.cards) ||
     !board.cards.every(isSavedTradeGroupCard)
