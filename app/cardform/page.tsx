@@ -6,7 +6,8 @@ import { AppTopBar } from "@/components/ui/AppTopBar";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { nanoid } from "nanoid";
 import { supabase } from "@/lib/supabase";
-import { TRADE_CATEGORIES, TradeCategory } from "@/lib/trade-types";
+import { TradeCategory, TradeCategoryOption } from "@/lib/trade-types";
+import { categoryRowsToOptions, TradeItemCategoryRow } from "@/lib/trade-item-categories";
 
 type TradeCollectionRow = {
   id: string;
@@ -81,7 +82,8 @@ export default function CardFormPage() {
   const [collectionId, setCollectionId] = useState("");
   const [workTitles, setWorkTitles] = useState<string[]>([]);
   const [workTitle, setWorkTitle] = useState("");
-  const [category, setCategory] = useState<TradeCategory>("benefit");
+  const [category, setCategory] = useState<TradeCategory>("");
+  const [categoryOptions, setCategoryOptions] = useState<TradeCategoryOption[]>([]);
   const [benefitSubcategories, setBenefitSubcategories] = useState<string[]>(
     [],
   );
@@ -164,10 +166,48 @@ export default function CardFormPage() {
       );
 
       setWorkTitles(uniqueWorkTitles);
-      setWorkTitle(uniqueWorkTitles[0] ?? "");
+      setWorkTitle("");
     }
 
     loadWorkTitles();
+  }, [collectionId]);
+
+  useEffect(() => {
+    async function loadCategories() {
+      if (!collectionId) {
+        setCategoryOptions([]);
+        setCategory("");
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("trade_item_categories")
+        .select("category_key, label, category_kind, is_visible, sort_order")
+        .eq("collection_id", collectionId)
+        .eq("is_visible", true)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        console.error(error);
+        setMessage("굿즈 종류 목록을 불러오지 못했습니다.");
+        setCategoryOptions([]);
+        setCategory("");
+        return;
+      }
+
+      const nextOptions = categoryRowsToOptions(
+        (data ?? []) as TradeItemCategoryRow[],
+      );
+      setCategoryOptions(nextOptions);
+      setCategory((current) =>
+        nextOptions.some((option) => option.id === current)
+          ? current
+          : (nextOptions[0]?.id ?? ""),
+      );
+    }
+
+    void loadCategories();
   }, [collectionId]);
 
   useEffect(() => {
@@ -269,8 +309,8 @@ export default function CardFormPage() {
       return;
     }
 
-    if (!workTitle) {
-      setMessage("작품을 선택해 주세요.");
+    if (!category || !categoryOptions.some((option) => option.id === category)) {
+      setMessage("이 행사에 등록된 굿즈 종류가 없습니다. 관리자에게 먼저 굿즈 종류 등록을 요청해 주세요.");
       return;
     }
 
@@ -284,7 +324,7 @@ export default function CardFormPage() {
       setMessage("");
 
       const fileExtension = getFileExtension(imageFile);
-      const safeWorkTitle = normalizePathPart(workTitle);
+      const safeWorkTitle = normalizePathPart(workTitle || "submission");
       const fileName = `${safeWorkTitle}-${Date.now()}-${nanoid(
         8,
       )}.${fileExtension}`;
@@ -405,29 +445,26 @@ export default function CardFormPage() {
 
                 <label className="block">
                   <span className="text-sm font-semibold text-neutral-800">
-                    작품 선택
+                    작품 선택 <span className="text-neutral-400">(선택)</span>
                   </span>
 
                   <select
                     value={workTitle}
                     onChange={(event) => setWorkTitle(event.target.value)}
-                    disabled={workTitles.length === 0}
-                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC] disabled:bg-neutral-100 disabled:text-neutral-400"
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
                   >
+                    <option value="">작품명 없음 · 단독/공통 행사</option>
                     {workTitles.length > 0 ? (
                       workTitles.map((title) => (
                         <option key={title} value={title}>
                           {title}
                         </option>
                       ))
-                    ) : (
-                      <option value="">등록된 작품이 없습니다</option>
-                    )}
+                    ) : null}
                   </select>
 
                   <p className="mt-2 text-xs leading-5 text-neutral-400">
-                    작품 목록은 관리자가 해당 행사에 등록한 작품 기준으로
-                    표시됩니다.
+                    여러 작품이 함께하는 행사에서만 선택하면 됩니다.
                   </p>
                 </label>
 
@@ -439,6 +476,7 @@ export default function CardFormPage() {
 
                     <select
                       value={category}
+                      disabled={categoryOptions.length === 0}
                       onChange={(event) =>
                         handleCategoryChange(
                           event.target.value as TradeCategory,
@@ -446,11 +484,15 @@ export default function CardFormPage() {
                       }
                       className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-[#7C5CFC]"
                     >
-                      {TRADE_CATEGORIES.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
+                      {categoryOptions.length > 0 ? (
+                        categoryOptions.map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))
+                      ) : (
+                        <option value="">등록된 굿즈 종류 없음</option>
+                      )}
                     </select>
                   </label>
 

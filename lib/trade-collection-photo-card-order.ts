@@ -1,20 +1,26 @@
-export type CollectionPhotoCardVariant = "A" | "B";
+export type CollectionPhotoCardVariant = "A" | "B" | "C" | "D";
 
 export const COLLECTION_PHOTO_CARD_VARIANTS: CollectionPhotoCardVariant[] = [
   "A",
   "B",
+  "C",
+  "D",
 ];
 
 export function getCollectionPhotoCardSortOrder(
   variant: CollectionPhotoCardVariant,
 ) {
-  return variant === "B" ? 1 : 0;
+  const index = COLLECTION_PHOTO_CARD_VARIANTS.indexOf(variant);
+  return index >= 0 ? index : 0;
 }
 
 export function getCollectionPhotoCardVariant(
   sortOrder?: number | null,
 ): CollectionPhotoCardVariant {
-  return sortOrder === 1 ? "B" : "A";
+  if (sortOrder === 1) return "B";
+  if (sortOrder === 2) return "C";
+  if (sortOrder === 3) return "D";
+  return "A";
 }
 
 export function normalizeCollectionPhotoCardSortOrder(

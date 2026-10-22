@@ -17,7 +17,11 @@ type TradeBuilderProps = {
   referenceImages: TradeReferenceImage[];
   initialGroupId?: string;
   embedded?: boolean;
-  onSavedGroupChange?: (group: { id: string; name: string }) => void;
+  onSavedGroupChange?: (group: {
+    id: string;
+    name: string;
+    collectionId: string;
+  }) => void;
 };
 
 export function TradeBuilder({
@@ -28,7 +32,7 @@ export function TradeBuilder({
   embedded = false,
   onSavedGroupChange,
 }: TradeBuilderProps) {
-  const editorState = useTradeEditorState(registeredItems);
+  const editorState = useTradeEditorState(registeredItems, collection.categoryOptions);
   const savedGroups = useSavedTradeGroups({
     collection,
     registeredItems,

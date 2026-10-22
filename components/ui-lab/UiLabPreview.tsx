@@ -1,12 +1,8 @@
 "use client";
 
 import { forwardRef, useEffect, useRef, useState } from "react";
-import {
-  TRADE_CATEGORIES,
-  TradeBoard,
-  TradeBoardMode,
-  TradeCard,
-} from "@/lib/trade-types";
+import { TradeBoard, TradeBoardMode, TradeCard } from "@/lib/trade-types";
+import { getFallbackCategoryLabel } from "@/lib/trade-item-categories";
 import { QuantityBadge } from "@/components/trade/QuantityBadge";
 import { ProtectedGoodsImage } from "@/components/trade-editor/ProtectedGoodsImage";
 import { sortTradeCardsBySideAndGroup } from "@/lib/trade-card-order";
@@ -81,8 +77,7 @@ function TradeCardStatusBadge({
 
 function getCardMetaLabel(card: TradeCard) {
   const categoryLabel =
-    TRADE_CATEGORIES.find((category) => category.id === card.category)?.label ??
-    card.category;
+    card.categoryLabel?.trim() || getFallbackCategoryLabel(card.category);
   const subcategory =
     typeof card.benefitSubcategory === "string"
       ? card.benefitSubcategory.trim()
@@ -541,6 +536,11 @@ function PreviewCard({
 }) {
   const metaLabel = getCardMetaLabel(card);
   const quantity = getCardQuantity(card);
+  const visibleItemName = card.showItemName !== false
+    ? (card.itemName ?? card.memo ?? '').trim()
+    : '';
+  const primaryLabel = card.workTitle.trim() || visibleItemName;
+  const secondaryItemName = card.workTitle.trim() ? visibleItemName : '';
 
   return (
     <article className="min-w-0 bg-white">
@@ -557,17 +557,19 @@ function PreviewCard({
       </div>
 
       <div className="pt-1.5">
-        <p className="line-clamp-1 text-center text-[9px] font-black leading-4 text-neutral-950">
-          {card.workTitle || "작품명"}
-        </p>
+        {primaryLabel ? (
+          <p className="line-clamp-1 text-center text-[9px] font-black leading-4 text-neutral-950">
+            {primaryLabel}
+          </p>
+        ) : null}
         {showMeta ? (
           <p className="line-clamp-1 text-center text-[8px] font-bold leading-3 text-neutral-500">
             {metaLabel}
           </p>
         ) : null}
-        {card.memo ? (
+        {secondaryItemName ? (
           <p className="line-clamp-1 text-center text-[8px] font-bold leading-3 text-neutral-400">
-            {card.memo}
+            {secondaryItemName}
           </p>
         ) : null}
       </div>

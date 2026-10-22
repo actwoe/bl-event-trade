@@ -12,6 +12,13 @@ import {
 } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
+import { getTradeItemImageUrl } from '@/lib/trade-item-image';
+import {
+  createCustomCategoryKey,
+  getFallbackCategoryLabel,
+  getFallbackCategorySortOrder,
+  normalizeCategoryKind,
+} from '@/lib/trade-item-categories';
 import {
   compareBenefitSubcategoryValues,
   createBenefitSubcategoryOrderMap,
@@ -25,8 +32,8 @@ import {
   normalizeCollectionPhotoCardSortOrder,
 } from '@/lib/trade-collection-photo-card-order';
 import {
-  TRADE_CATEGORIES,
   TradeCategory,
+  TradeCategoryKind,
   TradeImageRatio,
 } from '@/lib/trade-types';
 
@@ -40,6 +47,8 @@ type TradeCollectionRow = {
   event_start_date: string | null;
   event_end_date: string | null;
   event_location: string | null;
+  reference_section_enabled: boolean | null;
+  reference_section_title: string | null;
   thumbnail_path: string;
   status_label: string | null;
   is_public: boolean;
@@ -51,6 +60,17 @@ type TradeWorkRow = {
   collection_id: string;
   title: string;
   is_visible: boolean;
+  created_at: string;
+};
+
+type TradeItemCategoryRow = {
+  id: string;
+  collection_id: string;
+  category_key: string;
+  label: string;
+  category_kind: TradeCategoryKind;
+  is_visible: boolean;
+  sort_order: number;
   created_at: string;
 };
 
@@ -69,9 +89,11 @@ type TradeItemRow = {
   category: TradeCategory;
   work_title: string;
   item_name: string | null;
+  show_item_name: boolean | null;
   image_path: string;
   is_visible: boolean;
   sort_order: number;
+  display_order: number | null;
   image_ratio: TradeImageRatio | null;
   benefit_subcategory: string | null;
   created_at: string;
@@ -145,10 +167,22 @@ function sortBenefitSubcategories(rows: TradeBenefitSubcategoryRow[]) {
   });
 }
 
-function getCategoryLabel(category: TradeCategory) {
-  return (
-    TRADE_CATEGORIES.find((option) => option.id === category)?.label ?? category
-  );
+function sortItemCategories(rows: TradeItemCategoryRow[]) {
+  return [...rows].sort((a, b) => {
+    const sortDiff = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    if (sortDiff !== 0) return sortDiff;
+    return a.label.localeCompare(b.label, 'ko-KR', {
+      numeric: true,
+      sensitivity: 'base',
+    });
+  });
+}
+
+function getCategoryLabel(
+  category: TradeCategory,
+  categoryMap?: ReadonlyMap<string, TradeItemCategoryRow>,
+) {
+  return categoryMap?.get(category)?.label ?? getFallbackCategoryLabel(category);
 }
 
 function getSafeImageRatio(value?: string | null): TradeImageRatio {
@@ -165,40 +199,72 @@ function getBenefitSubcategoryLabel(value?: string | null) {
   return value?.trim() || '';
 }
 
-function getTradeItemMetaLabel(item: TradeItemRow) {
-  const categoryLabel = getCategoryLabel(item.category);
+function getCategoryKind(
+  category: TradeCategory,
+  categoryMap?: ReadonlyMap<string, TradeItemCategoryRow>,
+) {
+  const categoryKind = categoryMap?.get(category)?.category_kind;
+  if (categoryKind) return normalizeCategoryKind(categoryKind);
+  if (category === 'benefit' || category === 'collection_photo_card') {
+    return category;
+  }
+  return 'standard';
+}
+
+function getTradeItemMetaLabel(
+  item: TradeItemRow,
+  categoryMap?: ReadonlyMap<string, TradeItemCategoryRow>,
+) {
+  const categoryLabel = getCategoryLabel(item.category, categoryMap);
+  const categoryKind = getCategoryKind(item.category, categoryMap);
   const subcategory = getBenefitSubcategoryLabel(item.benefit_subcategory);
 
-  if (item.category === 'benefit' && subcategory) {
+  if (categoryKind === 'benefit' && subcategory) {
     return `${categoryLabel} · ${subcategory}`;
   }
 
-  if (item.category === 'collection_photo_card') {
+  if (categoryKind === 'collection_photo_card') {
     return `${categoryLabel} · ${getCollectionPhotoCardVariant(item.sort_order)}`;
   }
 
   return categoryLabel;
 }
 
-function getCategorySortIndex(category: TradeCategory) {
-  const index = TRADE_CATEGORIES.findIndex((option) => option.id === category);
-
-  return index === -1 ? TRADE_CATEGORIES.length : index;
+function getCategorySortIndex(
+  category: TradeCategory,
+  categoryOrderMap?: ReadonlyMap<string, number>,
+) {
+  return categoryOrderMap?.get(category) ?? getFallbackCategorySortOrder(category);
 }
 
 function sortTradeItems(
   rows: TradeItemRow[],
   benefitSubcategoryOrderMap: ReadonlyMap<string, number>,
+  categoryOrderMap?: ReadonlyMap<string, number>,
+  categoryMap?: ReadonlyMap<string, TradeItemCategoryRow>,
 ) {
+  const workTitlesByCategory = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (getCategoryKind(row.category, categoryMap) !== 'collection_photo_card') continue;
+    if (!row.work_title.trim()) continue;
+    const titles = workTitlesByCategory.get(row.category) ?? new Set<string>();
+    titles.add(row.work_title.trim());
+    workTitlesByCategory.set(row.category, titles);
+  }
+
   return [...rows].sort((a, b) => {
     const categoryDiff =
-      getCategorySortIndex(a.category) - getCategorySortIndex(b.category);
+      getCategorySortIndex(a.category, categoryOrderMap) -
+      getCategorySortIndex(b.category, categoryOrderMap);
 
     if (categoryDiff !== 0) {
       return categoryDiff;
     }
 
-    if (a.category === 'benefit' && b.category === 'benefit') {
+    if (
+      getCategoryKind(a.category, categoryMap) === 'benefit' &&
+      getCategoryKind(b.category, categoryMap) === 'benefit'
+    ) {
       const leftName = getBenefitSubcategoryLabel(a.benefit_subcategory);
       const rightName = getBenefitSubcategoryLabel(b.benefit_subcategory);
       const subcategoryDiff = compareBenefitSubcategoryValues(
@@ -213,28 +279,30 @@ function sortTradeItems(
       }
     }
 
-    const titleDiff = a.work_title.localeCompare(b.work_title, 'ko-KR', {
-      numeric: true,
-      sensitivity: 'base',
-    });
+    const isCollectionPhotoCard =
+      a.category === b.category &&
+      getCategoryKind(a.category, categoryMap) === 'collection_photo_card' &&
+      getCategoryKind(b.category, categoryMap) === 'collection_photo_card';
+    const workFirst = !isCollectionPhotoCard ||
+      (workTitlesByCategory.get(a.category)?.size ?? 0) > 1;
 
-    if (titleDiff !== 0) {
-      return titleDiff;
+    if (workFirst) {
+      const titleDiff = a.work_title.localeCompare(b.work_title, 'ko-KR', {
+        numeric: true,
+        sensitivity: 'base',
+      });
+      if (titleDiff !== 0) return titleDiff;
     }
 
-    if (
-      a.category === 'collection_photo_card' &&
-      b.category === 'collection_photo_card'
-    ) {
-      const collectionOrderDiff =
+    if (isCollectionPhotoCard) {
+      const variantDiff =
         normalizeCollectionPhotoCardSortOrder(a.sort_order) -
         normalizeCollectionPhotoCardSortOrder(b.sort_order);
-
-      if (collectionOrderDiff !== 0) {
-        return collectionOrderDiff;
-      }
+      if (variantDiff !== 0) return variantDiff;
     }
 
+    const displayDiff = (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER);
+    if (displayDiff !== 0) return displayDiff;
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
 }
@@ -248,6 +316,7 @@ export default function AdminEventManagePage() {
   const [adminState, setAdminState] = useState<AdminState>('checking');
   const [eventData, setEventData] = useState<TradeCollectionRow | null>(null);
   const [works, setWorks] = useState<TradeWorkRow[]>([]);
+  const [itemCategories, setItemCategories] = useState<TradeItemCategoryRow[]>([]);
   const [benefitSubcategories, setBenefitSubcategories] = useState<
     TradeBenefitSubcategoryRow[]
   >([]);
@@ -259,8 +328,14 @@ export default function AdminEventManagePage() {
   const [eventStartDate, setEventStartDate] = useState('');
   const [eventEndDate, setEventEndDate] = useState('');
   const [eventLocation, setEventLocation] = useState('');
+  const [referenceSectionEnabled, setReferenceSectionEnabled] = useState(false);
+  const [referenceSectionTitle, setReferenceSectionTitle] = useState(
+    '내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?',
+  );
   const [isPublic, setIsPublic] = useState(true);
   const [sortOrder, setSortOrder] = useState('0');
+  const [draggingItemId, setDraggingItemId] = useState('');
+  const [isSavingItemOrder, setIsSavingItemOrder] = useState(false);
 
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState('');
@@ -271,6 +346,16 @@ export default function AdminEventManagePage() {
   const [editingWorkId, setEditingWorkId] = useState('');
   const [editingWorkTitle, setEditingWorkTitle] = useState('');
   const [editingWorkIsVisible, setEditingWorkIsVisible] = useState(true);
+
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryKind, setNewCategoryKind] =
+    useState<TradeCategoryKind>('standard');
+  const [newCategoryIsVisible, setNewCategoryIsVisible] = useState(true);
+  const [editingCategoryId, setEditingCategoryId] = useState('');
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+  const [editingCategoryKind, setEditingCategoryKind] =
+    useState<TradeCategoryKind>('standard');
+  const [editingCategoryIsVisible, setEditingCategoryIsVisible] = useState(true);
 
   const [newBenefitSubcategoryName, setNewBenefitSubcategoryName] =
     useState('');
@@ -285,12 +370,14 @@ export default function AdminEventManagePage() {
     useState(true);
 
   const [selectedWorkTitle, setSelectedWorkTitle] = useState('');
+  const [itemName, setItemName] = useState('');
   const [category, setCategory] = useState<TradeCategory>('benefit');
   const [benefitSubcategory, setBenefitSubcategory] = useState('');
   const [collectionPhotoCardVariant, setCollectionPhotoCardVariant] =
     useState<CollectionPhotoCardVariant>('A');
   const [imageRatio, setImageRatio] = useState<TradeImageRatio>('square');
   const [itemIsVisible, setItemIsVisible] = useState(true);
+  const [itemShowName, setItemShowName] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
 
@@ -299,6 +386,7 @@ export default function AdminEventManagePage() {
 
   const [editingItemId, setEditingItemId] = useState('');
   const [editingItemWorkTitle, setEditingItemWorkTitle] = useState('');
+  const [editingItemName, setEditingItemName] = useState('');
   const [editingItemCategory, setEditingItemCategory] =
     useState<TradeCategory>('benefit');
   const [editingItemBenefitSubcategory, setEditingItemBenefitSubcategory] =
@@ -308,6 +396,7 @@ export default function AdminEventManagePage() {
   const [editingItemImageRatio, setEditingItemImageRatio] =
     useState<TradeImageRatio>('square');
   const [editingItemIsVisible, setEditingItemIsVisible] = useState(true);
+  const [editingItemShowName, setEditingItemShowName] = useState(false);
   const [editingItemImageFile, setEditingItemImageFile] =
     useState<File | null>(null);
   const [editingItemImagePreviewUrl, setEditingItemImagePreviewUrl] =
@@ -320,6 +409,7 @@ export default function AdminEventManagePage() {
     useState('all');
 
   const [isWorkSectionOpen, setIsWorkSectionOpen] = useState(false);
+  const [isCategorySectionOpen, setIsCategorySectionOpen] = useState(true);
   const [isBenefitSubcategorySectionOpen, setIsBenefitSubcategorySectionOpen] =
     useState(false);
   const [isItemCreateSectionOpen, setIsItemCreateSectionOpen] =
@@ -328,9 +418,14 @@ export default function AdminEventManagePage() {
     useState(false);
 
   const [message, setMessage] = useState('');
+  const [itemFormMessage, setItemFormMessage] = useState('');
   const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
   const [isSubmittingWork, setIsSubmittingWork] = useState(false);
   const [isUpdatingWorkId, setIsUpdatingWorkId] = useState('');
+  const [isSubmittingCategory, setIsSubmittingCategory] = useState(false);
+  const [isUpdatingCategoryId, setIsUpdatingCategoryId] = useState('');
+  const [isDeletingCategoryId, setIsDeletingCategoryId] = useState('');
+  const [isReorderingCategoryId, setIsReorderingCategoryId] = useState('');
   const [isSubmittingBenefitSubcategory, setIsSubmittingBenefitSubcategory] =
     useState(false);
   const [isUpdatingBenefitSubcategoryId, setIsUpdatingBenefitSubcategoryId] =
@@ -349,6 +444,8 @@ export default function AdminEventManagePage() {
   const [isSubmittingItem, setIsSubmittingItem] = useState(false);
   const [isSubmittingReferenceImages, setIsSubmittingReferenceImages] =
     useState(false);
+  const [isSavingReferenceSettings, setIsSavingReferenceSettings] =
+    useState(false);
   const [isUpdatingItemId, setIsUpdatingItemId] = useState('');
   const [isDeletingWorkId, setIsDeletingWorkId] = useState('');
   const [isDeletingItemId, setIsDeletingItemId] = useState('');
@@ -362,6 +459,45 @@ export default function AdminEventManagePage() {
   const visibleWorks = useMemo(() => {
     return sortKoreanTitles(works.filter((work) => work.is_visible));
   }, [works]);
+
+  const sortedItemCategories = useMemo(
+    () => sortItemCategories(itemCategories),
+    [itemCategories],
+  );
+
+  const visibleItemCategories = useMemo(
+    () => sortedItemCategories.filter((itemCategory) => itemCategory.is_visible),
+    [sortedItemCategories],
+  );
+
+  const itemCategoryMap = useMemo(
+    () =>
+      new Map(
+        itemCategories.map((itemCategory) => [
+          itemCategory.category_key,
+          itemCategory,
+        ]),
+      ),
+    [itemCategories],
+  );
+
+  const itemCategoryOrderMap = useMemo(
+    () =>
+      new Map(
+        itemCategories.map((itemCategory) => [
+          itemCategory.category_key,
+          itemCategory.sort_order ?? 0,
+        ]),
+      ),
+    [itemCategories],
+  );
+
+  const selectedItemCategoryKind =
+    itemCategoryMap.get(category)?.category_kind ?? 'standard';
+  const editingItemCategoryKind =
+    itemCategoryMap.get(editingItemCategory)?.category_kind ?? 'standard';
+
+  const hasBenefitCategory = itemCategoryMap.has('benefit');
 
   const visibleBenefitSubcategories = useMemo(() => {
     return sortBenefitSubcategories(
@@ -422,7 +558,12 @@ export default function AdminEventManagePage() {
     itemFilterBenefitSubcategories.length > 0 || hasUncategorizedBenefitItems;
 
   const filteredItems = useMemo(() => {
-    return sortTradeItems(items, benefitSubcategoryOrderMap).filter((item) => {
+    return sortTradeItems(
+      items,
+      benefitSubcategoryOrderMap,
+      itemCategoryOrderMap,
+      itemCategoryMap,
+    ).filter((item) => {
       const matchesWork =
         itemFilterWorkTitle === 'all' || item.work_title === itemFilterWorkTitle;
       const matchesCategory =
@@ -442,6 +583,8 @@ export default function AdminEventManagePage() {
   }, [
     items,
     benefitSubcategoryOrderMap,
+    itemCategoryOrderMap,
+    itemCategoryMap,
     itemFilterWorkTitle,
     itemFilterCategory,
     itemFilterBenefitSubcategory,
@@ -477,7 +620,7 @@ export default function AdminEventManagePage() {
       const { data, error } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, event_start_date, event_end_date, event_location, thumbnail_path, status_label, is_public, sort_order',
+          'id, slug, title, description, event_start_date, event_end_date, event_location, reference_section_enabled, reference_section_title, thumbnail_path, status_label, is_public, sort_order',
         )
         .eq('id', eventId)
         .single();
@@ -496,12 +639,18 @@ export default function AdminEventManagePage() {
       setEventStartDate(typedEvent.event_start_date ?? '');
       setEventEndDate(typedEvent.event_end_date ?? '');
       setEventLocation(typedEvent.event_location ?? '');
+      setReferenceSectionEnabled(typedEvent.reference_section_enabled === true);
+      setReferenceSectionTitle(
+        typedEvent.reference_section_title?.trim() ||
+          '내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?',
+      );
       setIsPublic(typedEvent.is_public);
       setSortOrder(String(typedEvent.sort_order ?? 0));
       setThumbnailPreviewUrl(getTradeAssetUrl(typedEvent.thumbnail_path));
 
       await Promise.all([
         loadWorks(),
+        loadItemCategories(),
         loadBenefitSubcategories(),
         loadItems(),
         loadReferenceImages(),
@@ -557,14 +706,59 @@ export default function AdminEventManagePage() {
 
     setWorks(nextWorks);
 
-    const firstVisibleWork = nextWorks.find((work) => work.is_visible);
     setSelectedWorkTitle((prev) => {
       if (prev && nextWorks.some((work) => work.title === prev)) {
         return prev;
       }
 
-      return firstVisibleWork?.title || '';
+      return '';
     });
+  }
+
+  async function loadItemCategories() {
+    const { data, error } = await supabase
+      .from('trade_item_categories')
+      .select(
+        'id, collection_id, category_key, label, category_kind, is_visible, sort_order, created_at',
+      )
+      .eq('collection_id', eventId)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error(error);
+      setMessage(
+        '행사별 굿즈 종류를 불러오지 못했습니다. trade_item_categories SQL 적용 여부를 확인해 주세요.',
+      );
+      return;
+    }
+
+    const nextItemCategories = sortItemCategories(
+      ((data ?? []) as Array<Omit<TradeItemCategoryRow, 'category_kind'> & {
+        category_kind: string;
+      }>).map((row) => ({
+        ...row,
+        category_kind: normalizeCategoryKind(row.category_kind),
+      })),
+    );
+    const nextVisibleItemCategories = nextItemCategories.filter(
+      (itemCategory) => itemCategory.is_visible,
+    );
+    const firstVisibleCategory = nextVisibleItemCategories[0]?.category_key ?? '';
+
+    setItemCategories(nextItemCategories);
+    setCategory((current) =>
+      nextVisibleItemCategories.some(
+        (itemCategory) => itemCategory.category_key === current,
+      )
+        ? current
+        : firstVisibleCategory,
+    );
+    setEditingItemCategory((current) =>
+      nextItemCategories.some((itemCategory) => itemCategory.category_key === current)
+        ? current
+        : firstVisibleCategory,
+    );
   }
 
   async function loadBenefitSubcategories() {
@@ -590,7 +784,7 @@ export default function AdminEventManagePage() {
     const { data, error } = await supabase
       .from('trade_items')
       .select(
-        'id, collection_id, category, work_title, item_name, image_path, is_visible, sort_order, image_ratio, benefit_subcategory, created_at',
+        'id, collection_id, category, work_title, item_name, show_item_name, image_path, is_visible, sort_order, display_order, image_ratio, benefit_subcategory, created_at',
       )
       .eq('collection_id', eventId)
       .order('created_at', { ascending: true });
@@ -649,7 +843,9 @@ export default function AdminEventManagePage() {
     }
 
     if (!file.type.startsWith('image/')) {
-      setMessage('이미지 파일만 업로드할 수 있습니다.');
+      const feedback = '이미지 파일만 업로드할 수 있습니다.';
+      setItemFormMessage(feedback);
+      setMessage(feedback);
       return;
     }
 
@@ -659,6 +855,7 @@ export default function AdminEventManagePage() {
 
     setImageFile(file);
     setImagePreviewUrl(URL.createObjectURL(file));
+    setItemFormMessage('');
   }
 
   function clearReferenceImagePreviews() {
@@ -767,6 +964,10 @@ export default function AdminEventManagePage() {
           event_start_date: eventStartDate || null,
           event_end_date: eventEndDate || null,
           event_location: eventLocation.trim() || null,
+          reference_section_enabled: referenceSectionEnabled,
+          reference_section_title:
+            referenceSectionTitle.trim() ||
+            '내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?',
           thumbnail_path: nextThumbnailPath,
           status_label: null,
           is_public: isPublic,
@@ -785,7 +986,7 @@ export default function AdminEventManagePage() {
       const { data } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, event_start_date, event_end_date, event_location, thumbnail_path, status_label, is_public, sort_order',
+          'id, slug, title, description, event_start_date, event_end_date, event_location, reference_section_enabled, reference_section_title, thumbnail_path, status_label, is_public, sort_order',
         )
         .eq('id', eventData.id)
         .single();
@@ -799,6 +1000,11 @@ export default function AdminEventManagePage() {
         setEventStartDate(refreshedEvent.event_start_date ?? '');
         setEventEndDate(refreshedEvent.event_end_date ?? '');
         setEventLocation(refreshedEvent.event_location ?? '');
+        setReferenceSectionEnabled(refreshedEvent.reference_section_enabled === true);
+        setReferenceSectionTitle(
+          refreshedEvent.reference_section_title?.trim() ||
+            '내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?',
+        );
         setIsPublic(refreshedEvent.is_public);
         setSortOrder(String(refreshedEvent.sort_order ?? 0));
         setThumbnailPreviewUrl(getTradeAssetUrl(refreshedEvent.thumbnail_path));
@@ -955,7 +1161,7 @@ export default function AdminEventManagePage() {
 
   async function handleDeleteWork(work: TradeWorkRow) {
     const ok = window.confirm(
-      '이 작품명을 작품 선택 목록에서 삭제할까요? 이미 등록된 굿즈 이미지는 삭제되지 않습니다.',
+      '이 작품명을 작품 선택 목록에서 삭제할까요? 이미 등록된 굿즈는 삭제되지 않습니다.',
     );
 
     if (!ok) {
@@ -989,6 +1195,286 @@ export default function AdminEventManagePage() {
       setMessage('작품명 삭제 중 오류가 발생했습니다.');
     } finally {
       setIsDeletingWorkId('');
+    }
+  }
+
+  async function handleAddItemCategory(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!eventData) {
+      setMessage('행사 정보를 불러온 뒤 다시 시도해 주세요.');
+      return;
+    }
+
+    const label = newCategoryName.trim();
+    if (!label) {
+      setMessage('굿즈 종류명을 입력해 주세요.');
+      return;
+    }
+
+    if (
+      itemCategories.some(
+        (itemCategory) =>
+          itemCategory.label.localeCompare(label, 'ko-KR', {
+            sensitivity: 'base',
+          }) === 0,
+      )
+    ) {
+      setMessage('이미 등록된 굿즈 종류명입니다.');
+      return;
+    }
+
+    const hasLegacyCollectionPhotoCardKey = itemCategories.some(
+      (itemCategory) => itemCategory.category_key === 'collection_photo_card',
+    );
+    const categoryKey =
+      newCategoryKind === 'benefit'
+        ? 'benefit'
+        : newCategoryKind === 'collection_photo_card' &&
+            !hasLegacyCollectionPhotoCardKey
+          ? 'collection_photo_card'
+          : createCustomCategoryKey();
+
+    if (
+      newCategoryKind === 'benefit' &&
+      itemCategories.some(
+        (itemCategory) => itemCategory.category_key === categoryKey,
+      )
+    ) {
+      setMessage(
+        '특전 기능을 사용하는 굿즈 종류는 행사당 하나만 등록할 수 있습니다.',
+      );
+      return;
+    }
+
+    const nextSortOrder =
+      itemCategories.reduce(
+        (max, itemCategory) => Math.max(max, itemCategory.sort_order ?? 0),
+        -1,
+      ) + 1;
+
+    try {
+      setIsSubmittingCategory(true);
+      setMessage('');
+
+      const { error } = await supabase.from('trade_item_categories').insert({
+        collection_id: eventData.id,
+        category_key: categoryKey,
+        label,
+        category_kind: newCategoryKind,
+        is_visible: newCategoryIsVisible,
+        sort_order: nextSortOrder,
+      });
+
+      if (error) {
+        console.error(error);
+        setMessage('굿즈 종류 등록에 실패했습니다. DB 정책 또는 중복명을 확인해 주세요.');
+        return;
+      }
+
+      setNewCategoryName('');
+      setNewCategoryKind('standard');
+      setNewCategoryIsVisible(true);
+      await loadItemCategories();
+      setMessage('굿즈 종류가 등록되었습니다.');
+    } catch (error) {
+      console.error(error);
+      setMessage('굿즈 종류 등록 중 오류가 발생했습니다.');
+    } finally {
+      setIsSubmittingCategory(false);
+    }
+  }
+
+  function handleStartEditItemCategory(itemCategory: TradeItemCategoryRow) {
+    setEditingCategoryId(itemCategory.id);
+    setEditingCategoryName(itemCategory.label);
+    setEditingCategoryKind(itemCategory.category_kind);
+    setEditingCategoryIsVisible(itemCategory.is_visible);
+  }
+
+  function handleCancelEditItemCategory() {
+    setEditingCategoryId('');
+    setEditingCategoryName('');
+    setEditingCategoryKind('standard');
+    setEditingCategoryIsVisible(true);
+  }
+
+  async function handleUpdateItemCategory(itemCategory: TradeItemCategoryRow) {
+    const label = editingCategoryName.trim();
+    if (!label) {
+      setMessage('수정할 굿즈 종류명을 입력해 주세요.');
+      return;
+    }
+
+    if (
+      itemCategories.some(
+        (row) =>
+          row.id !== itemCategory.id &&
+          row.label.localeCompare(label, 'ko-KR', { sensitivity: 'base' }) === 0,
+      )
+    ) {
+      setMessage('이미 등록된 굿즈 종류명입니다.');
+      return;
+    }
+
+    try {
+      setIsUpdatingCategoryId(itemCategory.id);
+      setMessage('');
+      const { error } = await supabase
+        .from('trade_item_categories')
+        .update({
+          label,
+          category_kind:
+            itemCategory.category_kind === 'benefit'
+              ? 'benefit'
+              : editingCategoryKind,
+          is_visible: editingCategoryIsVisible,
+        })
+        .eq('id', itemCategory.id);
+
+      if (error) {
+        console.error(error);
+        setMessage('굿즈 종류 수정에 실패했습니다.');
+        return;
+      }
+
+      handleCancelEditItemCategory();
+      await loadItemCategories();
+      setMessage('굿즈 종류가 수정되었습니다.');
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      setMessage('굿즈 종류 수정 중 오류가 발생했습니다.');
+    } finally {
+      setIsUpdatingCategoryId('');
+    }
+  }
+
+  async function handleDeleteItemCategory(itemCategory: TradeItemCategoryRow) {
+    if (
+      itemCategory.category_key === 'benefit' &&
+      benefitSubcategories.length > 0
+    ) {
+      const feedback =
+        '특전 하위 분류를 먼저 삭제한 뒤 특전 종류를 삭제해 주세요.';
+      setMessage(feedback);
+      window.alert(feedback);
+      return;
+    }
+
+    const ok = window.confirm(`'${itemCategory.label}' 굿즈 종류를 삭제할까요?`);
+    if (!ok) return;
+
+    try {
+      setIsDeletingCategoryId(itemCategory.id);
+      setMessage('굿즈 종류가 사용 중인지 확인하고 있습니다.');
+
+      const [
+        { count: itemCount, error: itemCountError },
+        { count: submissionCount, error: submissionCountError },
+      ] = await Promise.all([
+        supabase
+          .from('trade_items')
+          .select('id', { count: 'exact', head: true })
+          .eq('collection_id', eventId)
+          .eq('category', itemCategory.category_key),
+        supabase
+          .from('card_submissions')
+          .select('id', { count: 'exact', head: true })
+          .eq('collection_id', eventId)
+          .eq('category', itemCategory.category_key),
+      ]);
+
+      if (itemCountError || submissionCountError) {
+        if (itemCountError) console.error(itemCountError);
+        if (submissionCountError) console.error(submissionCountError);
+        const feedback =
+          '굿즈 종류의 사용 여부를 확인하지 못했습니다. DB 조회 권한을 확인한 뒤 다시 시도해 주세요.';
+        setMessage(feedback);
+        window.alert(feedback);
+        return;
+      }
+
+      if ((itemCount ?? 0) > 0 || (submissionCount ?? 0) > 0) {
+        const feedback =
+          '이 종류를 사용하는 굿즈 또는 제보 기록이 있어 삭제할 수 없습니다. 먼저 해당 굿즈/제보를 다른 종류로 변경하거나 삭제해 주세요.';
+        setMessage(feedback);
+        window.alert(feedback);
+        return;
+      }
+
+      setMessage('굿즈 종류를 삭제하고 있습니다.');
+      const { data: deletedRows, error } = await supabase
+        .from('trade_item_categories')
+        .delete()
+        .eq('id', itemCategory.id)
+        .select('id');
+
+      if (error || !deletedRows?.some((row) => row.id === itemCategory.id)) {
+        console.error(error);
+        const feedback =
+          '굿즈 종류가 삭제되지 않았습니다. 관리자 DELETE/SELECT RLS 정책과 권한을 확인해 주세요.';
+        setMessage(feedback);
+        window.alert(feedback);
+        return;
+      }
+
+      if (itemFilterCategory === itemCategory.category_key) {
+        setItemFilterCategory('all');
+      }
+      await loadItemCategories();
+      setMessage('굿즈 종류가 삭제되었습니다.');
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      const feedback = '굿즈 종류 삭제 중 오류가 발생했습니다.';
+      setMessage(feedback);
+      window.alert(feedback);
+    } finally {
+      setIsDeletingCategoryId('');
+    }
+  }
+
+  async function handleMoveItemCategory(
+    itemCategory: TradeItemCategoryRow,
+    direction: -1 | 1,
+  ) {
+    const rows = sortedItemCategories;
+    const index = rows.findIndex((row) => row.id === itemCategory.id);
+    const target = rows[index + direction];
+    if (index < 0 || !target) return;
+
+    try {
+      setIsReorderingCategoryId(itemCategory.id);
+      setMessage('');
+      const currentOrder = itemCategory.sort_order ?? index;
+      const targetOrder = target.sort_order ?? index + direction;
+
+      const [currentResult, targetResult] = await Promise.all([
+        supabase
+          .from('trade_item_categories')
+          .update({ sort_order: targetOrder })
+          .eq('id', itemCategory.id),
+        supabase
+          .from('trade_item_categories')
+          .update({ sort_order: currentOrder })
+          .eq('id', target.id),
+      ]);
+
+      if (currentResult.error || targetResult.error) {
+        console.error(currentResult.error ?? targetResult.error);
+        setMessage('굿즈 종류 순서 저장에 실패했습니다.');
+        return;
+      }
+
+      await loadItemCategories();
+      setMessage('굿즈 종류 순서가 변경되었습니다.');
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      setMessage('굿즈 종류 순서 변경 중 오류가 발생했습니다.');
+    } finally {
+      setIsReorderingCategoryId('');
     }
   }
 
@@ -1135,6 +1621,11 @@ export default function AdminEventManagePage() {
 
   async function handleAddBenefitSubcategory(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!hasBenefitCategory) {
+      setMessage('굿즈 종류 관리에서 특전 기능을 사용하는 종류를 먼저 등록해 주세요.');
+      return;
+    }
 
     if (!eventData) {
       setMessage('행사 정보를 불러온 뒤 다시 시도해 주세요.');
@@ -1330,67 +1821,95 @@ export default function AdminEventManagePage() {
   async function handleAddItem(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const showItemFeedback = (feedback: string) => {
+      setItemFormMessage(feedback);
+      setMessage(feedback);
+    };
+
     if (!eventData) {
-      setMessage('행사 정보를 불러온 뒤 다시 시도해 주세요.');
+      showItemFeedback('행사 정보를 불러온 뒤 다시 시도해 주세요.');
       return;
     }
 
-    if (!selectedWorkTitle) {
-      setMessage('작품명을 선택해 주세요.');
+    const normalizedItemName = itemName.trim();
+    const selectedItemCategory =
+      visibleItemCategories.find(
+        (itemCategory) => itemCategory.category_key === category,
+      ) ?? visibleItemCategories[0];
+
+    if (!selectedItemCategory) {
+      showItemFeedback('굿즈 종류를 먼저 등록하고 선택해 주세요.');
       return;
     }
 
-    if (!imageFile) {
-      setMessage('굿즈 이미지를 업로드해 주세요.');
+    const resolvedCategory = selectedItemCategory.category_key;
+    if (resolvedCategory !== category) {
+      setCategory(resolvedCategory);
+    }
+
+    if (!imageFile && !normalizedItemName) {
+      showItemFeedback('이미지가 없으면 굿즈명을 입력해 주세요.');
       return;
     }
+
+    const selectedCategoryKind = selectedItemCategory.category_kind;
 
     try {
       setIsSubmittingItem(true);
+      setItemFormMessage('굿즈를 등록하고 있습니다.');
       setMessage('');
 
-      const fileExtension = getFileExtension(imageFile);
-      const safeWorkTitle = normalizePathPart(selectedWorkTitle);
-      const safeBenefitSubcategory = normalizePathPart(
-        benefitSubcategory || 'benefit',
-      );
-      const fileNamePrefix =
-        category === 'benefit'
-          ? `${category}-${safeBenefitSubcategory}-${safeWorkTitle}`
-          : `${category}-${safeWorkTitle}`;
-      const fileName = `${fileNamePrefix}-${Date.now()}.${fileExtension}`;
-      const imagePath = `${eventData.slug}/${fileName}`;
+      let imagePath = '';
 
-      const { error: uploadError } = await supabase.storage
-        .from('trade-assets')
-        .upload(imagePath, imageFile, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: imageFile.type,
-        });
-
-      if (uploadError) {
-        console.error(uploadError);
-        setMessage(
-          '이미지 업로드에 실패했습니다. Storage 정책과 trade-assets 버킷을 확인해 주세요.',
+      if (imageFile) {
+        const fileExtension = getFileExtension(imageFile);
+        const safeWorkTitle = normalizePathPart(
+          selectedWorkTitle || normalizedItemName || 'event',
         );
-        return;
+        const safeBenefitSubcategory = normalizePathPart(
+          benefitSubcategory || 'benefit',
+        );
+        const fileNamePrefix =
+          selectedCategoryKind === 'benefit'
+            ? `${resolvedCategory}-${safeBenefitSubcategory}-${safeWorkTitle}`
+            : `${resolvedCategory}-${safeWorkTitle}`;
+        const fileName = `${fileNamePrefix}-${Date.now()}.${fileExtension}`;
+        imagePath = `${eventData.slug}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('trade-assets')
+          .upload(imagePath, imageFile, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: imageFile.type,
+          });
+
+        if (uploadError) {
+          console.error(uploadError);
+          showItemFeedback(
+            `이미지 업로드에 실패했습니다. ${uploadError.message}`,
+          );
+          return;
+        }
       }
 
       const { error: insertError } = await supabase.from('trade_items').insert({
         collection_id: eventData.id,
-        category,
-        work_title: selectedWorkTitle,
-        item_name: null,
+        category: resolvedCategory,
+        work_title: selectedWorkTitle.trim(),
+        item_name: normalizedItemName || null,
+        show_item_name: normalizedItemName ? itemShowName : false,
         image_path: imagePath,
         image_ratio: imageRatio,
         benefit_subcategory:
-          category === 'benefit' ? benefitSubcategory.trim() || null : null,
+          selectedCategoryKind === 'benefit'
+            ? benefitSubcategory.trim() || null
+            : null,
         is_visible: itemIsVisible,
         sort_order:
-          category === 'collection_photo_card'
+          selectedCategoryKind === 'collection_photo_card'
             ? getCollectionPhotoCardSortOrder(collectionPhotoCardVariant)
-            : category === 'benefit'
+            : selectedCategoryKind === 'benefit'
               ? (getBenefitSubcategorySortOrder(
                   benefitSubcategoryOrderMap,
                   benefitSubcategory,
@@ -1400,26 +1919,84 @@ export default function AdminEventManagePage() {
 
       if (insertError) {
         console.error(insertError);
-        setMessage('굿즈 등록에 실패했습니다. DB 정책을 확인해 주세요.');
+        showItemFeedback(`굿즈 등록에 실패했습니다. ${insertError.message}`);
         return;
       }
 
       setImageFile(null);
       setImagePreviewUrl('');
+      setItemName('');
       setBenefitSubcategory('');
       setCollectionPhotoCardVariant('A');
       setImageRatio('square');
       setItemIsVisible(true);
+      setItemShowName(true);
 
       await loadItems();
 
-      setMessage('굿즈 이미지가 등록되었습니다.');
+      const successMessage = imageFile
+        ? '굿즈가 등록되었습니다.'
+        : '텍스트 굿즈가 등록되었습니다.';
+      setItemFormMessage(successMessage);
+      setMessage(successMessage);
       router.refresh();
     } catch (error) {
       console.error(error);
-      setMessage('굿즈 등록 중 오류가 발생했습니다.');
+      const errorMessage =
+        error instanceof Error ? error.message : '알 수 없는 오류';
+      showItemFeedback(`굿즈 등록 중 오류가 발생했습니다. ${errorMessage}`);
     } finally {
       setIsSubmittingItem(false);
+    }
+  }
+
+  // 그룹 간 이동은 기존 작품/특전/A-B-C 정렬을 훼손하므로 허용하지 않습니다.
+  function getItemOrderGroup(item: TradeItemRow) {
+    const kind = getCategoryKind(item.category, itemCategoryMap);
+    return JSON.stringify([
+      item.category,
+      kind === 'benefit' ? getBenefitSubcategoryLabel(item.benefit_subcategory) : '',
+      item.work_title.trim(),
+      kind === 'collection_photo_card' ? normalizeCollectionPhotoCardSortOrder(item.sort_order) : '',
+    ]);
+  }
+
+  async function handleDropItem(target: TradeItemRow) {
+    const sourceId = draggingItemId;
+    setDraggingItemId('');
+    if (!sourceId || sourceId === target.id || isSavingItemOrder) return;
+    const source = items.find((row) => row.id === sourceId);
+    if (!source) return;
+    if (getItemOrderGroup(source) !== getItemOrderGroup(target)) {
+      setMessage('같은 작품·굿즈 종류·그룹 안에서만 순서를 변경할 수 있습니다.');
+      return;
+    }
+    const siblings = sortTradeItems(items, benefitSubcategoryOrderMap, itemCategoryOrderMap, itemCategoryMap)
+      .filter((row) => getItemOrderGroup(row) === getItemOrderGroup(source));
+    const from = siblings.findIndex((row) => row.id === sourceId);
+    const to = siblings.findIndex((row) => row.id === target.id);
+    if (from < 0 || to < 0) return;
+    const reordered = [...siblings];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+    setIsSavingItemOrder(true);
+    setMessage('');
+    try {
+      // 다른 그룹은 변경하지 않으며 순서를 영속적으로 저장합니다.
+      for (const [index, row] of reordered.entries()) {
+        const { data, error } = await supabase.from('trade_items')
+          .update({ display_order: index }).eq('id', row.id).select('id');
+        if (error) throw error;
+        if (!data?.length) throw new Error('굿즈 순서 저장 권한을 확인해 주세요.');
+      }
+      await loadItems();
+      setMessage('굿즈 순서가 저장되었습니다. 사용자 교환판에도 같은 순서가 적용됩니다.');
+    } catch (error) {
+      console.error(error);
+      await loadItems();
+      setMessage(`순서 저장 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    } finally {
+      setIsSavingItemOrder(false);
     }
   }
 
@@ -1436,6 +2013,7 @@ export default function AdminEventManagePage() {
     clearEditingItemImagePreview();
     setEditingItemId(item.id);
     setEditingItemWorkTitle(item.work_title);
+    setEditingItemName(item.item_name ?? '');
     setEditingItemCategory(item.category);
     setEditingItemBenefitSubcategory(item.benefit_subcategory ?? '');
     setEditingItemCollectionPhotoCardVariant(
@@ -1443,17 +2021,20 @@ export default function AdminEventManagePage() {
     );
     setEditingItemImageRatio(getSafeImageRatio(item.image_ratio));
     setEditingItemIsVisible(item.is_visible);
+    setEditingItemShowName(item.show_item_name === true);
   }
 
   function handleCancelEditItem() {
     clearEditingItemImagePreview();
     setEditingItemId('');
     setEditingItemWorkTitle('');
-    setEditingItemCategory('benefit');
+    setEditingItemName('');
+    setEditingItemCategory(visibleItemCategories[0]?.category_key ?? '');
     setEditingItemBenefitSubcategory('');
     setEditingItemCollectionPhotoCardVariant('A');
     setEditingItemImageRatio('square');
     setEditingItemIsVisible(true);
+    setEditingItemShowName(false);
   }
 
   async function handleUpdateItem(item: TradeItemRow) {
@@ -1462,8 +2043,15 @@ export default function AdminEventManagePage() {
       return;
     }
 
-    if (!editingItemWorkTitle) {
-      setMessage('작품명을 선택해 주세요.');
+    const normalizedEditingItemName = editingItemName.trim();
+
+    if (!editingItemCategory) {
+      setMessage('굿즈 종류를 선택해 주세요.');
+      return;
+    }
+
+    if (!item.image_path && !editingItemImageFile && !normalizedEditingItemName) {
+      setMessage('이미지가 없으면 굿즈명을 입력해 주세요.');
       return;
     }
 
@@ -1475,12 +2063,14 @@ export default function AdminEventManagePage() {
 
       if (editingItemImageFile) {
         const fileExtension = getFileExtension(editingItemImageFile);
-        const safeWorkTitle = normalizePathPart(editingItemWorkTitle);
+        const safeWorkTitle = normalizePathPart(
+          editingItemWorkTitle || normalizedEditingItemName || 'event',
+        );
         const safeBenefitSubcategory = normalizePathPart(
           editingItemBenefitSubcategory || 'benefit',
         );
         const fileNamePrefix =
-          editingItemCategory === 'benefit'
+          editingItemCategoryKind === 'benefit'
             ? `${editingItemCategory}-${safeBenefitSubcategory}-${safeWorkTitle}`
             : `${editingItemCategory}-${safeWorkTitle}`;
         const fileName = `${fileNamePrefix}-replace-${Date.now()}.${fileExtension}`;
@@ -1506,21 +2096,24 @@ export default function AdminEventManagePage() {
       const { error } = await supabase
         .from('trade_items')
         .update({
-          work_title: editingItemWorkTitle,
+          work_title: editingItemWorkTitle.trim(),
           category: editingItemCategory,
-          item_name: null,
+          item_name: normalizedEditingItemName || null,
+          show_item_name: normalizedEditingItemName
+            ? editingItemShowName
+            : false,
           image_path: nextImagePath,
           image_ratio: editingItemImageRatio,
           benefit_subcategory:
-            editingItemCategory === 'benefit'
+            editingItemCategoryKind === 'benefit'
               ? editingItemBenefitSubcategory.trim() || null
               : null,
           sort_order:
-            editingItemCategory === 'collection_photo_card'
+            editingItemCategoryKind === 'collection_photo_card'
               ? getCollectionPhotoCardSortOrder(
                   editingItemCollectionPhotoCardVariant,
                 )
-              : editingItemCategory === 'benefit'
+              : editingItemCategoryKind === 'benefit'
                 ? (getBenefitSubcategorySortOrder(
                     benefitSubcategoryOrderMap,
                     editingItemBenefitSubcategory,
@@ -1555,7 +2148,7 @@ export default function AdminEventManagePage() {
   }
 
   async function handleDeleteItem(item: TradeItemRow) {
-    const ok = window.confirm('이 굿즈 이미지를 삭제할까요?');
+    const ok = window.confirm('이 굿즈를 삭제할까요?');
 
     if (!ok) {
       return;
@@ -1565,12 +2158,14 @@ export default function AdminEventManagePage() {
       setIsDeletingItemId(item.id);
       setMessage('');
 
-      const { error: storageError } = await supabase.storage
-        .from('trade-assets')
-        .remove([item.image_path]);
+      if (item.image_path) {
+        const { error: storageError } = await supabase.storage
+          .from('trade-assets')
+          .remove([item.image_path]);
 
-      if (storageError) {
-        console.error(storageError);
+        if (storageError) {
+          console.error(storageError);
+        }
       }
 
       const { error: deleteError } = await supabase
@@ -1585,13 +2180,60 @@ export default function AdminEventManagePage() {
       }
 
       await loadItems();
-      setMessage('굿즈 이미지가 삭제되었습니다.');
+      setMessage('굿즈가 삭제되었습니다.');
       router.refresh();
     } catch (error) {
       console.error(error);
       setMessage('굿즈 삭제 중 오류가 발생했습니다.');
     } finally {
       setIsDeletingItemId('');
+    }
+  }
+
+  async function handleSaveReferenceSettings() {
+    if (!eventData) {
+      setMessage('행사 정보를 불러온 뒤 다시 시도해 주세요.');
+      return;
+    }
+
+    try {
+      setIsSavingReferenceSettings(true);
+      setMessage('');
+
+      const normalizedTitle =
+        referenceSectionTitle.trim() ||
+        '내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?';
+
+      const { error } = await supabase
+        .from('trade_collections')
+        .update({
+          reference_section_enabled: referenceSectionEnabled,
+          reference_section_title: normalizedTitle,
+        })
+        .eq('id', eventData.id);
+
+      if (error) {
+        console.error(error);
+        setMessage('행사 공지 설정 저장에 실패했습니다.');
+        return;
+      }
+
+      setReferenceSectionTitle(normalizedTitle);
+      setEventData((prev) =>
+        prev
+          ? {
+              ...prev,
+              reference_section_enabled: referenceSectionEnabled,
+              reference_section_title: normalizedTitle,
+            }
+          : prev,
+      );
+      setMessage('행사 공지 설정이 저장되었습니다.');
+    } catch (error) {
+      console.error(error);
+      setMessage('행사 공지 설정 저장 중 오류가 발생했습니다.');
+    } finally {
+      setIsSavingReferenceSettings(false);
     }
   }
 
@@ -1650,7 +2292,7 @@ export default function AdminEventManagePage() {
 
       if (insertError) {
         console.error(insertError);
-        setMessage('공지용 이미지 등록에 실패했습니다. DB 정책을 확인해 주세요.');
+        setMessage('행사 공지 이미지 등록에 실패했습니다. DB 정책을 확인해 주세요.');
         return;
       }
 
@@ -1660,7 +2302,7 @@ export default function AdminEventManagePage() {
       router.refresh();
     } catch (error) {
       console.error(error);
-      setMessage('공지용 이미지 등록 중 오류가 발생했습니다.');
+      setMessage('행사 공지 이미지 등록 중 오류가 발생했습니다.');
     } finally {
       setIsSubmittingReferenceImages(false);
     }
@@ -1979,7 +2621,7 @@ export default function AdminEventManagePage() {
                 작품명 등록
               </h2>
               <p className="mt-2 text-sm leading-6 text-neutral-500">
-                굿즈 등록과 유저 이미지 제보에서 선택할 작품명을 미리 등록합니다.
+                여러 작품이 함께하는 행사에서만 등록하면 됩니다. 단독 행사는 작품명 없이 사용할 수 있습니다.
               </p>
               <p className="mt-1 text-xs font-bold text-neutral-400">
                 등록된 작품명 {works.length}개
@@ -2165,6 +2807,273 @@ export default function AdminEventManagePage() {
         </form>
 
         <form
+          onSubmit={handleAddItemCategory}
+          className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="text-lg font-black text-neutral-950">
+                굿즈 종류 관리
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-neutral-500">
+                행사마다 실제 판매·배포되는 굿즈 종류만 등록해 주세요.
+              </p>
+              <p className="mt-1 text-xs font-bold text-neutral-400">
+                등록된 종류 {itemCategories.length}개
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsCategorySectionOpen((prev) => !prev)}
+              className="shrink-0 rounded-full border border-neutral-200 bg-white px-4 py-2 text-xs font-black text-neutral-600"
+            >
+              {isCategorySectionOpen ? '접기' : '펼치기'}
+            </button>
+          </div>
+
+          {isCategorySectionOpen ? (
+            <>
+              <div className="mt-5 space-y-3">
+                <label className="block">
+                  <span className="text-sm font-bold text-neutral-800">
+                    굿즈 종류명
+                  </span>
+                  <input
+                    value={newCategoryName}
+                    onChange={(event) => setNewCategoryName(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                    placeholder="예: 포토카드, 아크릴 스탠드, 인형"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-sm font-bold text-neutral-800">
+                    종류 기능
+                  </span>
+                  <select
+                    value={newCategoryKind}
+                    onChange={(event) =>
+                      setNewCategoryKind(event.target.value as TradeCategoryKind)
+                    }
+                    className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+                  >
+                    <option value="standard">일반 굿즈</option>
+                    <option value="benefit">특전 · 하위 분류 사용</option>
+                    <option value="collection_photo_card">
+                      컬렉션 포토카드 · A/B/C/D 내부 정렬
+                    </option>
+                  </select>
+                  <p className="mt-2 text-xs leading-5 text-neutral-400">
+                    대부분은 일반 굿즈를 선택하면 됩니다. 컬렉션 포토카드 A/B/C/D 기능은 ver.1, ver.2처럼 여러 굿즈 종류에 각각 사용할 수 있습니다.
+                  </p>
+                </label>
+
+                <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
+                  <span>
+                    <span className="block text-sm font-bold text-neutral-800">
+                      공개
+                    </span>
+                    <span className="mt-1 block text-xs text-neutral-500">
+                      교환판과 이미지 제보의 굿즈 종류 목록에 노출합니다.
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={newCategoryIsVisible}
+                    onChange={(event) => setNewCategoryIsVisible(event.target.checked)}
+                    className="h-5 w-5"
+                  />
+                </label>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingCategory}
+                  className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
+                >
+                  {isSubmittingCategory ? '등록 중...' : '굿즈 종류 등록'}
+                </button>
+              </div>
+
+              <div className="mt-5 border-t border-neutral-100 pt-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-black text-neutral-950">
+                    등록된 굿즈 종류
+                  </h3>
+                  <span className="text-[11px] font-bold text-neutral-400">
+                    위/아래 버튼으로 표시 순서 변경
+                  </span>
+                </div>
+
+                {sortedItemCategories.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {sortedItemCategories.map((itemCategory, index) => {
+                      const isEditing = editingCategoryId === itemCategory.id;
+                      const isUpdating = isUpdatingCategoryId === itemCategory.id;
+                      const isDeleting = isDeletingCategoryId === itemCategory.id;
+                      const isReordering = isReorderingCategoryId === itemCategory.id;
+                      const kindLabel =
+                        itemCategory.category_kind === 'benefit'
+                          ? '특전 기능'
+                          : itemCategory.category_kind === 'collection_photo_card'
+                            ? 'A/B/C/D 정렬'
+                            : '일반';
+
+                      return (
+                        <div
+                          key={itemCategory.id}
+                          className="rounded-2xl bg-neutral-50 px-3 py-3"
+                        >
+                          {isEditing ? (
+                            <div className="space-y-3">
+                              <label className="block">
+                                <span className="text-xs font-bold text-neutral-500">
+                                  굿즈 종류명
+                                </span>
+                                <input
+                                  value={editingCategoryName}
+                                  onChange={(event) =>
+                                    setEditingCategoryName(event.target.value)
+                                  }
+                                  className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-950"
+                                />
+                              </label>
+
+                              <label className="block">
+                                <span className="text-xs font-bold text-neutral-500">
+                                  종류 기능
+                                </span>
+                                {itemCategory.category_kind === 'benefit' ? (
+                                  <div className="mt-1 rounded-xl border border-neutral-200 bg-neutral-100 px-3 py-2 text-sm font-bold text-neutral-500">
+                                    특전 · 하위 분류 사용
+                                  </div>
+                                ) : (
+                                  <>
+                                    <select
+                                      value={editingCategoryKind}
+                                      onChange={(event) =>
+                                        setEditingCategoryKind(
+                                          event.target.value as TradeCategoryKind,
+                                        )
+                                      }
+                                      className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-950"
+                                    >
+                                      <option value="standard">일반 굿즈</option>
+                                      <option value="collection_photo_card">
+                                        컬렉션 포토카드 · A/B/C/D 내부 정렬
+                                      </option>
+                                    </select>
+                                    <p className="mt-1 text-[11px] leading-5 text-neutral-400">
+                                      기존 일반 굿즈를 A/B/C/D 기능으로 바꾸면 기존 등록 굿즈는 우선 A로 취급됩니다.
+                                    </p>
+                                  </>
+                                )}
+                              </label>
+
+                              <label className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-3">
+                                <span>
+                                  <span className="block text-xs font-bold text-neutral-600">
+                                    공개
+                                  </span>
+                                  <span className="mt-0.5 block text-[11px] text-neutral-400">
+                                    유저 선택 목록 노출
+                                  </span>
+                                </span>
+                                <input
+                                  type="checkbox"
+                                  checked={editingCategoryIsVisible}
+                                  onChange={(event) =>
+                                    setEditingCategoryIsVisible(event.target.checked)
+                                  }
+                                  className="h-5 w-5"
+                                />
+                              </label>
+
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEditItemCategory}
+                                  disabled={isUpdating}
+                                  className="rounded-xl border border-neutral-300 bg-white px-3 py-2 text-xs font-black text-neutral-600"
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateItemCategory(itemCategory)}
+                                  disabled={isUpdating}
+                                  className="rounded-xl bg-neutral-950 px-3 py-2 text-xs font-black text-white disabled:bg-neutral-300"
+                                >
+                                  {isUpdating ? '수정 중...' : '수정 저장'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <div className="flex shrink-0 items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveItemCategory(itemCategory, -1)}
+                                  disabled={index === 0 || isReordering}
+                                  className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white text-xs font-black text-neutral-500 disabled:opacity-30"
+                                  aria-label={`${itemCategory.label} 위로 이동`}
+                                >
+                                  ↑
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveItemCategory(itemCategory, 1)}
+                                  disabled={index === sortedItemCategories.length - 1 || isReordering}
+                                  className="flex h-8 w-8 items-center justify-center rounded-full border border-neutral-200 bg-white text-xs font-black text-neutral-500 disabled:opacity-30"
+                                  aria-label={`${itemCategory.label} 아래로 이동`}
+                                >
+                                  ↓
+                                </button>
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-black text-neutral-950">
+                                  {itemCategory.label}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-neutral-400">
+                                  {kindLabel} · {itemCategory.is_visible ? '공개' : '숨김'}
+                                </p>
+                              </div>
+
+                              <div className="flex shrink-0 items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditItemCategory(itemCategory)}
+                                  className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-[11px] font-black text-neutral-600"
+                                >
+                                  수정
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteItemCategory(itemCategory)}
+                                  disabled={isDeleting}
+                                  className="rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-black text-red-600 disabled:opacity-50"
+                                >
+                                  {isDeleting ? '삭제 중' : '삭제'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="mt-3 rounded-2xl bg-neutral-50 px-4 py-6 text-center text-xs leading-5 text-neutral-400">
+                    아직 등록된 굿즈 종류가 없습니다. 굿즈를 등록하기 전에 이 행사에서 사용하는 종류를 먼저 추가해 주세요.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : null}
+        </form>
+
+        <form
           onSubmit={handleAddBenefitSubcategory}
           className="mt-5 rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm"
         >
@@ -2191,6 +3100,12 @@ export default function AdminEventManagePage() {
               {isBenefitSubcategorySectionOpen ? '접기' : '펼치기'}
             </button>
           </div>
+
+          {!hasBenefitCategory ? (
+            <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-xs font-bold leading-5 text-amber-700">
+              이 행사에는 특전 기능 굿즈 종류가 없습니다. 먼저 위의 굿즈 종류 관리에서 종류 기능을 ‘특전 · 하위 분류 사용’으로 등록해 주세요.
+            </p>
+          ) : null}
 
           {isBenefitSubcategorySectionOpen ? (
             <>
@@ -2233,7 +3148,7 @@ export default function AdminEventManagePage() {
 
               <button
                 type="submit"
-                disabled={isSubmittingBenefitSubcategory}
+                disabled={isSubmittingBenefitSubcategory || !hasBenefitCategory}
                 className="mt-4 w-full rounded-2xl bg-neutral-950 px-5 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
               >
                 {isSubmittingBenefitSubcategory
@@ -2422,7 +3337,7 @@ export default function AdminEventManagePage() {
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="text-lg font-black text-neutral-950">
-                공지용 이미지 등록
+                행사 공지
               </h2>
               <p className="mt-2 text-sm leading-6 text-neutral-500">
                 행사 공지에 올라온 특전 안내 이미지를 그대로 등록합니다. 교환/양도판 만들기에서 “내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?” 영역에 순서대로 표시됩니다.
@@ -2443,6 +3358,51 @@ export default function AdminEventManagePage() {
 
           {isReferenceImageSectionOpen ? (
             <>
+              <div className="mt-5 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+                <label className="flex items-center justify-between gap-3">
+                  <span>
+                    <span className="block text-sm font-black text-neutral-800">
+                      행사 공지 표시
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-neutral-500">
+                      끄면 공지용 이미지 안내 영역 전체가 사용자에게 보이지 않습니다.
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={referenceSectionEnabled}
+                    onChange={(event) =>
+                      setReferenceSectionEnabled(event.target.checked)
+                    }
+                    className="h-5 w-5"
+                  />
+                </label>
+
+                <label className="mt-4 block">
+                  <span className="text-sm font-bold text-neutral-800">
+                    공지명
+                  </span>
+                  <input
+                    value={referenceSectionTitle}
+                    onChange={(event) =>
+                      setReferenceSectionTitle(event.target.value)
+                    }
+                    disabled={!referenceSectionEnabled}
+                    className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-neutral-950 disabled:bg-neutral-100 disabled:text-neutral-400"
+                    placeholder="내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?"
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={handleSaveReferenceSettings}
+                  disabled={isSavingReferenceSettings}
+                  className="mt-3 w-full rounded-xl border border-neutral-300 bg-white px-4 py-2.5 text-xs font-black text-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSavingReferenceSettings ? '저장 중...' : '행사 공지 설정 저장'}
+                </button>
+              </div>
+
               <label className="mt-5 flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-7 text-center hover:border-neutral-950">
                 <span className="text-sm font-black text-neutral-700">
                   공지용 이미지 선택
@@ -2478,7 +3438,7 @@ export default function AdminEventManagePage() {
                 disabled={isSubmittingReferenceImages}
                 className="mt-4 w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
               >
-                {isSubmittingReferenceImages ? '등록 중...' : '공지용 이미지 등록'}
+                {isSubmittingReferenceImages ? '등록 중...' : '공지 이미지 등록'}
               </button>
 
               <div className="mt-5 border-t border-neutral-100 pt-5">
@@ -2537,10 +3497,10 @@ export default function AdminEventManagePage() {
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h2 className="text-lg font-black text-neutral-950">
-                굿즈 이미지 등록
+                굿즈 등록
               </h2>
               <p className="mt-2 text-sm leading-6 text-neutral-500">
-                작품명, 굿즈 종류, 특전 하위 분류와 이미지 비율을 설정해 굿즈 이미지를 등록합니다.
+                작품명은 선택사항입니다. 이미지가 없어도 굿즈명만으로 먼저 등록할 수 있습니다.
               </p>
               <p className="mt-1 text-xs font-bold text-neutral-400">
                 등록된 굿즈 {items.length}개
@@ -2561,29 +3521,66 @@ export default function AdminEventManagePage() {
           <div className="mt-5 space-y-5">
             <label className="block">
               <span className="text-sm font-bold text-neutral-800">
-                작품명
+                작품명 <span className="text-neutral-400">(선택)</span>
               </span>
 
               <select
                 value={selectedWorkTitle}
                 onChange={(event) => setSelectedWorkTitle(event.target.value)}
-                disabled={visibleWorks.length === 0}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950 disabled:bg-neutral-100 disabled:text-neutral-400"
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
               >
+                <option value="">작품명 없음 · 단독/공통 행사</option>
                 {visibleWorks.length > 0 ? (
                   visibleWorks.map((work) => (
                     <option key={work.id} value={work.title}>
                       {work.title}
                     </option>
                   ))
-                ) : (
-                  <option value="">등록된 작품명이 없습니다</option>
-                )}
+                ) : null}
               </select>
 
               <p className="mt-2 text-xs leading-5 text-neutral-400">
-                작품명 등록 영역에서 먼저 작품명을 추가해 주세요.
+                여러 작품이 함께하는 행사에서만 선택하면 됩니다. 단독 행사는 비워둘 수 있습니다.
               </p>
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-bold text-neutral-800">
+                굿즈명 <span className="text-neutral-400">(이미지 없을 때 필수)</span>
+              </span>
+
+              <input
+                value={itemName}
+                onChange={(event) => {
+                  setItemName(event.target.value);
+                  setItemFormMessage('');
+                }}
+                placeholder="예: 입장 특전 포토카드 A / 아크릴 스탠드"
+                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
+              />
+
+              <p className="mt-2 text-xs leading-5 text-neutral-400">
+                이미지가 아직 공개되지 않았다면 굿즈명만 입력해서 먼저 등록할 수 있습니다.
+              </p>
+            </label>
+
+            <label className="flex items-center justify-between gap-3 rounded-2xl bg-neutral-100 px-4 py-3">
+              <span>
+                <span className="block text-sm font-bold text-neutral-800">
+                  굿즈명 표시
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-neutral-500">
+                  A, B, C 같은 임시 이름을 교환판에 보이거나 숨길 수 있습니다.
+                </span>
+              </span>
+
+              <input
+                type="checkbox"
+                checked={itemShowName}
+                onChange={(event) => setItemShowName(event.target.checked)}
+                disabled={!itemName.trim()}
+                className="h-5 w-5"
+              />
             </label>
 
             <div className="grid grid-cols-2 gap-3">
@@ -2597,21 +3594,28 @@ export default function AdminEventManagePage() {
                   onChange={(event) => {
                     const nextCategory = event.target.value as TradeCategory;
                     setCategory(nextCategory);
-                    if (nextCategory !== 'benefit') {
+                    setItemFormMessage('');
+                    const nextCategoryKind =
+                      itemCategoryMap.get(nextCategory)?.category_kind ?? 'standard';
+                    if (nextCategoryKind !== 'benefit') {
                       setBenefitSubcategory('');
                     }
                   }}
                   className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm outline-none focus:border-neutral-950"
                 >
-                  {TRADE_CATEGORIES.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
+                  {visibleItemCategories.length > 0 ? (
+                    visibleItemCategories.map((option) => (
+                      <option key={option.id} value={option.category_key}>
+                        {option.label}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">굿즈 종류를 먼저 등록해 주세요</option>
+                  )}
                 </select>
               </label>
 
-              {category === 'benefit' ? (
+              {selectedItemCategoryKind === 'benefit' ? (
                 <label className="block">
                   <span className="text-sm font-bold text-neutral-800">
                     특전 하위 분류
@@ -2640,7 +3644,7 @@ export default function AdminEventManagePage() {
                     )}
                   </select>
                 </label>
-              ) : category === 'collection_photo_card' ? (
+              ) : selectedItemCategoryKind === 'collection_photo_card' ? (
                 <label className="block">
                   <span className="text-sm font-bold text-neutral-800">
                     컬렉션 하위 분류
@@ -2678,8 +3682,8 @@ export default function AdminEventManagePage() {
             </div>
 
             <p className="-mt-3 text-xs leading-5 text-neutral-400">
-              {category === 'collection_photo_card'
-                ? 'A/B는 관리자 정렬용 값이며 일반 사용자 화면에는 표시되지 않습니다.'
+              {selectedItemCategoryKind === 'collection_photo_card'
+                ? 'A/B/C/D는 관리자 정렬용 값이며 일반 사용자 화면에는 표시되지 않습니다.'
                 : '특전 하위 분류는 굿즈 종류가 특전이고 등록된 하위 분류가 있을 때만 선택할 수 있습니다.'}
             </p>
 
@@ -2706,7 +3710,7 @@ export default function AdminEventManagePage() {
             <div className="space-y-3">
               <div className="flex items-center gap-3">
                 <span className="shrink-0 text-sm font-bold text-neutral-800">
-                  굿즈 이미지
+                  굿즈 이미지 <span className="text-neutral-400">(선택)</span>
                 </span>
 
                 <label className="flex min-h-[56px] flex-1 cursor-pointer items-center justify-between gap-3 rounded-2xl border border-dashed border-neutral-300 bg-neutral-50 px-4 py-3 hover:border-neutral-950">
@@ -2728,7 +3732,7 @@ export default function AdminEventManagePage() {
                   )}
 
                   <span className="hidden text-xs text-neutral-400 sm:inline">
-                    팝업 & 콜카 굿즈 교환판에 표시될 이미지를 업로드합니다.
+                    이미지가 공개된 경우에만 업로드하면 됩니다.
                   </span>
 
                   <input
@@ -2759,9 +3763,19 @@ export default function AdminEventManagePage() {
               </label>
             </div>
 
+            {itemFormMessage ? (
+              <p
+                className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm font-bold leading-6 text-neutral-700"
+                role="status"
+                aria-live="polite"
+              >
+                {itemFormMessage}
+              </p>
+            ) : null}
+
             <button
               type="submit"
-              disabled={isSubmittingItem || visibleWorks.length === 0}
+              disabled={isSubmittingItem}
               className="w-full rounded-2xl bg-neutral-950 px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
             >
               {isSubmittingItem ? '등록 중...' : '굿즈 등록'}
@@ -2778,7 +3792,7 @@ export default function AdminEventManagePage() {
               등록된 굿즈
             </h2>
             <p className="mt-1 text-xs text-neutral-400">
-              총 {items.length}개 · 현재 표시 {filteredItems.length}개
+              총 {items.length}개 · 현재 표시 {filteredItems.length}개 · 같은 그룹 내에서 카드를 끌어 순서 변경
             </p>
           </div>
 
@@ -2827,8 +3841,8 @@ export default function AdminEventManagePage() {
                 >
                   <option value="all">전체 종류</option>
 
-                  {TRADE_CATEGORIES.map((option) => (
-                    <option key={option.id} value={option.id}>
+                  {sortedItemCategories.map((option) => (
+                    <option key={option.id} value={option.category_key}>
                       {option.label}
                     </option>
                   ))}
@@ -2872,7 +3886,7 @@ export default function AdminEventManagePage() {
             filteredItems.length > 0 ? (
               <div className="mt-5 grid grid-cols-2 gap-3">
                 {filteredItems.map((item) => {
-                  const categoryLabel = getTradeItemMetaLabel(item);
+                  const categoryLabel = getTradeItemMetaLabel(item, itemCategoryMap);
                   const isEditing = editingItemId === item.id;
                   const isUpdating = isUpdatingItemId === item.id;
                   const isDeleting = isDeletingItemId === item.id;
@@ -2892,12 +3906,27 @@ export default function AdminEventManagePage() {
                   return (
                     <article
                       key={item.id}
-                      className="overflow-hidden rounded-2xl border border-neutral-200 bg-white"
+                      draggable={!isSavingItemOrder && !editingItemId}
+                      onDragStart={(event) => {
+                        setDraggingItemId(item.id);
+                        event.dataTransfer.effectAllowed = 'move';
+                        event.dataTransfer.setData('text/plain', item.id);
+                      }}
+                      onDragOver={(event) => {
+                        if (draggingItemId && !isSavingItemOrder) event.preventDefault();
+                      }}
+                      onDrop={(event) => { event.preventDefault(); void handleDropItem(item); }}
+                      onDragEnd={() => setDraggingItemId('')}
+                      className={`overflow-hidden rounded-2xl border bg-white ${draggingItemId === item.id ? 'border-blue-500 opacity-50' : 'border-neutral-200'}`}
                     >
                       <div className={`relative ${getImageRatioClass(item.image_ratio)} bg-neutral-100`}>
                         <img
-                          src={getTradeAssetUrl(item.image_path)}
-                          alt={item.work_title}
+                          src={getTradeItemImageUrl(
+                            item.image_path,
+                            item.item_name,
+                            getSafeImageRatio(item.image_ratio),
+                          )}
+                          alt={item.item_name || item.work_title || '굿즈'}
                           className="h-full w-full bg-white object-contain p-1"
                         />
 
@@ -2917,7 +3946,7 @@ export default function AdminEventManagePage() {
                           <div className="space-y-2">
                             <label className="block">
                               <span className="text-[10px] font-bold text-neutral-500">
-                                작품명
+                                작품명 (선택)
                               </span>
 
                               <select
@@ -2927,6 +3956,8 @@ export default function AdminEventManagePage() {
                                 }
                                 className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
                               >
+                                <option value="">작품명 없음 · 단독/공통</option>
+
                                 {shouldShowCurrentWork ? (
                                   <option value={editingItemWorkTitle}>
                                     {editingItemWorkTitle} 현재값
@@ -2939,6 +3970,40 @@ export default function AdminEventManagePage() {
                                   </option>
                                 ))}
                               </select>
+                            </label>
+
+                            <label className="block">
+                              <span className="text-[10px] font-bold text-neutral-500">
+                                굿즈명
+                              </span>
+                              <input
+                                value={editingItemName}
+                                onChange={(event) =>
+                                  setEditingItemName(event.target.value)
+                                }
+                                placeholder="이미지가 없으면 필수"
+                                className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
+                              />
+                            </label>
+
+                            <label className="flex items-center justify-between gap-2 rounded-xl bg-neutral-50 px-3 py-2">
+                              <span>
+                                <span className="block text-[10px] font-bold text-neutral-600">
+                                  굿즈명 표시
+                                </span>
+                                <span className="mt-0.5 block text-[10px] text-neutral-400">
+                                  이미지 등록 후 이름 숨김 가능
+                                </span>
+                              </span>
+                              <input
+                                type="checkbox"
+                                checked={editingItemShowName}
+                                onChange={(event) =>
+                                  setEditingItemShowName(event.target.checked)
+                                }
+                                disabled={!editingItemName.trim()}
+                                className="h-5 w-5"
+                              />
                             </label>
 
                             <label className="block">
@@ -2958,15 +4023,15 @@ export default function AdminEventManagePage() {
                                 }}
                                 className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-2 py-2 text-xs outline-none focus:border-neutral-950"
                               >
-                                {TRADE_CATEGORIES.map((option) => (
-                                  <option key={option.id} value={option.id}>
+                                {sortedItemCategories.map((option) => (
+                                  <option key={option.id} value={option.category_key}>
                                     {option.label}
                                   </option>
                                 ))}
                               </select>
                             </label>
 
-                            {editingItemCategory === 'benefit' ? (
+                            {editingItemCategoryKind === 'benefit' ? (
                               <label className="block">
                                 <span className="text-[10px] font-bold text-neutral-500">
                                   특전 하위 분류
@@ -2996,7 +4061,7 @@ export default function AdminEventManagePage() {
                                   ))}
                                 </select>
                               </label>
-                            ) : editingItemCategory === 'collection_photo_card' ? (
+                            ) : editingItemCategoryKind === 'collection_photo_card' ? (
                               <label className="block">
                                 <span className="text-[10px] font-bold text-neutral-500">
                                   컬렉션 하위 분류
@@ -3032,14 +4097,18 @@ export default function AdminEventManagePage() {
                                 <img
                                   src={
                                     editingItemImagePreviewUrl ||
-                                    getTradeAssetUrl(item.image_path)
+                                    getTradeItemImageUrl(
+                                      item.image_path,
+                                      editingItemName || item.item_name,
+                                      editingItemImageRatio,
+                                    )
                                   }
-                                  alt={item.work_title}
+                                  alt={editingItemName || editingItemWorkTitle || '굿즈'}
                                   className="h-16 w-16 rounded-xl bg-white object-contain p-1 ring-1 ring-neutral-200"
                                 />
 
                                 <span className="min-w-0 flex-1 text-[10px] leading-4 text-neutral-400">
-                                  새 이미지를 선택하면 저장 시 기존 굿즈 이미지가 교체됩니다.
+                                  이미지가 없는 텍스트 굿즈에도 나중에 이미지를 추가할 수 있습니다.
                                 </span>
                               </div>
 
@@ -3126,8 +4195,14 @@ export default function AdminEventManagePage() {
                         ) : (
                           <>
                             <p className="line-clamp-1 text-[11px] font-black text-neutral-950">
-                              {item.work_title}
+                              {item.work_title || item.item_name || (visibleWorks.length > 1 ? '행사 공통' : '')}
                             </p>
+
+                            {item.work_title && item.item_name ? (
+                              <p className="mt-0.5 line-clamp-1 text-[10px] font-bold text-neutral-400">
+                                {item.item_name}
+                              </p>
+                            ) : null}
 
                             <p className="mt-1 line-clamp-1 text-[10px] text-neutral-500">
                               {categoryLabel}
@@ -3167,14 +4242,14 @@ export default function AdminEventManagePage() {
             ) : (
               <div className="mt-5 rounded-2xl bg-neutral-50 px-4 py-10 text-center">
                 <p className="text-sm font-bold text-neutral-400">
-                  선택한 조건에 맞는 굿즈 이미지가 없습니다.
+                  선택한 조건에 맞는 굿즈가 없습니다.
                 </p>
               </div>
             )
           ) : (
             <div className="mt-5 rounded-2xl bg-neutral-50 px-4 py-10 text-center">
               <p className="text-sm font-bold text-neutral-400">
-                아직 등록된 굿즈 이미지가 없습니다.
+                아직 등록된 굿즈가 없습니다.
               </p>
             </div>
           )}

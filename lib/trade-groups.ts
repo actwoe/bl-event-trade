@@ -46,13 +46,7 @@ function isTradeSide(value: unknown): value is TradeSide {
 }
 
 function isTradeCategory(value: unknown): value is TradeCategory {
-  return (
-    value === 'benefit' ||
-    value === 'deco_photo_pack' ||
-    value === 'sweets_acrylic_magnet' ||
-    value === 'heart_can_badge' ||
-    value === 'collection_photo_card'
-  );
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 function isTradeImageRatio(value: unknown): value is TradeImageRatio {

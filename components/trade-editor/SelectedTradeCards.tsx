@@ -1,10 +1,10 @@
 "use client";
 
 import {
-  TRADE_CATEGORIES,
   TradeBoardMode,
   TradeCard,
   TradeCategory,
+  TradeCategoryOption,
   TradeSide,
 } from "@/lib/trade-types";
 import {
@@ -20,6 +20,8 @@ type SelectedTradeCardsProps = {
   title: string;
   cards: TradeCard[];
   boardMode?: TradeBoardMode;
+  categoryOptions: TradeCategoryOption[];
+  showCommonWorkLabel?: boolean;
   onUpdate: (cardId: string, patch: Partial<QuantityTradeCard>) => void;
   onRemove: (cardId: string) => void;
   sideLabelMode?: SideLabelMode;
@@ -29,6 +31,8 @@ export function SelectedTradeCards({
   title,
   cards,
   boardMode = "trade",
+  categoryOptions,
+  showCommonWorkLabel = false,
   onUpdate,
   onRemove,
   sideLabelMode = "korean",
@@ -46,6 +50,8 @@ export function SelectedTradeCards({
             key={card.id}
             card={card}
             boardMode={boardMode}
+            categoryOptions={categoryOptions}
+            showCommonWorkLabel={showCommonWorkLabel}
             onUpdate={(patch) => onUpdate(card.id, patch)}
             onRemove={() => onRemove(card.id)}
             sideLabelMode={sideLabelMode}
@@ -59,6 +65,8 @@ export function SelectedTradeCards({
 type SelectedTradeCardEditorProps = {
   card: TradeCard;
   boardMode: TradeBoardMode;
+  categoryOptions: TradeCategoryOption[];
+  showCommonWorkLabel: boolean;
   onUpdate: (patch: Partial<QuantityTradeCard>) => void;
   onRemove: () => void;
   sideLabelMode: SideLabelMode;
@@ -67,12 +75,24 @@ type SelectedTradeCardEditorProps = {
 function SelectedTradeCardEditor({
   card,
   boardMode,
+  categoryOptions,
+  showCommonWorkLabel,
   onUpdate,
   onRemove,
   sideLabelMode,
 }: SelectedTradeCardEditorProps) {
   const quantity = getCardQuantity(card);
-  const metaLabel = getCardMetaLabel(card);
+  const categoryOption = categoryOptions.find((option) => option.id === card.category);
+  const metaLabel = getCardMetaLabel({
+    ...card,
+    categoryLabel: categoryOption?.label ?? card.categoryLabel,
+  });
+  const visibleItemName =
+    card.showItemName !== false ? (card.itemName ?? card.memo ?? "").trim() : "";
+  const primaryLabel =
+    (showCommonWorkLabel ? card.workTitle.trim() : "") ||
+    visibleItemName ||
+    "";
   const bilingual = sideLabelMode === "bilingual";
 
   function decreaseQuantity() {
@@ -129,15 +149,24 @@ function SelectedTradeCardEditor({
 
             <select
               value={card.category}
-              onChange={(event) =>
+              onChange={(event) => {
+                const nextCategory = event.target.value as TradeCategory;
+                const option = categoryOptions.find(
+                  (category) => category.id === nextCategory,
+                );
                 onUpdate({
-                  category: event.target.value as TradeCategory,
-                })
-              }
+                  category: nextCategory,
+                  categoryLabel: option?.label,
+                  categorySortOrder: option?.sortOrder ?? null,
+                  categoryKind: option?.kind,
+                  benefitSubcategory:
+                    nextCategory === "benefit" ? card.benefitSubcategory : null,
+                });
+              }}
               className="min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs outline-none"
               aria-label="굿즈 종류"
             >
-              {TRADE_CATEGORIES.map((category) => (
+              {categoryOptions.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.label}
                 </option>
@@ -157,9 +186,11 @@ function SelectedTradeCardEditor({
 
         <div className="flex min-w-0 items-start gap-2">
           <div className="min-w-0 flex-1 space-y-0.5 text-xs leading-5">
-            <p className="truncate font-black text-neutral-950">
-              {card.workTitle || "작품명 없음"}
-            </p>
+            {primaryLabel ? (
+              <p className="truncate font-black text-neutral-950">
+                {primaryLabel}
+              </p>
+            ) : null}
             <p className="truncate text-neutral-500">{metaLabel}</p>
           </div>
 

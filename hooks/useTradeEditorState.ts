@@ -25,12 +25,15 @@ import {
   compareBenefitSubcategoryValues,
   normalizeBenefitSubcategorySortOrder,
 } from "@/lib/trade-benefit-subcategory-order";
+import { getFallbackCategoryLabel } from "@/lib/trade-item-categories";
+import { TRADE_CATEGORIES } from "@/lib/trade-types";
 import type {
   RegisteredTradeItem,
   TradeBoard,
   TradeBoardMode,
   TradeCategory,
   TradeCategoryDisplayMode,
+  TradeCategoryOption,
   TradeSide,
 } from "@/lib/trade-types";
 
@@ -76,7 +79,10 @@ export type CategoryFilterValue =
   | typeof ALL_CATEGORIES_VALUE;
 export type BenefitSubcategoryFilterValue = string;
 
-export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
+export function useTradeEditorState(
+  registeredItems: RegisteredTradeItem[],
+  providedCategoryOptions?: TradeCategoryOption[],
+) {
   const [board, setBoard] = useState<TradeBoard>(() => createInitialTradeBoard());
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -92,6 +98,36 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportPreviewUrl, setExportPreviewUrl] = useState<string | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
+
+
+  const categoryOptions = useMemo<TradeCategoryOption[]>(() => {
+    if (providedCategoryOptions !== undefined) {
+      return [...providedCategoryOptions].sort(
+        (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, "ko-KR"),
+      );
+    }
+
+    const optionMap = new Map<string, TradeCategoryOption>();
+    for (const item of registeredItems) {
+      if (!optionMap.has(item.category)) {
+        optionMap.set(item.category, {
+          id: item.category,
+          label:
+            item.categoryLabel?.trim() || getFallbackCategoryLabel(item.category),
+          sortOrder:
+            typeof item.categorySortOrder === "number"
+              ? item.categorySortOrder
+              : Number.MAX_SAFE_INTEGER,
+          kind: item.categoryKind,
+        });
+      }
+    }
+
+    const derived = [...optionMap.values()].sort(
+      (a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label, "ko-KR"),
+    );
+    return derived.length > 0 ? derived : TRADE_CATEGORIES;
+  }, [providedCategoryOptions, registeredItems]);
 
   const workTitleOptions = useMemo(() => {
     const titles = registeredItems
@@ -210,6 +246,15 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
   useEffect(() => {
     if (
       selectedCategory !== ALL_CATEGORIES_VALUE &&
+      !categoryOptions.some((option) => option.id === selectedCategory)
+    ) {
+      setSelectedCategory(ALL_CATEGORIES_VALUE);
+    }
+  }, [categoryOptions, selectedCategory]);
+
+  useEffect(() => {
+    if (
+      selectedCategory !== ALL_CATEGORIES_VALUE &&
       selectedCategory !== "benefit" &&
       selectedBenefitSubcategory !== ALL_BENEFIT_SUBCATEGORIES_VALUE
     ) {
@@ -308,9 +353,14 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
                 ? {
                     ...card,
                     category: item.category,
+                    categoryLabel: item.categoryLabel,
+                    categorySortOrder: item.categorySortOrder ?? null,
+                    categoryKind: item.categoryKind,
                     imageUrl: item.imageUrl,
                     workTitle: item.workTitle,
-                    memo: item.itemName,
+                    itemName: item.itemName,
+                    showItemName: item.showItemName === true,
+                    memo: item.showItemName ? item.itemName : "",
                     imageRatio: getItemImageRatio(item),
                     benefitSubcategory: item.benefitSubcategory ?? null,
                     benefitSubcategorySortOrder:
@@ -330,9 +380,14 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
         id: nanoid(),
         side,
         category: item.category,
+        categoryLabel: item.categoryLabel,
+        categorySortOrder: item.categorySortOrder ?? null,
+        categoryKind: item.categoryKind,
         imageUrl: item.imageUrl,
         workTitle: item.workTitle,
-        memo: item.itemName,
+        itemName: item.itemName,
+        showItemName: item.showItemName === true,
+        memo: item.showItemName ? item.itemName : "",
         imageRatio: getItemImageRatio(item),
         benefitSubcategory: item.benefitSubcategory ?? null,
         benefitSubcategorySortOrder:
@@ -380,7 +435,6 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
     metadata: UploadedCardMetadata,
   ) {
     const workTitle = metadata.workTitle.trim();
-    if (!workTitle) return;
 
     const newCards: QuantityTradeCard[] = Array.from(files)
       .filter((file) => file.type.startsWith("image/"))
@@ -388,16 +442,20 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
         id: nanoid(),
         side,
         category: metadata.category,
+        categoryLabel: metadata.categoryLabel,
+        categorySortOrder: metadata.categorySortOrder,
+        categoryKind: metadata.categoryKind,
         imageUrl: URL.createObjectURL(file),
         workTitle,
         memo: "",
         imageRatio: "square",
         benefitSubcategory:
-          metadata.category === "benefit"
+          metadata.categoryKind === "benefit" || metadata.category === "benefit"
             ? metadata.benefitSubcategory
             : null,
         benefitSubcategorySortOrder:
-          metadata.category === "benefit" && metadata.benefitSubcategory
+          (metadata.categoryKind === "benefit" || metadata.category === "benefit") &&
+          metadata.benefitSubcategory
             ? (benefitSubcategoryOrderMap.get(
                 metadata.benefitSubcategory.trim(),
               ) ?? null)
@@ -468,6 +526,7 @@ export function useTradeEditorState(registeredItems: RegisteredTradeItem[]) {
     setExportPreviewUrl,
     previewRef,
     workTitleOptions,
+    categoryOptions,
     benefitSubcategoryOptions,
     hasBenefitItemsWithoutSubcategory,
     filteredItems,

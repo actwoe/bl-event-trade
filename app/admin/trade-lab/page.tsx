@@ -4,6 +4,14 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { TradeBuilder } from '@/components/trade/TradeBuilder';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
+import { getTradeItemImageUrl } from '@/lib/trade-item-image';
+import {
+  categoryRowsToOptions,
+  createCategoryOptionMap,
+  getFallbackCategoryLabel,
+  getFallbackCategorySortOrder,
+  TradeItemCategoryRow,
+} from '@/lib/trade-item-categories';
 import {
   createBenefitSubcategoryOrderMap,
   getBenefitSubcategorySortOrder,
@@ -26,6 +34,8 @@ type TradeCollectionRow = {
   event_start_date: string | null;
   event_end_date: string | null;
   event_location: string | null;
+  reference_section_enabled: boolean | null;
+  reference_section_title: string | null;
   is_public: boolean;
   sort_order: number | null;
   created_at: string | null;
@@ -36,6 +46,7 @@ type TradeItemRow = {
   category: TradeCategory;
   work_title: string;
   item_name: string | null;
+  show_item_name: boolean | null;
   image_path: string;
   sort_order: number | null;
   image_ratio: TradeImageRatio | null;
@@ -113,7 +124,7 @@ export default function AdminTradeLabPage() {
       const { data, error } = await supabase
         .from('trade_collections')
         .select(
-          'id, slug, title, description, event_start_date, event_end_date, event_location, is_public, sort_order, created_at',
+          'id, slug, title, description, event_start_date, event_end_date, event_location, reference_section_enabled, reference_section_title, is_public, sort_order, created_at',
         )
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
@@ -157,11 +168,11 @@ export default function AdminTradeLabPage() {
         return;
       }
 
-      const [itemsResult, referencesResult, subcategoriesResult] = await Promise.all([
+      const [itemsResult, referencesResult, subcategoriesResult, categoriesResult] = await Promise.all([
         supabase
           .from('trade_items')
           .select(
-            'id, category, work_title, item_name, image_path, sort_order, image_ratio, benefit_subcategory',
+            'id, category, work_title, item_name, show_item_name, image_path, sort_order, image_ratio, benefit_subcategory',
           )
           .eq('collection_id', selectedCollection.id)
           .eq('is_visible', true)
@@ -179,6 +190,13 @@ export default function AdminTradeLabPage() {
           .eq('is_visible', true)
           .order('sort_order', { ascending: true })
           .order('name', { ascending: true }),
+        supabase
+          .from('trade_item_categories')
+          .select('category_key, label, category_kind, is_visible, sort_order')
+          .eq('collection_id', selectedCollection.id)
+          .eq('is_visible', true)
+          .order('sort_order', { ascending: true })
+          .order('created_at', { ascending: true }),
       ]);
 
       if (isCancelled) {
@@ -203,6 +221,17 @@ export default function AdminTradeLabPage() {
         console.error(subcategoriesResult.error);
       }
 
+      if (categoriesResult.error) {
+        console.error(categoriesResult.error);
+      }
+
+      const categoryOptions = categoriesResult.error
+        ? undefined
+        : categoryRowsToOptions(
+            (categoriesResult.data ?? []) as TradeItemCategoryRow[],
+          );
+      const categoryOptionMap = createCategoryOptionMap(categoryOptions);
+
       const benefitSubcategoryOrderMap = createBenefitSubcategoryOrderMap(
         (subcategoriesResult.data ?? []) as TradeBenefitSubcategoryRow[],
       );
@@ -215,17 +244,31 @@ export default function AdminTradeLabPage() {
         eventStartDate: selectedCollection.event_start_date,
         eventEndDate: selectedCollection.event_end_date,
         location: selectedCollection.event_location,
+        referenceSectionEnabled: selectedCollection.reference_section_enabled !== false,
+        referenceSectionTitle: selectedCollection.reference_section_title,
+        categoryOptions,
       });
 
       setRegisteredItems(
         ((itemsResult.data ?? []) as TradeItemRow[])
-          .filter((item) => item.image_path)
-          .map((item, catalogOrder) => ({
+          .filter((item) => categoriesResult.error || categoryOptionMap.has(item.category))
+          .map((item, catalogOrder) => {
+            const categoryOption = categoryOptionMap.get(item.category);
+            return ({
             id: item.id,
             category: item.category,
+            categoryLabel:
+              categoryOption?.label ?? getFallbackCategoryLabel(item.category),
+            categorySortOrder:
+              categoryOption?.sortOrder ?? getFallbackCategorySortOrder(item.category),
             workTitle: item.work_title,
             itemName: item.item_name || '',
-            imageUrl: getTradeAssetUrl(item.image_path),
+            showItemName: item.show_item_name === true,
+            imageUrl: getTradeItemImageUrl(
+              item.image_path,
+              item.item_name,
+              getSafeImageRatio(item.image_ratio),
+            ),
             sortOrder: item.sort_order ?? 0,
             catalogOrder,
             imageRatio: getSafeImageRatio(item.image_ratio),
@@ -234,7 +277,8 @@ export default function AdminTradeLabPage() {
               benefitSubcategoryOrderMap,
               item.benefit_subcategory,
             ),
-          })),
+          });
+          }),
       );
 
       setReferenceImages(
