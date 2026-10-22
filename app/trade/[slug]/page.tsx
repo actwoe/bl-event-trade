@@ -10,6 +10,14 @@ import {
   getKoreaTodayDateString,
 } from '@/lib/event-status';
 import { getTradeAssetUrl, supabase } from '@/lib/supabase';
+import { getTradeItemImageUrl } from '@/lib/trade-item-image';
+import {
+  categoryRowsToOptions,
+  createCategoryOptionMap,
+  getFallbackCategoryLabel,
+  getFallbackCategorySortOrder,
+  TradeItemCategoryRow,
+} from '@/lib/trade-item-categories';
 import {
   addBenefitSubcategoryItemOrderFallback,
   createBenefitSubcategoryOrderMap,
@@ -39,6 +47,8 @@ type TradeCollectionRow = {
   event_start_date: string | null;
   event_end_date: string | null;
   event_location: string | null;
+  reference_section_enabled: boolean | null;
+  reference_section_title: string | null;
 };
 
 type TradeItemRow = {
@@ -46,8 +56,10 @@ type TradeItemRow = {
   category: TradeCategory;
   work_title: string;
   item_name: string | null;
+  show_item_name: boolean | null;
   image_path: string;
   sort_order: number | null;
+  display_order: number | null;
   image_ratio: TradeImageRatio | null;
   benefit_subcategory: string | null;
 };
@@ -71,7 +83,7 @@ async function getTradePageData(slug: string) {
     const { data: collectionData, error: collectionError } = await supabase
       .from('trade_collections')
       .select(
-        'id, slug, title, description, event_start_date, event_end_date, event_location',
+        'id, slug, title, description, event_start_date, event_end_date, event_location, reference_section_enabled, reference_section_title',
       )
       .eq('slug', slug)
       .eq('is_public', true)
@@ -82,12 +94,12 @@ async function getTradePageData(slug: string) {
     }
 
     const collectionRow = collectionData as TradeCollectionRow;
-    const [itemsResult, referencesResult, subcategoriesResult] =
+    const [itemsResult, referencesResult, subcategoriesResult, categoriesResult] =
       await Promise.all([
       supabase
         .from('trade_items')
         .select(
-          'id, category, work_title, item_name, image_path, sort_order, image_ratio, benefit_subcategory',
+          'id, category, work_title, item_name, show_item_name, image_path, sort_order, display_order, image_ratio, benefit_subcategory',
         )
         .eq('collection_id', collectionRow.id)
         .eq('is_visible', true)
@@ -105,6 +117,13 @@ async function getTradePageData(slug: string) {
         .eq('is_visible', true)
         .order('sort_order', { ascending: true })
         .order('name', { ascending: true }),
+      supabase
+        .from('trade_item_categories')
+        .select('category_key, label, category_kind, is_visible, sort_order')
+        .eq('collection_id', collectionRow.id)
+        .eq('is_visible', true)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true }),
     ]);
 
     return {
@@ -115,6 +134,8 @@ async function getTradePageData(slug: string) {
       referenceError: referencesResult.error,
       subcategoryData: subcategoriesResult.data,
       subcategoryError: subcategoriesResult.error,
+      categoryData: categoriesResult.data,
+      categoryError: categoriesResult.error,
     };
 }
 
@@ -134,6 +155,8 @@ export default async function TradePage({ params }: TradePageProps) {
     referenceError,
     subcategoryData,
     subcategoryError,
+    categoryData,
+    categoryError,
   } = result;
 
   if (itemError) {
@@ -147,12 +170,25 @@ export default async function TradePage({ params }: TradePageProps) {
     );
   }
 
+
+  if (categoryError && process.env.NODE_ENV !== 'production') {
+    console.warn(
+      '행사별 굿즈 종류를 불러오지 못해 기존 분류 fallback을 사용합니다.',
+      categoryError.message,
+    );
+  }
+
   if (referenceError && process.env.NODE_ENV !== 'production') {
     console.warn(
       '공지용 이미지 목록을 불러오지 못했습니다. trade_reference_images 권한 또는 SQL 적용 여부를 확인해 주세요.',
       referenceError.message,
     );
   }
+
+  const categoryOptions = categoryError
+    ? undefined
+    : categoryRowsToOptions((categoryData ?? []) as TradeItemCategoryRow[]);
+  const categoryOptionMap = createCategoryOptionMap(categoryOptions);
 
   const collection: TradeCollectionSummary = {
     id: collectionRow.id,
@@ -162,6 +198,9 @@ export default async function TradePage({ params }: TradePageProps) {
     eventStartDate: collectionRow.event_start_date,
     eventEndDate: collectionRow.event_end_date,
     location: collectionRow.event_location,
+    referenceSectionEnabled: collectionRow.reference_section_enabled === true,
+    referenceSectionTitle: collectionRow.reference_section_title,
+    categoryOptions,
   };
 
   const benefitSubcategoryOrderMap = createBenefitSubcategoryOrderMap(
@@ -175,22 +214,34 @@ export default async function TradePage({ params }: TradePageProps) {
   const registeredItems: RegisteredTradeItem[] = (
     (itemData ?? []) as TradeItemRow[]
   )
-    .filter((item) => item.image_path)
-    .map((item, catalogOrder) => ({
+    .filter((item) => categoryError || categoryOptionMap.has(item.category))
+    .map((item, catalogOrder) => {
+      const categoryOption = categoryOptionMap.get(item.category);
+      return ({
       id: item.id,
       category: item.category,
+      categoryLabel: categoryOption?.label ?? getFallbackCategoryLabel(item.category),
+      categorySortOrder:
+        categoryOption?.sortOrder ?? getFallbackCategorySortOrder(item.category),
+      categoryKind: categoryOption?.kind,
       workTitle: item.work_title,
       itemName: item.item_name || '',
-      imageUrl: getTradeAssetUrl(item.image_path),
+      showItemName: item.show_item_name === true,
+      imageUrl: getTradeItemImageUrl(
+        item.image_path,
+        item.item_name,
+        getSafeImageRatio(item.image_ratio),
+      ),
       sortOrder: item.sort_order ?? 0,
-      catalogOrder,
+      catalogOrder: item.display_order ?? catalogOrder,
       imageRatio: getSafeImageRatio(item.image_ratio),
       benefitSubcategory: item.benefit_subcategory ?? null,
       benefitSubcategorySortOrder: getBenefitSubcategorySortOrder(
         benefitSubcategoryOrderMap,
         item.benefit_subcategory,
       ),
-    }));
+    });
+    });
 
   const referenceImages: TradeReferenceImage[] = (
     (referenceData ?? []) as TradeReferenceImageRow[]

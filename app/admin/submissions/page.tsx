@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { TRADE_CATEGORIES, TradeCategory } from "@/lib/trade-types";
+import { TradeCategory } from "@/lib/trade-types";
+import { getFallbackCategoryLabel } from "@/lib/trade-item-categories";
 
 type AdminState = "checking" | "admin" | "not-admin" | "signed-out";
 
@@ -75,9 +76,18 @@ function getContentTypeFromExtension(extension: string) {
   return "image/jpeg";
 }
 
-function getCategoryLabel(category: TradeCategory) {
+function getCategoryMapKey(collectionId: string | null, category: TradeCategory) {
+  return `${collectionId ?? "unknown"}:${category}`;
+}
+
+function getCategoryLabel(
+  collectionId: string | null,
+  category: TradeCategory,
+  categoryLabelByKey: Record<string, string>,
+) {
   return (
-    TRADE_CATEGORIES.find((option) => option.id === category)?.label ?? category
+    categoryLabelByKey[getCategoryMapKey(collectionId, category)] ??
+    getFallbackCategoryLabel(category)
   );
 }
 
@@ -86,6 +96,7 @@ export default function AdminSubmissionsPage() {
 
   const [adminState, setAdminState] = useState<AdminState>("checking");
   const [submissions, setSubmissions] = useState<CardSubmissionRow[]>([]);
+  const [categoryLabelByKey, setCategoryLabelByKey] = useState<Record<string, string>>({});
   const [signedUrlById, setSignedUrlById] = useState<Record<string, string>>(
     {},
   );
@@ -160,6 +171,38 @@ export default function AdminSubmissionsPage() {
     const nextSubmissions = (data ?? []) as CardSubmissionRow[];
 
     setSubmissions(nextSubmissions);
+
+    const collectionIds = Array.from(
+      new Set(
+        nextSubmissions
+          .map((submission) => submission.collection_id)
+          .filter((value): value is string => Boolean(value)),
+      ),
+    );
+
+    if (collectionIds.length > 0) {
+      const { data: categoryRows, error: categoryError } = await supabase
+        .from("trade_item_categories")
+        .select("collection_id, category_key, label")
+        .in("collection_id", collectionIds);
+
+      if (categoryError) {
+        console.error(categoryError);
+        setCategoryLabelByKey({});
+      } else {
+        const nextCategoryLabels: Record<string, string> = {};
+
+        (categoryRows ?? []).forEach((row) => {
+          nextCategoryLabels[
+            getCategoryMapKey(row.collection_id as string, row.category_key as string)
+          ] = row.label as string;
+        });
+
+        setCategoryLabelByKey(nextCategoryLabels);
+      }
+    } else {
+      setCategoryLabelByKey({});
+    }
 
     const nextAdminNotes: Record<string, string> = {};
 
@@ -533,7 +576,11 @@ export default function AdminSubmissionsPage() {
             filteredSubmissions.map((submission) => {
               const signedUrl = signedUrlById[submission.id];
               const isProcessing = processingId === submission.id;
-              const categoryLabel = getCategoryLabel(submission.category);
+              const categoryLabel = getCategoryLabel(
+                submission.collection_id,
+                submission.category,
+                categoryLabelByKey,
+              );
 
               return (
                 <article
@@ -544,7 +591,7 @@ export default function AdminSubmissionsPage() {
                     {signedUrl ? (
                       <img
                         src={signedUrl}
-                        alt={submission.work_title}
+                        alt={submission.work_title || "행사 공통 굿즈"}
                         className="h-full w-full bg-white object-contain p-1"
                       />
                     ) : (
@@ -576,7 +623,7 @@ export default function AdminSubmissionsPage() {
                     </p>
 
                     <h2 className="mt-1 text-lg font-black text-neutral-950">
-                      {submission.work_title}
+                      {submission.work_title || "작품명 없음 · 행사 공통"}
                     </h2>
 
                     <div className="mt-3 space-y-1 text-sm leading-6 text-neutral-600">

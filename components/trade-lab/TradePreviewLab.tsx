@@ -1,11 +1,9 @@
 'use client';
 
 import { forwardRef } from 'react';
-import {
-  TRADE_CATEGORIES,
-  TradeBoard,
-  TradeCard,
-} from '@/lib/trade-types';
+import { TradeBoard, TradeCard } from '@/lib/trade-types';
+import { getFallbackCategoryLabel } from '@/lib/trade-item-categories';
+import { sortTradeCardsBySideAndGroup } from '@/lib/trade-card-order';
 import { QuantityBadge } from '@/components/trade/QuantityBadge';
 
 type TradePreviewLabProps = {
@@ -49,8 +47,7 @@ function getCardQuantity(card: TradeCard) {
 
 function getCardMetaLabel(card: TradeCard) {
   const categoryLabel =
-    TRADE_CATEGORIES.find((category) => category.id === card.category)?.label ??
-    card.category;
+    card.categoryLabel?.trim() || getFallbackCategoryLabel(card.category);
 
   const benefitSubcategory =
     'benefitSubcategory' in card && typeof card.benefitSubcategory === 'string'
@@ -73,38 +70,22 @@ type CardGroup = {
 function getCardGroups(cards: TradeCard[]): CardGroup[] {
   const groups: CardGroup[] = [];
 
-  for (const category of TRADE_CATEGORIES) {
-    const categoryCards = cards.filter((card) => card.category === category.id);
+  for (const card of sortTradeCardsBySideAndGroup(cards)) {
+    const categoryLabel =
+      card.categoryLabel?.trim() || getFallbackCategoryLabel(card.category);
+    const subcategory = card.benefitSubcategory?.trim() ?? '';
+    const key =
+      card.category === 'benefit'
+        ? `benefit:${subcategory || '__none__'}`
+        : `category:${card.category}`;
+    const label =
+      card.category === 'benefit' && subcategory
+        ? subcategory
+        : categoryLabel;
+    const existing = groups.find((group) => group.key === key);
 
-    if (categoryCards.length === 0) continue;
-
-    if (category.id !== 'benefit') {
-      groups.push({
-        key: category.id,
-        label: category.label,
-        cards: categoryCards,
-      });
-      continue;
-    }
-
-    const benefitGroups = new Map<string, TradeCard[]>();
-
-    for (const card of categoryCards) {
-      const subcategory =
-        'benefitSubcategory' in card &&
-        typeof card.benefitSubcategory === 'string'
-          ? card.benefitSubcategory.trim()
-          : '';
-      const label = subcategory || category.label;
-      const key = subcategory ? `benefit:${subcategory}` : 'benefit';
-      const currentCards = benefitGroups.get(key) ?? [];
-      currentCards.push(card);
-      benefitGroups.set(key, currentCards);
-
-      if (!groups.some((group) => group.key === key)) {
-        groups.push({ key, label, cards: currentCards });
-      }
-    }
+    if (existing) existing.cards.push(card);
+    else groups.push({ key, label, cards: [card] });
   }
 
   return groups;
@@ -340,6 +321,11 @@ function CardGrid({ cards, showMeta }: { cards: TradeCard[]; showMeta: boolean }
 function PreviewCard({ card, showMeta }: PreviewCardProps) {
   const metaLabel = getCardMetaLabel(card);
   const quantity = getCardQuantity(card);
+  const visibleItemName = card.showItemName !== false
+    ? (card.itemName ?? card.memo ?? '').trim()
+    : '';
+  const primaryLabel = card.workTitle.trim() || visibleItemName;
+  const secondaryItemName = card.workTitle.trim() ? visibleItemName : '';
 
   return (
     <article className="overflow-hidden rounded-2xl bg-white">
@@ -356,9 +342,11 @@ function PreviewCard({ card, showMeta }: PreviewCardProps) {
       </div>
 
       <div className="px-1.5 pb-1 pt-1.5">
-        <p className="line-clamp-1 text-center text-[10px] font-black leading-4 text-neutral-950">
-          {card.workTitle || '작품명'}
-        </p>
+        {primaryLabel ? (
+          <p className="line-clamp-1 text-center text-[10px] font-black leading-4 text-neutral-950">
+            {primaryLabel}
+          </p>
+        ) : null}
 
         {showMeta ? (
           <p className="mt-0 line-clamp-1 text-center text-[9px] font-bold leading-3 text-neutral-500">
@@ -366,9 +354,9 @@ function PreviewCard({ card, showMeta }: PreviewCardProps) {
           </p>
         ) : null}
 
-        {card.memo ? (
+        {secondaryItemName ? (
           <p className="mt-0.5 line-clamp-1 text-center text-[9px] font-bold leading-3 text-neutral-400">
-            {card.memo}
+            {secondaryItemName}
           </p>
         ) : null}
       </div>

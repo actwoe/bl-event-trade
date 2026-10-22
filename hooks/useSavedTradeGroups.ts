@@ -22,7 +22,11 @@ import { supabase } from "@/lib/supabase";
 
 type UserAuthState = "checking" | "signed-in" | "signed-out";
 
-type SavedGroupChangeHandler = (group: { id: string; name: string }) => void;
+type SavedGroupChangeHandler = (group: {
+  id: string;
+  name: string;
+  collectionId: string;
+}) => void;
 
 type UseSavedTradeGroupsOptions = {
   collection: TradeCollectionSummary;
@@ -93,7 +97,10 @@ function restoreSavedTradeGroupBoard(
       {
         id: nanoid(),
         side: savedCard.side,
-        category: savedCard.category,
+        category: item.category,
+        categoryLabel: item.categoryLabel,
+        categorySortOrder: item.categorySortOrder ?? null,
+        categoryKind: item.categoryKind,
         imageUrl: item.imageUrl,
         workTitle: savedCard.workTitle || item.workTitle,
         memo: savedCard.memo || item.itemName,
@@ -308,7 +315,11 @@ export function useSavedTradeGroups({
             ? `교환판을 저장했습니다. 직접 추가 이미지 ${skippedUploadCount}개는 저장에서 제외되었습니다.`
             : "교환판을 저장했습니다.",
         );
-        onSavedGroupChange?.({ id: activeGroupId, name: normalizedName });
+        onSavedGroupChange?.({
+          id: activeGroupId,
+          name: normalizedName,
+          collectionId: collection.id,
+        });
         return;
       }
 
@@ -327,7 +338,11 @@ export function useSavedTradeGroups({
 
       setActiveGroupId(data.id);
       setSavedGroupCount((current) => current + 1);
-      onSavedGroupChange?.({ id: data.id, name: normalizedName });
+      onSavedGroupChange?.({
+        id: data.id,
+        name: normalizedName,
+        collectionId: collection.id,
+      });
 
       const nextUrl = new URL(window.location.href);
       nextUrl.searchParams.set("group", data.id);

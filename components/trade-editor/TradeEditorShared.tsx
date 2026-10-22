@@ -58,9 +58,15 @@ export function AddSideButton({ koreanTitle, englishTitle, iconSrc, count, onCli
   );
 }
 
-type GoodsWorkReferenceProps = { referenceImages: TradeReferenceImage[] };
+type GoodsWorkReferenceProps = {
+  referenceImages: TradeReferenceImage[];
+  title?: string | null;
+};
 
-export function GoodsWorkReference({ referenceImages }: GoodsWorkReferenceProps) {
+export function GoodsWorkReference({
+  referenceImages,
+  title,
+}: GoodsWorkReferenceProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -74,7 +80,7 @@ export function GoodsWorkReference({ referenceImages }: GoodsWorkReferenceProps)
         <span className="flex min-w-0 items-center gap-1.5">
           <span aria-hidden="true" className="shrink-0 text-xs leading-none">🔍</span>
           <span className="text-xs font-black leading-4 text-neutral-950">
-            내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?
+            {title?.trim() || "내가 뽑은 굿즈가 어떤 작품인지 모르겠다면?"}
           </span>
         </span>
         <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-black text-neutral-500 ring-1 ring-neutral-200">

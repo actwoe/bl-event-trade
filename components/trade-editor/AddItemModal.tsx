@@ -17,9 +17,10 @@ import {
   TradeBoardMode,
   TradeCard,
   TradeCategory,
+  TradeCategoryKind,
+  TradeCategoryOption,
   TradeReferenceImage,
   TradeSide,
-  TRADE_CATEGORIES,
 } from "@/lib/trade-types";
 
 const ALL_WORKS_VALUE = "all";
@@ -33,6 +34,9 @@ export type BenefitSubcategoryFilterValue = string;
 export type UploadedCardMetadata = {
   workTitle: string;
   category: TradeCategory;
+  categoryLabel?: string;
+  categorySortOrder?: number | null;
+  categoryKind?: TradeCategoryKind;
   benefitSubcategory: string | null;
 };
 
@@ -43,9 +47,12 @@ export type AddItemModalProps = {
   selectedCategory: CategoryFilterValue;
   selectedBenefitSubcategory: BenefitSubcategoryFilterValue;
   workTitleOptions: string[];
+  categoryOptions: TradeCategoryOption[];
   benefitSubcategoryOptions: string[];
   hasBenefitItemsWithoutSubcategory: boolean;
   referenceImages: TradeReferenceImage[];
+  referenceSectionEnabled?: boolean;
+  referenceSectionTitle?: string | null;
   registeredItems: RegisteredTradeItem[];
   selectedCards: TradeCard[];
   filteredItems: RegisteredTradeItem[];
@@ -66,9 +73,12 @@ export function AddItemModal({
   selectedCategory,
   selectedBenefitSubcategory,
   workTitleOptions,
+  categoryOptions,
   benefitSubcategoryOptions,
   hasBenefitItemsWithoutSubcategory,
   referenceImages,
+  referenceSectionEnabled = false,
+  referenceSectionTitle,
   registeredItems,
   selectedCards,
   filteredItems,
@@ -89,6 +99,7 @@ export function AddItemModal({
     variant === "lab"
       ? `${sideKoreanLabel} (${sideEnglishLabel})`
       : sideKoreanLabel;
+  const hasMultipleWorks = workTitleOptions.length > 1;
   const canUseBenefitSubcategoryFilter =
     (selectedCategory === ALL_CATEGORIES_VALUE ||
       selectedCategory === "benefit") &&
@@ -98,7 +109,9 @@ export function AddItemModal({
       ? selectedWorkTitle
       : workTitleOptions[0] ?? "";
   const initialUploadCategory: TradeCategory =
-    selectedCategory !== ALL_CATEGORIES_VALUE ? selectedCategory : "benefit";
+    selectedCategory !== ALL_CATEGORIES_VALUE
+      ? selectedCategory
+      : (categoryOptions[0]?.id ?? "");
   const [uploadWorkTitle, setUploadWorkTitle] = useState(initialUploadWorkTitle);
   const [uploadCategory, setUploadCategory] =
     useState<TradeCategory>(initialUploadCategory);
@@ -148,26 +161,28 @@ export function AddItemModal({
             </button>
           </div>
 
-          <div className="mt-5 grid grid-cols-3 gap-2">
-            <label className="block min-w-0">
-              <span className="text-xs font-black text-neutral-500">
-                작품별
-              </span>
+          <div className={`mt-5 grid gap-2 ${hasMultipleWorks ? "grid-cols-3" : "grid-cols-2"}`}>
+            {hasMultipleWorks ? (
+              <label className="block min-w-0">
+                <span className="text-xs font-black text-neutral-500">
+                  작품별
+                </span>
 
-              <select
-                value={selectedWorkTitle}
-                onChange={(event) => onChangeWorkTitle(event.target.value)}
-                className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-2 py-3 text-xs outline-none focus:border-neutral-950"
-              >
-                <option value={ALL_WORKS_VALUE}>전체</option>
+                <select
+                  value={selectedWorkTitle}
+                  onChange={(event) => onChangeWorkTitle(event.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-2 py-3 text-xs outline-none focus:border-neutral-950"
+                >
+                  <option value={ALL_WORKS_VALUE}>전체</option>
 
-                {workTitleOptions.map((workTitle) => (
-                  <option key={workTitle} value={workTitle}>
-                    {workTitle}
-                  </option>
-                ))}
-              </select>
-            </label>
+                  {workTitleOptions.map((workTitle) => (
+                    <option key={workTitle} value={workTitle}>
+                      {workTitle}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
 
             <label className="block min-w-0">
               <span className="text-xs font-black text-neutral-500">
@@ -176,14 +191,18 @@ export function AddItemModal({
 
               <select
                 value={selectedCategory}
+                disabled={categoryOptions.length === 0}
                 onChange={(event) =>
                   onChangeCategory(event.target.value as CategoryFilterValue)
                 }
                 className="mt-1 w-full rounded-2xl border border-neutral-200 bg-white px-2 py-3 text-xs outline-none focus:border-neutral-950"
               >
                 <option value={ALL_CATEGORIES_VALUE}>전체</option>
+                {categoryOptions.length === 0 ? (
+                  <option value="">등록된 굿즈 종류 없음</option>
+                ) : null}
 
-                {TRADE_CATEGORIES.map((category) => (
+                {categoryOptions.map((category) => (
                   <option key={category.id} value={category.id}>
                     {category.label}
                   </option>
@@ -223,7 +242,12 @@ export function AddItemModal({
         </header>
 
         <div className="flex-1 overflow-y-auto px-5 pb-5 pt-1">
-          <GoodsWorkReference referenceImages={referenceImages} />
+          {referenceSectionEnabled && referenceImages.length > 0 ? (
+            <GoodsWorkReference
+              referenceImages={referenceImages}
+              title={referenceSectionTitle}
+            />
+          ) : null}
 
           <details className="mb-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-black text-neutral-950 [&::-webkit-details-marker]:hidden">
@@ -242,34 +266,39 @@ export function AddItemModal({
             <p className="mt-2 text-xs leading-5 text-neutral-500">
               직접 찍은 이미지를 교환판에 넣고 싶을 때 사용해 주세요.
               {variant === "default"
-                ? " 파일명 대신 아래에서 선택한 작품명과 분류가 표시됩니다."
+                ? hasMultipleWorks
+                  ? " 파일명 대신 아래에서 선택한 작품명과 분류가 표시됩니다."
+                  : " 파일명 대신 선택한 분류가 표시됩니다."
                 : null}
             </p>
 
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <label className="block min-w-0">
-                <span className="text-[11px] font-black text-neutral-500">작품명</span>
-                <select
-                  value={uploadWorkTitle}
-                  onChange={(event) => {
-                    setUploadWorkTitle(event.target.value);
-                    setUploadBenefitSubcategory("");
-                  }}
-                  className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-xs outline-none focus:border-neutral-950"
-                >
-                  <option value="">작품 선택</option>
-                  {workTitleOptions.map((workTitle) => (
-                    <option key={workTitle} value={workTitle}>
-                      {workTitle}
-                    </option>
-                  ))}
-                </select>
-              </label>
+            <div className={`mt-4 grid gap-2 ${hasMultipleWorks ? "grid-cols-2" : "grid-cols-1"}`}>
+              {hasMultipleWorks ? (
+                <label className="block min-w-0">
+                  <span className="text-[11px] font-black text-neutral-500">작품명</span>
+                  <select
+                    value={uploadWorkTitle}
+                    onChange={(event) => {
+                      setUploadWorkTitle(event.target.value);
+                      setUploadBenefitSubcategory("");
+                    }}
+                    className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-xs outline-none focus:border-neutral-950"
+                  >
+                    <option value="">작품명 없음 · 행사 공통</option>
+                    {workTitleOptions.map((workTitle) => (
+                      <option key={workTitle} value={workTitle}>
+                        {workTitle}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : null}
 
               <label className="block min-w-0">
                 <span className="text-[11px] font-black text-neutral-500">굿즈 종류</span>
                 <select
                   value={uploadCategory}
+                  disabled={categoryOptions.length === 0}
                   onChange={(event) => {
                     const category = event.target.value as TradeCategory;
                     setUploadCategory(category);
@@ -277,7 +306,7 @@ export function AddItemModal({
                   }}
                   className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-xs outline-none focus:border-neutral-950"
                 >
-                  {TRADE_CATEGORIES.map((category) => (
+                  {categoryOptions.map((category) => (
                     <option key={category.id} value={category.id}>
                       {category.label}
                     </option>
@@ -311,26 +340,29 @@ export function AddItemModal({
             ) : null}
 
             <label
-              className={`mt-4 flex items-center justify-center rounded-xl border border-dashed px-3 py-4 text-xs font-bold ${
-                uploadWorkTitle
-                  ? "cursor-pointer border-neutral-300 bg-white text-neutral-600 hover:border-neutral-900 hover:text-neutral-950"
-                  : "cursor-not-allowed border-neutral-200 bg-neutral-100 text-neutral-300"
-              }`}
+              className="mt-4 flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-neutral-300 bg-white px-3 py-4 text-xs font-bold text-neutral-600 hover:border-neutral-900 hover:text-neutral-950"
             >
               {sideLabel}에 직접 추가
               <input
                 type="file"
                 accept="image/*"
                 multiple
-                disabled={!uploadWorkTitle}
                 className="hidden"
+                disabled={categoryOptions.length === 0}
                 onChange={(event) => {
                   const files = event.target.files;
-                  if (!files || files.length === 0 || !uploadWorkTitle) return;
+                  if (!files || files.length === 0) return;
+
+                  const uploadCategoryOption = categoryOptions.find(
+                    (option) => option.id === uploadCategory,
+                  );
 
                   onUpload(files, {
                     workTitle: uploadWorkTitle,
                     category: uploadCategory,
+                    categoryLabel: uploadCategoryOption?.label,
+                    categorySortOrder: uploadCategoryOption?.sortOrder ?? null,
+                    categoryKind: uploadCategoryOption?.kind,
                     benefitSubcategory:
                       uploadCategory === "benefit"
                         ? uploadBenefitSubcategory || null
@@ -386,6 +418,7 @@ export function AddItemModal({
                     item={item}
                     quantity={quantity}
                     variant={variant}
+                    showCommonWorkLabel={workTitleOptions.length > 1}
                     onIncrease={() => onIncreaseItem(item)}
                     onDecrease={() => onDecreaseItem(item)}
                   />
@@ -421,6 +454,7 @@ type RegisteredItemCardProps = {
   onIncrease: () => void;
   onDecrease: () => void;
   variant: "lab" | "default";
+  showCommonWorkLabel: boolean;
 };
 
 function RegisteredItemCard({
@@ -429,10 +463,16 @@ function RegisteredItemCard({
   onIncrease,
   onDecrease,
   variant,
+  showCommonWorkLabel,
 }: RegisteredItemCardProps) {
   const selected = quantity > 0;
   const metaLabel = getItemMetaLabel(item);
   const imageRatio = getItemImageRatio(item);
+  const visibleItemName = item.showItemName ? item.itemName.trim() : "";
+  const primaryLabel =
+    (showCommonWorkLabel ? item.workTitle.trim() : "") ||
+    visibleItemName ||
+    "";
 
   return (
     <article
@@ -445,7 +485,7 @@ function RegisteredItemCard({
           onIncrease();
         }
       }}
-      aria-label={`${item.workTitle} 수량 늘리기`}
+      aria-label={`${item.workTitle || item.itemName || "굿즈"} 수량 늘리기`}
       className={
         selected
           ? "cursor-pointer overflow-hidden rounded-2xl border-2 border-neutral-950 bg-neutral-50 text-left shadow-sm"
@@ -460,7 +500,7 @@ function RegisteredItemCard({
         >
           <ProtectedGoodsImage
             src={item.imageUrl}
-            alt={item.itemName}
+            alt={item.itemName || item.workTitle || "굿즈"}
             loading="lazy"
             decoding="async"
             className={`${getImageRatioClass(imageRatio)} ${
@@ -472,10 +512,12 @@ function RegisteredItemCard({
         </div>
 
         <div className="p-2">
-          <p className="line-clamp-1 text-center text-[11px] font-black text-neutral-950">
-            {item.workTitle}
-          </p>
-          <p className="mt-0.5 line-clamp-1 text-center text-[10px] text-neutral-500">
+          {primaryLabel ? (
+            <p className="line-clamp-1 text-center text-[11px] font-black text-neutral-950">
+              {primaryLabel}
+            </p>
+          ) : null}
+          <p className={`${primaryLabel ? "mt-0.5" : ""} line-clamp-1 text-center text-[10px] text-neutral-500`}>
             {metaLabel}
           </p>
         </div>

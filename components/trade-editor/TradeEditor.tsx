@@ -71,6 +71,7 @@ export function TradeEditorView({
     setExportPreviewUrl,
     previewRef,
     workTitleOptions,
+    categoryOptions,
     benefitSubcategoryOptions,
     hasBenefitItemsWithoutSubcategory,
     filteredItems,
@@ -392,6 +393,8 @@ export function TradeEditorView({
                         title={boardMode === "sell" ? "양도해요" : "있어요"}
                         cards={haveCards}
                         boardMode={boardMode}
+                        categoryOptions={categoryOptions}
+                        showCommonWorkLabel={workTitleOptions.length > 1}
                         onUpdate={updateCard}
                         onRemove={removeCard}
                         sideLabelMode="bilingual"
@@ -403,6 +406,8 @@ export function TradeEditorView({
                         title="구해요"
                         cards={wantCards}
                         boardMode={boardMode}
+                        categoryOptions={categoryOptions}
+                        showCommonWorkLabel={workTitleOptions.length > 1}
                         onUpdate={updateCard}
                         onRemove={removeCard}
                         sideLabelMode="bilingual"
@@ -513,9 +518,12 @@ export function TradeEditorView({
           selectedCategory={selectedCategory}
           selectedBenefitSubcategory={selectedBenefitSubcategory}
           workTitleOptions={workTitleOptions}
+          categoryOptions={categoryOptions}
           benefitSubcategoryOptions={benefitSubcategoryOptions}
           hasBenefitItemsWithoutSubcategory={hasBenefitItemsWithoutSubcategory}
           referenceImages={referenceImages}
+          referenceSectionEnabled={collection.referenceSectionEnabled === true}
+          referenceSectionTitle={collection.referenceSectionTitle}
           registeredItems={registeredItems}
           selectedCards={board.cards}
           filteredItems={filteredItems}
@@ -547,7 +555,10 @@ export function TradeEditorView({
 
 
 export function TradeEditor(props: TradeEditorProps) {
-  const editorState = useTradeEditorState(props.registeredItems);
+  const editorState = useTradeEditorState(
+    props.registeredItems,
+    props.collection.categoryOptions,
+  );
 
   return (
     <TradeEditorView

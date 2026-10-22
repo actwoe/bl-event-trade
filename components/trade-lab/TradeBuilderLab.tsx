@@ -17,6 +17,7 @@ import {
   TradeSide,
 } from "@/lib/trade-types";
 import { TradePreviewLab } from "./TradePreviewLab";
+import { getFallbackCategoryLabel } from "@/lib/trade-item-categories";
 import { QuantityBadge } from "@/components/trade/QuantityBadge";
 
 type TradeBuilderLabProps = {
@@ -619,7 +620,7 @@ function getRegisteredItemQuantity(
 
 function getCategoryLabel(category: TradeCategory) {
   return (
-    TRADE_CATEGORIES.find((option) => option.id === category)?.label ?? category
+    TRADE_CATEGORIES.find((option) => option.id === category)?.label ?? getFallbackCategoryLabel(category)
   );
 }
 
@@ -636,7 +637,7 @@ function getBenefitSubcategoryLabel(value?: string | null) {
 }
 
 function getItemMetaLabel(item: RegisteredTradeItem) {
-  const categoryLabel = getCategoryLabel(item.category);
+  const categoryLabel = item.categoryLabel?.trim() || getCategoryLabel(item.category);
   const benefitSubcategory = getBenefitSubcategoryLabel(
     item.benefitSubcategory,
   );
@@ -649,7 +650,7 @@ function getItemMetaLabel(item: RegisteredTradeItem) {
 }
 
 function getCardMetaLabel(card: TradeCard) {
-  const categoryLabel = getCategoryLabel(card.category);
+  const categoryLabel = card.categoryLabel?.trim() || getCategoryLabel(card.category);
   const benefitSubcategory = getBenefitSubcategoryLabel(
     card.benefitSubcategory,
   );
@@ -1037,6 +1038,7 @@ export function TradeBuilderLab({
                     quantity: safeQuantity,
                     registeredItemId: item.id,
                     registeredSortOrder: item.sortOrder,
+                    registeredCatalogOrder: item.catalogOrder,
                   }
                 : card,
             ),
@@ -1056,6 +1058,7 @@ export function TradeBuilderLab({
         quantity: safeQuantity,
         registeredItemId: item.id,
         registeredSortOrder: item.sortOrder,
+                    registeredCatalogOrder: item.catalogOrder,
       };
 
       return {
