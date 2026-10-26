@@ -96,7 +96,11 @@ export default function MyTradesPage() {
   const [editorData, setEditorData] = useState<EditorData | null>(null);
   const [isLoadingGroups, setIsLoadingGroups] = useState(true);
   const [isLoadingEditor, setIsLoadingEditor] = useState(false);
+  const [editorError, setEditorError] = useState("");
+  const [editorRetry, setEditorRetry] = useState(0);
   const [message, setMessage] = useState("");
+  const [view, setView] = useState<"manage" | "edit">("manage");
+  const [isDeletingGroupId, setIsDeletingGroupId] = useState("");
 
   useEffect(() => {
     let isMounted = true;
@@ -148,6 +152,7 @@ export default function MyTradesPage() {
 
       const params = new URLSearchParams(window.location.search);
       const requestedGroupId = params.get("group");
+      if (requestedGroupId || params.get("collection")) setView("edit");
       const requestedCollectionId = params.get("collection");
       const requestedGroup = nextGroups.find(
         (group) => group.id === requestedGroupId,
@@ -209,13 +214,15 @@ export default function MyTradesPage() {
     let isMounted = true;
 
     async function loadEditor() {
-      if (!selectedCollectionId) {
-        setEditorData(null);
+      if (view !== "edit" || !selectedCollectionId) {
+        setIsLoadingEditor(false);
         return;
       }
 
       setIsLoadingEditor(true);
+      setEditorError("");
       setMessage("");
+      try {
 
       const [
         collectionResult,
@@ -223,7 +230,8 @@ export default function MyTradesPage() {
         referenceResult,
         subcategoryResult,
         categoryResult,
-      ] = await Promise.all([
+      ] = await Promise.race([
+        Promise.all([
         supabase
           .from("trade_collections")
           .select(
@@ -260,6 +268,10 @@ export default function MyTradesPage() {
           .eq("is_visible", true)
           .order("sort_order", { ascending: true })
           .order("created_at", { ascending: true }),
+        ]),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("교환판 조회 시간 초과")), 15000);
+        }),
       ]);
 
       if (!isMounted) return;
@@ -267,8 +279,7 @@ export default function MyTradesPage() {
       if (collectionResult.error || !collectionResult.data) {
         if (collectionResult.error) console.error(collectionResult.error);
         setEditorData(null);
-        setMessage("이 행사의 교환판 정보를 불러오지 못했습니다.");
-        setIsLoadingEditor(false);
+        setEditorError("행사 정보를 불러오지 못했습니다. 행사가 공개 상태인지 확인해 주세요.");
         return;
       }
 
@@ -354,7 +365,15 @@ export default function MyTradesPage() {
         }));
 
       setEditorData({ collection, registeredItems, referenceImages });
-      setIsLoadingEditor(false);
+      } catch (error) {
+        console.error("교환판 편집 데이터 로딩 실패", error);
+        if (isMounted) {
+          setEditorData(null);
+          setEditorError("교환판 편집 정보를 불러오는 중 문제가 발생했습니다. 다시 시도해 주세요.");
+        }
+      } finally {
+        if (isMounted) setIsLoadingEditor(false);
+      }
     }
 
     void loadEditor();
@@ -362,7 +381,7 @@ export default function MyTradesPage() {
     return () => {
       isMounted = false;
     };
-  }, [selectedCollectionId]);
+  }, [selectedCollectionId, view, editorRetry]);
 
   function updateUrl(collectionId: string, groupId?: string) {
     const nextUrl = new URL(window.location.href);
@@ -432,6 +451,76 @@ export default function MyTradesPage() {
     updateUrl(group.collectionId, group.id);
   }
 
+  function openSavedBoard(group: SavedGroupSummary) {
+    const matchingCollection = collections.find(
+      (collection) => collection.id === group.collection_id,
+    );
+    if (!matchingCollection) {
+      setMessage("현재 공개되지 않은 행사의 교환판은 수정할 수 없습니다.");
+      return;
+    }
+    setMessage("");
+    setSelectedCollectionId(matchingCollection.id);
+    setActiveGroupId(group.id);
+    setEditorData(null);
+    setView("edit");
+    updateUrl(matchingCollection.id, group.id);
+  }
+
+  function openNewBoard() {
+    if (groups.length >= MAX_TRADE_GROUPS) {
+      setMessage(`저장 가능한 교환판은 최대 ${MAX_TRADE_GROUPS}개입니다. 기존 교환판을 삭제한 후 새로 만들어 주세요.`);
+      return;
+    }
+    if (!selectedCollectionId) {
+      setMessage("현재 새 교환판을 만들 수 있는 공개 행사가 없습니다.");
+      return;
+    }
+    setMessage("");
+    setActiveGroupId("");
+    setView("edit");
+    updateUrl(selectedCollectionId);
+  }
+
+  function backToManagement() {
+    setView("manage");
+    setMessage("");
+    window.history.replaceState({}, "", "/my-trades");
+  }
+
+  async function deleteSavedBoard(group: SavedGroupSummary) {
+    if (!window.confirm(`‘${group.name}’ 교환판을 삭제할까요? 삭제한 교환판은 복구할 수 없습니다.`)) return;
+    setIsDeletingGroupId(group.id);
+    setMessage("");
+    try {
+      const { data: userData, error: authError } = await supabase.auth.getUser();
+      if (authError || !userData.user) throw authError ?? new Error("로그인이 필요합니다.");
+      const { data, error } = await supabase
+        .from("trade_groups")
+        .delete()
+        .eq("id", group.id)
+        .eq("user_id", userData.user.id)
+        .select("id");
+      if (error) throw error;
+      if (!data?.some((deleted) => deleted.id === group.id)) {
+        throw new Error("교환판 삭제 권한을 확인해 주세요.");
+      }
+      setGroups((current) => current.filter((saved) => saved.id !== group.id));
+      if (activeGroupId === group.id) {
+        setActiveGroupId("");
+        setEditorData(null);
+      }
+      setView("manage");
+      window.history.replaceState({}, "", "/my-trades");
+      setMessage("교환판을 삭제했습니다.");
+    } catch (error) {
+      console.error(error);
+      setMessage("교환판을 삭제하지 못했습니다. 로그인 상태와 삭제 권한을 확인해 주세요.");
+    } finally {
+      setIsDeletingGroupId("");
+    }
+  }
+
   async function handleLogout() {
     await supabase.auth.signOut();
     router.push("/");
@@ -493,12 +582,84 @@ export default function MyTradesPage() {
             내 교환/양도판
           </h2>
           <p className="mt-2 text-sm leading-6 text-neutral-500">
-            행사부터 고른 뒤 저장한 교환판을 수정하거나 새 교환판을 만들 수 있습니다.
+            작품과 행사에 관계없이 저장한 교환판을 한곳에서 관리할 수 있습니다.
           </p>
         </section>
 
-        {collections.length > 0 ? (
-          <>
+        {view === "manage" ? (
+          <section className="space-y-4 px-4 py-5">
+            <div className="rounded-2xl border border-neutral-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-black text-neutral-900">저장한 교환판</p>
+                <span className="rounded-full bg-[#F1EDFF] px-3 py-1 text-xs font-black text-[#7C5CFC]">
+                  {groups.length} / {MAX_TRADE_GROUPS}개
+                </span>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-neutral-500">
+                모든 작품의 교환판을 확인하고 수정하거나 삭제할 수 있습니다.
+              </p>
+            </div>
+            {message ? (
+              <p role="status" className="rounded-xl bg-neutral-100 px-4 py-3 text-sm text-neutral-700">{message}</p>
+            ) : null}
+            {groups.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-neutral-200 p-7 text-center text-sm text-neutral-500">
+                아직 저장된 교환판이 없습니다.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {groups.map((group) => {
+                  const collection = collections.find((item) => item.id === group.collection_id);
+                  return (
+                    <article key={group.id} className="rounded-2xl border border-neutral-200 bg-white p-4">
+                      <p className="text-xs font-bold text-[#7C5CFC]">{collection?.title ?? "현재 비공개된 행사"}</p>
+                      <h3 className="mt-1 break-words text-base font-black text-neutral-950">{group.name}</h3>
+                      <p className="mt-1 text-xs text-neutral-400">저장일 {new Date(group.created_at).toLocaleDateString("ko-KR")}</p>
+                      <div className="mt-4 flex gap-2">
+                        <button type="button" onClick={() => openSavedBoard(group)} disabled={!collection}
+                          className="min-w-0 flex-1 rounded-xl bg-neutral-950 px-3 py-2.5 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-40">
+                          열기 · 수정
+                        </button>
+                        <button type="button" onClick={() => void deleteSavedBoard(group)} disabled={Boolean(isDeletingGroupId)}
+                          className="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-bold text-red-600 disabled:opacity-40">
+                          {isDeletingGroupId === group.id ? "삭제 중" : "삭제"}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+            <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
+              <p className="text-sm font-black text-neutral-900">새 교환판 만들기</p>
+              {groups.length >= MAX_TRADE_GROUPS ? (
+                <p className="mt-2 text-xs leading-5 text-neutral-600">
+                  최대 {MAX_TRADE_GROUPS}개를 저장했습니다. 위 목록에서 사용하지 않는 교환판을 삭제하면 새로 만들 수 있습니다.
+                </p>
+              ) : (
+                <>
+                  <label className="mt-3 block text-xs font-bold text-neutral-700" htmlFor="new-trade-collection">행사 선택</label>
+                  <select id="new-trade-collection" value={selectedCollectionId}
+                    onChange={(event) => selectCollection(event.target.value)}
+                    className="mt-1 w-full rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-700">
+                    {collections.map((collection) => <option key={collection.id} value={collection.id}>{collection.title}</option>)}
+                  </select>
+                </>
+              )}
+              <button type="button" disabled={groups.length >= MAX_TRADE_GROUPS || collections.length === 0}
+                onClick={openNewBoard}
+                className="mt-3 w-full rounded-xl bg-neutral-950 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-neutral-300">
+                + 새 교환판
+              </button>
+            </div>
+          </section>
+        ) : collections.length > 0 ? (
+          <> 
+            <div className="border-b border-neutral-100 bg-white px-4 py-3">
+              <button type="button" onClick={backToManagement} className="text-sm font-black text-[#7C5CFC]">
+                ← 전체 교환판 관리로 돌아가기
+              </button>
+            </div>
             <div className="sticky top-0 z-20 space-y-3 border-b border-neutral-100 bg-white/95 px-4 py-3 backdrop-blur">
               <label className="block">
                 <span className="text-xs font-black text-neutral-700">행사 선택</span>
@@ -547,14 +708,14 @@ export default function MyTradesPage() {
 
                   <button
                     type="button"
-                    onClick={startFreshBoard}
+                    onClick={groups.length >= MAX_TRADE_GROUPS ? backToManagement : startFreshBoard}
                     className={
                       activeGroupId
                         ? "shrink-0 rounded-full border border-dashed border-neutral-300 bg-white px-4 py-2.5 text-xs font-black text-neutral-500"
-                        : "shrink-0 rounded-full bg-[#F1EDFF] px-4 py-2.5 text-xs font-black text-[#7C5CFC] ring-1 ring-[#DED5FF]"
+                        : "shrink-0 rounded-full bg-neutral-950 px-4 py-2.5 text-xs font-black text-white"
                     }
                   >
-                    + 새 교환판
+                    {groups.length >= MAX_TRADE_GROUPS ? "저장 공간 관리" : "+ 새 교환판"}
                   </button>
                 </div>
               </div>
@@ -566,9 +727,19 @@ export default function MyTradesPage() {
               </p>
             ) : null}
 
-            {isLoadingEditor || !editorData ? (
+            {isLoadingEditor ? (
               <div className="p-6 text-center text-sm text-neutral-400">
                 교환판 편집 화면을 불러오는 중입니다.
+              </div>
+            ) : !editorData ? (
+              <div className="space-y-3 p-6 text-center">
+                <p role="alert" className="text-sm text-red-600">
+                  {editorError || "교환판 편집 정보를 표시할 수 없습니다."}
+                </p>
+                <button type="button" onClick={() => setEditorRetry((count) => count + 1)}
+                  className="rounded-xl bg-neutral-950 px-5 py-3 text-sm font-bold text-white">
+                  다시 시도
+                </button>
               </div>
             ) : (
               <TradeBuilder
