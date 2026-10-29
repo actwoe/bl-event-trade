@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppBottomNav } from "@/components/ui/AppBottomNav";
 import { AppFrame } from "@/components/ui/AppFrame";
 import { AppTopBar } from "@/components/ui/AppTopBar";
 import { TradeBuilder } from "@/components/trade/TradeBuilder";
@@ -89,6 +88,7 @@ function getSafeImageRatio(value?: string | null): TradeImageRatio {
 export default function MyTradesPage() {
   const router = useRouter();
   const [authState, setAuthState] = useState<AuthState>("checking");
+  const [isAdmin, setIsAdmin] = useState(false);
   const [groups, setGroups] = useState<SavedGroupSummary[]>([]);
   const [collections, setCollections] = useState<CollectionOption[]>([]);
   const [selectedCollectionId, setSelectedCollectionId] = useState("");
@@ -106,20 +106,26 @@ export default function MyTradesPage() {
     let isMounted = true;
 
     async function loadPageData() {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const user = sessionData.session?.user;
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const user = userError ? null : userData.user;
 
       if (!isMounted) return;
 
       if (!user) {
+        setIsAdmin(false);
+        setGroups([]);
+        setCollections([]);
+        setActiveGroupId("");
+        setEditorData(null);
         setAuthState("signed-out");
         setIsLoadingGroups(false);
         return;
       }
 
       setAuthState("signed-in");
+      setIsAdmin(false);
 
-      const [groupResult, collectionResult] = await Promise.all([
+      const [groupResult, collectionResult, adminResult] = await Promise.all([
         supabase
           .from("trade_groups")
           .select("id, collection_id, name, created_at")
@@ -131,6 +137,7 @@ export default function MyTradesPage() {
           .eq("is_public", true)
           .order("sort_order", { ascending: true })
           .order("title", { ascending: true }),
+        supabase.from("admin_users").select("user_id").eq("user_id", user.id).maybeSingle(),
       ]);
 
       if (!isMounted) return;
@@ -145,6 +152,7 @@ export default function MyTradesPage() {
         setMessage("행사 목록을 불러오지 못했습니다.");
       }
 
+      setIsAdmin(!adminResult.error && Boolean(adminResult.data));
       const nextGroups = (groupResult.data ?? []) as SavedGroupSummary[];
       const nextCollections = (collectionResult.data ?? []) as CollectionOption[];
       setGroups(nextGroups);
@@ -185,11 +193,24 @@ export default function MyTradesPage() {
     }
 
     void loadPageData();
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT" || event === "SIGNED_IN") {
+        setGroups([]);
+        setIsAdmin(false);
+        setEditorData(null);
+        setAuthState("checking");
+        setIsLoadingGroups(true);
+        // Refresh the route so the authenticated user's data is reloaded.
+        router.refresh();
+        window.location.reload();
+      }
+    });
 
     return () => {
+      listener.subscription.unsubscribe();
       isMounted = false;
     };
-  }, []);
+  }, [router]);
 
   const selectedCollection = useMemo(
     () =>
@@ -534,7 +555,7 @@ export default function MyTradesPage() {
         <div className="flex min-h-0 flex-1 items-center justify-center px-6 text-sm text-neutral-500">
           저장한 교환판과 행사 목록을 불러오는 중입니다.
         </div>
-        <AppBottomNav active="trades" />
+
       </AppFrame>
     );
   }
@@ -559,7 +580,7 @@ export default function MyTradesPage() {
             </Link>
           </section>
         </div>
-        <AppBottomNav active="trades" />
+
       </AppFrame>
     );
   }
@@ -569,8 +590,8 @@ export default function MyTradesPage() {
       <AppTopBar
         title="내 교환/양도판"
         backHref="/"
-        onAccountClick={handleLogout}
-        accountLabel="로그아웃"
+        loginHref="/my-trades"
+        accountLabel="내 교환/양도판"
       />
 
       <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
@@ -581,6 +602,12 @@ export default function MyTradesPage() {
           <h2 className="mt-1 text-[24px] font-black leading-tight tracking-[-0.03em] text-neutral-950">
             내 교환/양도판
           </h2>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {isAdmin && (
+              <Link href="/admin" className="rounded-lg bg-neutral-950 px-4 py-2 text-xs font-bold text-white hover:bg-neutral-800">관리자 메뉴</Link>
+            )}
+            <button type="button" onClick={handleLogout} className="rounded-lg border border-neutral-200 px-3 py-2 text-xs font-bold text-neutral-700 hover:bg-neutral-50">로그아웃</button>
+          </div>
           <p className="mt-2 text-sm leading-6 text-neutral-500">
             작품과 행사에 관계없이 저장한 교환판을 한곳에서 관리할 수 있습니다.
           </p>
@@ -770,7 +797,6 @@ export default function MyTradesPage() {
         )}
       </div>
 
-      <AppBottomNav active="trades" />
     </AppFrame>
   );
 }

@@ -37,10 +37,10 @@ export function UserAuthLinks({
     let isMounted = true;
 
     async function loadSession() {
-      const { data } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getUser();
 
       if (!isMounted) return;
-      setAuthState(data.session?.user ? 'signed-in' : 'signed-out');
+      setAuthState(!error && data.user ? 'signed-in' : 'signed-out');
     }
 
     void loadSession();

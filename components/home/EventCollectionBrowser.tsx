@@ -3,7 +3,6 @@
 import { useMemo, useState } from 'react';
 import { UserAuthLinks } from '@/components/auth/UserAuthLinks';
 import { CollectionCard } from '@/components/home/CollectionCard';
-import { AppBottomNav } from '@/components/ui/AppBottomNav';
 import {
   compareEventsByStatus,
   getEventPeriodLabel,
@@ -172,7 +171,6 @@ export function EventCollectionBrowser({
         )}
       </div>
 
-      <AppBottomNav active="home" />
     </div>
   );
 }

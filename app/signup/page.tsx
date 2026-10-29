@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { AppBottomNav } from '@/components/ui/AppBottomNav';
 import { AppFrame } from '@/components/ui/AppFrame';
 import { AppTopBar } from '@/components/ui/AppTopBar';
 import { FormEvent, useState } from 'react';
@@ -172,7 +171,7 @@ export default function SignupPage() {
           </p>
         </form>
       </div>
-      <AppBottomNav active="login" />
+
     </AppFrame>
   );
 }

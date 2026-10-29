@@ -1,4 +1,3 @@
-import { AppBottomNav } from '@/components/ui/AppBottomNav';
 import { AppFrame } from '@/components/ui/AppFrame';
 import { AppTopBar } from '@/components/ui/AppTopBar';
 
@@ -24,7 +23,6 @@ export default function TradeLoadingPage() {
         </div>
       </div>
 
-      <AppBottomNav active="home" />
     </AppFrame>
   );
 }

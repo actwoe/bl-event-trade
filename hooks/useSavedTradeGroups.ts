@@ -161,14 +161,16 @@ export function useSavedTradeGroups({
     let isMounted = true;
 
     async function loadUserAndSavedGroup() {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const user = sessionData.session?.user;
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const user = userError ? null : userData.user;
 
       if (!isMounted) return;
 
       if (!user) {
         setUserAuthState("signed-out");
         setCurrentUserId("");
+        setSavedGroupCount(0);
+        setActiveGroupId("");
         return;
       }
 
@@ -267,6 +269,12 @@ export function useSavedTradeGroups({
   async function saveTradeGroup() {
     if (userAuthState !== "signed-in" || !currentUserId) {
       setGroupSaveMessage("로그인 후 교환판을 저장할 수 있습니다.");
+      return;
+    }
+
+    const { data: verifiedUser, error: verifyError } = await supabase.auth.getUser();
+    if (verifyError || !verifiedUser.user || verifiedUser.user.id !== currentUserId) {
+      setGroupSaveMessage("로그인 상태가 변경되었습니다. 다시 로그인해 주세요.");
       return;
     }
 

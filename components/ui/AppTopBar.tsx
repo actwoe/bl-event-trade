@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { UserAuthLinks } from "@/components/auth/UserAuthLinks";
 
 export type AppTopBarProps = {
   title: string;
@@ -41,9 +42,8 @@ function AccountIcon() {
 export function AppTopBar({
   title,
   backHref,
-  loginHref = "/login",
   onAccountClick,
-  accountLabel = "로그인",
+  accountLabel = "내 교환/양도판",
   showAccount = true,
 }: AppTopBarProps) {
   const accountClassName =
@@ -61,7 +61,7 @@ export function AppTopBar({
         </Link>
 
         <h1 className="truncate px-2 text-center text-[16px] font-black tracking-[-0.02em] text-neutral-950">
-          {title}
+          <Link href="/" aria-label="홈으로 이동" className="hover:underline">{title}</Link>
         </h1>
 
         {!showAccount ? (
@@ -76,13 +76,7 @@ export function AppTopBar({
             <AccountIcon />
           </button>
         ) : (
-          <Link
-            href={loginHref}
-            aria-label={accountLabel}
-            className={accountClassName}
-          >
-            <AccountIcon />
-          </Link>
+          <UserAuthLinks variant="icon" />
         )}
       </div>
     </header>

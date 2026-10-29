@@ -1,10 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { AppBottomNav } from '@/components/ui/AppBottomNav';
 import { AppFrame } from '@/components/ui/AppFrame';
 import { AppTopBar } from '@/components/ui/AppTopBar';
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import {
@@ -32,6 +31,30 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    async function checkExistingLogin() {
+      const { data, error } = await supabase.auth.getUser();
+      if (!active) return;
+      if (error || !data.user) {
+        setCheckingSession(false);
+        return;
+      }
+      const { data: adminUser, error: adminError } = await supabase
+        .from('admin_users').select('user_id')
+        .eq('user_id', data.user.id).maybeSingle();
+      if (!active) return;
+      if (!adminError && adminUser) {
+        router.replace('/admin');
+      } else {
+        router.replace(getNextPath());
+      }
+    }
+    void checkExistingLogin();
+    return () => { active = false; };
+  }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,6 +113,10 @@ export default function LoginPage() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (checkingSession) {
+    return <AppFrame><div className="flex min-h-0 flex-1 items-center justify-center text-sm text-neutral-500">로그인 상태를 확인하는 중입니다.</div></AppFrame>;
   }
 
   return (
@@ -157,7 +184,7 @@ export default function LoginPage() {
           </p>
         </form>
       </div>
-      <AppBottomNav active="login" />
+
     </AppFrame>
   );
 }

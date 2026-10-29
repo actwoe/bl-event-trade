@@ -1,6 +1,5 @@
 "use client";
 
-import { AppBottomNav } from "@/components/ui/AppBottomNav";
 import { AppFrame } from "@/components/ui/AppFrame";
 import { AppTopBar } from "@/components/ui/AppTopBar";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
@@ -579,7 +578,7 @@ export default function CardFormPage() {
             </form>
           )}
         </div>
-      <AppBottomNav active="submit" />
+
     </AppFrame>
   );
 }

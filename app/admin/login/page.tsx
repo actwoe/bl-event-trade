@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
@@ -24,6 +24,28 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    async function checkExistingAdmin() {
+      const { data, error } = await supabase.auth.getUser();
+      if (!active) return;
+      if (!error && data.user) {
+        const { data: admin, error: adminError } = await supabase
+          .from('admin_users').select('user_id')
+          .eq('user_id', data.user.id).maybeSingle();
+        if (!active) return;
+        if (!adminError && admin) {
+          router.replace('/admin');
+          return;
+        }
+      }
+      setCheckingSession(false);
+    }
+    void checkExistingAdmin();
+    return () => { active = false; };
+  }, [router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -84,6 +106,10 @@ export default function AdminLoginPage() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (checkingSession) {
+    return <main className="flex min-h-full items-center justify-center text-sm text-neutral-500">로그인 상태를 확인하는 중입니다.</main>;
   }
 
   return (

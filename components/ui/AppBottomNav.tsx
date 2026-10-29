@@ -1,3 +1,7 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 
 export type AppBottomNavItem = "home" | "submit" | "trades" | "login";
@@ -54,10 +58,22 @@ function NavIcon({ id }: { id: AppBottomNavItem }) {
 }
 
 export function AppBottomNav({ active, homeHref = "/" }: AppBottomNavProps) {
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void supabase.auth.getUser().then(({ data, error }) => {
+      if (active) setSignedIn(!error && !!data.user);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") setSignedIn(false);
+      else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") setSignedIn(!!session?.user);
+    });
+    return () => { active = false; listener.subscription.unsubscribe(); };
+  }, []);
   return (
     <nav className="app-bottom-nav relative z-20 grid shrink-0 grid-cols-4 border-t border-neutral-200 bg-white px-2">
       {ITEMS.map((item) => {
-        const href = item.id === "home" ? homeHref : item.href;
+        const href = item.id === "home" ? homeHref : item.id === "login" && signedIn ? "/my-trades" : item.href;
         const isActive = item.id === active;
 
         return (
@@ -72,7 +88,7 @@ export function AppBottomNav({ active, homeHref = "/" }: AppBottomNavProps) {
           >
             <NavIcon id={item.id} />
             <span className={isActive ? "text-[10px] font-black" : "text-[10px] font-bold"}>
-              {item.label}
+              {item.id === "login" && signedIn ? "내 계정" : item.label}
             </span>
           </Link>
         );

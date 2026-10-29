@@ -1,6 +1,5 @@
 import { notFound } from 'next/navigation';
 import { TradeBuilder } from '@/components/trade/TradeBuilder';
-import { AppBottomNav } from '@/components/ui/AppBottomNav';
 import { AppFrame } from '@/components/ui/AppFrame';
 import { AppTopBar } from '@/components/ui/AppTopBar';
 import {
@@ -326,7 +325,6 @@ export default async function TradePage({ params }: TradePageProps) {
         />
       </div>
 
-      <AppBottomNav active="home" />
     </AppFrame>
   );
 }
