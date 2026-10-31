@@ -10,6 +10,8 @@ import {
 const TRADE_PREVIEW_WIDTH = 840;
 const TRADE_EXPORT_WIDTH = 2000;
 const TRADE_EXPORT_SCALE = TRADE_EXPORT_WIDTH / TRADE_PREVIEW_WIDTH;
+const IOS_EXPORT_WIDTHS = [1400, 1000, 840] as const;
+const IOS_MAX_CANVAS_PIXELS = 8_000_000;
 const TRADE_FONT_FAMILY = "'Pretendard', Arial, sans-serif";
 const IMAGE_READY_TIMEOUT_MS = 10_000;
 const EXPORT_RETRY_DELAY_MS = 250;
@@ -36,6 +38,16 @@ type ExportImageSnapshot = {
   statusBadge: ExportBadgeSnapshot | null;
   previousVisibility: string;
 };
+
+function isIosWebKit() {
+  const ua = navigator.userAgent;
+  return /iPhone|iPad|iPod/i.test(ua) ||
+    (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+}
+
+function timeoutAfter(ms: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+}
 
 function prefersTouchSaveFlow() {
   const userAgent = navigator.userAgent;
@@ -249,8 +261,14 @@ async function prepareExportImages(node: HTMLElement) {
 async function ensureTradeFontReady() {
   if (typeof document === "undefined" || !("fonts" in document)) return;
 
-  await document.fonts.load(`900 22px ${TRADE_FONT_FAMILY}`);
-  await document.fonts.ready;
+  // Safari can leave a web-font promise pending. Do not block image export forever.
+  await Promise.race([
+    (async () => {
+      await document.fonts.load(`900 22px ${TRADE_FONT_FAMILY}`);
+      await document.fonts.ready;
+    })().catch(() => undefined),
+    timeoutAfter(IMAGE_READY_TIMEOUT_MS),
+  ]);
 }
 
 function getExportErrorMessage(error: unknown) {
@@ -492,6 +510,8 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
 async function createTradePngBlob(
   node: HTMLDivElement,
   snapshots: ExportImageSnapshot[],
+  targetWidth: number = TRADE_EXPORT_WIDTH,
+  skipFontEmbedding = false,
 ) {
   const nodeRect = node.getBoundingClientRect();
   const width = Math.max(node.offsetWidth, Math.ceil(nodeRect.width));
@@ -501,9 +521,18 @@ async function createTradePngBlob(
     throw new Error("미리보기 크기를 계산하지 못했습니다.");
   }
 
+  const constrainedWidth = Math.min(
+    targetWidth,
+    Math.floor(Math.sqrt(IOS_MAX_CANVAS_PIXELS * width / height)),
+  );
+  const pixelRatio = isIosWebKit()
+    ? constrainedWidth / width
+    : TRADE_EXPORT_SCALE;
+
   const canvas = await toCanvas(node, {
     cacheBust: false,
-    pixelRatio: TRADE_EXPORT_SCALE,
+    pixelRatio,
+    skipFonts: skipFontEmbedding,
     width,
     height,
     backgroundColor: "transparent",
@@ -533,16 +562,31 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
 
     let lastError: unknown;
 
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    const ios = isIosWebKit();
+    const attempts = ios
+      ? IOS_EXPORT_WIDTHS.map((targetWidth, index) => ({
+          targetWidth,
+          skipFontEmbedding: index === IOS_EXPORT_WIDTHS.length - 1,
+        }))
+      : [
+          { targetWidth: TRADE_EXPORT_WIDTH, skipFontEmbedding: false },
+          { targetWidth: TRADE_EXPORT_WIDTH, skipFontEmbedding: false },
+        ];
+
+    for (const attempt of attempts) {
       try {
-        return await createTradePngBlob(node, preparedImages.snapshots);
+        return await createTradePngBlob(
+          node,
+          preparedImages.snapshots,
+          attempt.targetWidth,
+          attempt.skipFontEmbedding,
+        );
       } catch (error) {
         lastError = error;
+        console.warn("교환판 PNG 생성 재시도:", error);
       }
 
-      await new Promise((resolve) =>
-        window.setTimeout(resolve, EXPORT_RETRY_DELAY_MS),
-      );
+      await timeoutAfter(EXPORT_RETRY_DELAY_MS);
       await waitForNextPaint();
     }
 
