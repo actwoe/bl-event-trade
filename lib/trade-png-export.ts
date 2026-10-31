@@ -10,8 +10,9 @@ import {
 const TRADE_PREVIEW_WIDTH = 840;
 const TRADE_EXPORT_WIDTH = 2000;
 const TRADE_EXPORT_SCALE = TRADE_EXPORT_WIDTH / TRADE_PREVIEW_WIDTH;
-const IOS_EXPORT_WIDTHS = [1400, 1000, 840] as const;
-const IOS_MAX_CANVAS_PIXELS = 8_000_000;
+const IOS_EXPORT_WIDTHS = [2000, 1600, 1200] as const;
+const IOS_MAX_CANVAS_PIXELS = 12_000_000;
+const IMAGE_FETCH_CONCURRENCY = 4;
 const TRADE_FONT_FAMILY = "'Pretendard', Arial, sans-serif";
 const IMAGE_READY_TIMEOUT_MS = 10_000;
 const EXPORT_RETRY_DELAY_MS = 250;
@@ -208,9 +209,14 @@ async function prepareExportImages(node: HTMLElement) {
     string,
     Promise<{ image: HTMLImageElement; objectUrl: string }>
   >();
+  const objectUrls = new Set<string>();
+  let index = 0;
 
-  try {
-    for (const element of images) {
+  // A large board previously awaited every image in sequence. Limit parallel
+  // downloads/decodes to avoid long iOS exports without overloading Safari.
+  const worker = async () => {
+    while (index < images.length) {
+      const element = images[index++];
       const source = element.currentSrc || element.src;
       if (!source) continue;
 
@@ -221,39 +227,51 @@ async function prepareExportImages(node: HTMLElement) {
       }
 
       const { image: drawable, objectUrl } = await drawablePromise;
+      objectUrls.add(objectUrl);
       const style = window.getComputedStyle(element);
-      const quantityBadgeElement = getQuantityBadge(element);
-      const statusBadgeElement = getStatusBadge(element);
-
       snapshots.push({
         element,
         drawable,
         objectUrl,
         rect: element.getBoundingClientRect(),
         borderRadius: Number.parseFloat(style.borderTopLeftRadius) || 0,
-        quantityBadge: createBadgeSnapshot(quantityBadgeElement),
-        statusBadge: createBadgeSnapshot(statusBadgeElement),
+        quantityBadge: createBadgeSnapshot(getQuantityBadge(element)),
+        statusBadge: createBadgeSnapshot(getStatusBadge(element)),
         previousVisibility: element.style.visibility,
       });
     }
+  };
+
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(IMAGE_FETCH_CONCURRENCY, images.length) },
+        () => worker()),
+    );
   } catch (error) {
-    for (const snapshot of snapshots) {
-      URL.revokeObjectURL(snapshot.objectUrl);
+    // Pending workers may still resolve: revoke their object URLs as well.
+    await Promise.allSettled(Array.from(drawableBySource.values()));
+    for (const result of drawableBySource.values()) {
+      const resolved = await result.catch(() => null);
+      if (resolved) objectUrls.add(resolved.objectUrl);
     }
+    for (const url of objectUrls) URL.revokeObjectURL(url);
     throw error;
   }
 
-  for (const snapshot of snapshots) {
-    snapshot.element.style.visibility = "hidden";
-  }
+  // Promise completion order is not necessarily DOM order. Use the original
+  // image order for repeatable compositing and overlapping badges.
+  snapshots.sort(
+    (a, b) => images.indexOf(a.element) - images.indexOf(b.element),
+  );
+  for (const snapshot of snapshots) snapshot.element.style.visibility = "hidden";
 
   return {
     snapshots,
     restore() {
       for (const snapshot of snapshots) {
         snapshot.element.style.visibility = snapshot.previousVisibility;
-        URL.revokeObjectURL(snapshot.objectUrl);
       }
+      for (const url of objectUrls) URL.revokeObjectURL(url);
     },
   };
 }
@@ -511,7 +529,6 @@ async function createTradePngBlob(
   node: HTMLDivElement,
   snapshots: ExportImageSnapshot[],
   targetWidth: number = TRADE_EXPORT_WIDTH,
-  skipFontEmbedding = false,
 ) {
   const nodeRect = node.getBoundingClientRect();
   const width = Math.max(node.offsetWidth, Math.ceil(nodeRect.width));
@@ -521,10 +538,9 @@ async function createTradePngBlob(
     throw new Error("미리보기 크기를 계산하지 못했습니다.");
   }
 
-  const constrainedWidth = Math.min(
-    targetWidth,
-    Math.floor(Math.sqrt(IOS_MAX_CANVAS_PIXELS * width / height)),
-  );
+  const constrainedWidth = isIosWebKit()
+    ? Math.min(targetWidth, Math.floor(Math.sqrt(IOS_MAX_CANVAS_PIXELS * width / height)))
+    : targetWidth;
   const pixelRatio = isIosWebKit()
     ? constrainedWidth / width
     : TRADE_EXPORT_SCALE;
@@ -532,7 +548,7 @@ async function createTradePngBlob(
   const canvas = await toCanvas(node, {
     cacheBust: false,
     pixelRatio,
-    skipFonts: skipFontEmbedding,
+    skipFonts: false,
     width,
     height,
     backgroundColor: "transparent",
@@ -564,10 +580,7 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
 
     const ios = isIosWebKit();
     const attempts = ios
-      ? IOS_EXPORT_WIDTHS.map((targetWidth, index) => ({
-          targetWidth,
-          skipFontEmbedding: index === IOS_EXPORT_WIDTHS.length - 1,
-        }))
+      ? IOS_EXPORT_WIDTHS.map((targetWidth) => ({ targetWidth }))
       : [
           { targetWidth: TRADE_EXPORT_WIDTH, skipFontEmbedding: false },
           { targetWidth: TRADE_EXPORT_WIDTH, skipFontEmbedding: false },
@@ -579,7 +592,6 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
           node,
           preparedImages.snapshots,
           attempt.targetWidth,
-          attempt.skipFontEmbedding,
         );
       } catch (error) {
         lastError = error;
