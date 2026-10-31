@@ -298,6 +298,12 @@ function getExportErrorMessage(error: unknown) {
   return "미리보기 이미지 또는 글꼴 로딩이 완료되지 않았습니다.";
 }
 
+function formatExportFailure(stage: string, error: unknown) {
+  const detail = getExportErrorMessage(error);
+  const errorName = error instanceof Error ? error.name : "UnknownError";
+  return new Error(`[PNG ${stage}] ${errorName}: ${detail}`);
+}
+
 function createRoundedRectPath(
   context: CanvasRenderingContext2D,
   x: number,
@@ -545,21 +551,35 @@ async function createTradePngBlob(
     ? constrainedWidth / width
     : TRADE_EXPORT_SCALE;
 
-  const canvas = await toCanvas(node, {
-    cacheBust: false,
-    pixelRatio,
-    skipFonts: false,
-    width,
-    height,
-    backgroundColor: "transparent",
-    style: {
-      transform: "none",
-      transformOrigin: "top left",
-    },
-  });
+  let canvas: HTMLCanvasElement;
+  try {
+    canvas = await toCanvas(node, {
+      cacheBust: false,
+      pixelRatio,
+      skipFonts: false,
+      width,
+      height,
+      backgroundColor: "transparent",
+      style: {
+        transform: "none",
+        transformOrigin: "top left",
+      },
+    });
+  } catch (error) {
+    throw formatExportFailure(`HTML 변환 (${Math.round(width * pixelRatio)}x${Math.round(height * pixelRatio)})`, error);
+  }
 
-  compositeExportImages(canvas, node, snapshots, width, height);
-  return canvasToBlob(canvas);
+  try {
+    compositeExportImages(canvas, node, snapshots, width, height);
+  } catch (error) {
+    throw formatExportFailure("굿즈 이미지·워터마크 합성", error);
+  }
+
+  try {
+    return await canvasToBlob(canvas);
+  } catch (error) {
+    throw formatExportFailure("PNG 파일 인코딩", error);
+  }
 }
 
 export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
@@ -571,12 +591,22 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
     node.style.transform = "none";
     node.style.transformOrigin = "top left";
 
-    await Promise.all([ensureTradeFontReady(), ensurePreviewImagesReady(node)]);
-    const preparedImages = await prepareExportImages(node);
+    try {
+      await Promise.all([ensureTradeFontReady(), ensurePreviewImagesReady(node)]);
+    } catch (error) {
+      throw formatExportFailure("글꼴·미리보기 준비", error);
+    }
+
+    let preparedImages: Awaited<ReturnType<typeof prepareExportImages>>;
+    try {
+      preparedImages = await prepareExportImages(node);
+    } catch (error) {
+      throw formatExportFailure("굿즈 원본 이미지 다운로드·디코딩", error);
+    }
     restoreImages = preparedImages.restore;
     await waitForNextPaint();
 
-    let lastError: unknown;
+    const attemptErrors: string[] = [];
 
     const ios = isIosWebKit();
     const attempts = ios
@@ -594,7 +624,7 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
           attempt.targetWidth,
         );
       } catch (error) {
-        lastError = error;
+        attemptErrors.push(getExportErrorMessage(error));
         console.warn("교환판 PNG 생성 재시도:", error);
       }
 
@@ -602,7 +632,14 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
       await waitForNextPaint();
     }
 
-    throw new Error(getExportErrorMessage(lastError));
+    // Show the first failure stage and whether subsequent size retries changed it.
+    // Avoid reporting a generic font/image error when Safari returns an empty exception.
+    throw new Error(
+      `${attemptErrors[0] || "PNG 변환 실패 (원인 메시지 없음)"} (총 ${attemptErrors.length}회 실패)` +
+      (attemptErrors.length > 1 && attemptErrors.at(-1) !== attemptErrors[0]
+        ? ` / 마지막: ${attemptErrors.at(-1)}`
+        : ""),
+    );
   } finally {
     restoreImages?.();
     node.style.transform = previousTransform;
