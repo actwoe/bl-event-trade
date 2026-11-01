@@ -10,6 +10,9 @@ import {
 const TRADE_PREVIEW_WIDTH = 840;
 const TRADE_EXPORT_WIDTH = 2000;
 const TRADE_EXPORT_SCALE = TRADE_EXPORT_WIDTH / TRADE_PREVIEW_WIDTH;
+const IOS_EXPORT_WIDTHS = [2000, 1600, 1200] as const;
+const IOS_MAX_CANVAS_PIXELS = 12_000_000;
+const IMAGE_FETCH_CONCURRENCY = 4;
 const TRADE_FONT_FAMILY = "'Pretendard', Arial, sans-serif";
 const IMAGE_READY_TIMEOUT_MS = 10_000;
 const EXPORT_RETRY_DELAY_MS = 250;
@@ -37,6 +40,16 @@ type ExportImageSnapshot = {
   previousVisibility: string;
 };
 
+function isIosWebKit() {
+  const ua = navigator.userAgent;
+  return /iPhone|iPad|iPod/i.test(ua) ||
+    (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+}
+
+function timeoutAfter(ms: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+}
+
 function prefersTouchSaveFlow() {
   const userAgent = navigator.userAgent;
   const isPhoneOrTabletUa = /iPhone|iPad|iPod|Android/i.test(userAgent);
@@ -52,6 +65,102 @@ function waitForNextPaint() {
       requestAnimationFrame(() => resolve());
     });
   });
+}
+
+const GOODS_WATERMARK_STYLE_MARKERS = [
+  "data:image/svg+xml",
+  "BL EVENT TRADE",
+  "BL%20EVENT%20TRADE",
+] as const;
+
+type ExportStyleOverrideRecord = {
+  element: HTMLElement;
+  styleValue: string;
+  stylePriority: string;
+  backgroundValue: string;
+  backgroundPriority: string;
+  backgroundImageValue: string;
+  backgroundImagePriority: string;
+  opacityValue: string;
+  opacityPriority: string;
+  displayValue: string;
+  displayPriority: string;
+};
+
+function isGoodsProtectionElement(element: HTMLElement) {
+  if (element.dataset.goodsImageProtectionLayer === "true") {
+    return true;
+  }
+
+  const inlineStyle = element.getAttribute("style") ?? "";
+  return GOODS_WATERMARK_STYLE_MARKERS.some((marker) =>
+    inlineStyle.includes(marker),
+  );
+}
+
+function suppressGoodsProtectionLayers(root: ParentNode) {
+  const records: ExportStyleOverrideRecord[] = [];
+  root.querySelectorAll<HTMLElement>("*").forEach((element) => {
+    if (!isGoodsProtectionElement(element)) return;
+
+    records.push({
+      element,
+      styleValue: element.getAttribute("style") ?? "",
+      stylePriority: "",
+      backgroundValue: element.style.getPropertyValue("background"),
+      backgroundPriority: element.style.getPropertyPriority("background"),
+      backgroundImageValue: element.style.getPropertyValue("background-image"),
+      backgroundImagePriority: element.style.getPropertyPriority("background-image"),
+      opacityValue: element.style.getPropertyValue("opacity"),
+      opacityPriority: element.style.getPropertyPriority("opacity"),
+      displayValue: element.style.getPropertyValue("display"),
+      displayPriority: element.style.getPropertyPriority("display"),
+    });
+
+    element.style.setProperty("background", "transparent", "important");
+    element.style.setProperty("background-image", "none", "important");
+    element.style.setProperty("opacity", "0", "important");
+    element.style.setProperty("display", "none", "important");
+  });
+
+  return () => {
+    for (const record of records) {
+      if (record.styleValue) {
+        record.element.setAttribute("style", record.styleValue);
+      } else {
+        record.element.removeAttribute("style");
+      }
+
+      if (record.backgroundValue) {
+        record.element.style.setProperty(
+          "background",
+          record.backgroundValue,
+          record.backgroundPriority,
+        );
+      }
+      if (record.backgroundImageValue) {
+        record.element.style.setProperty(
+          "background-image",
+          record.backgroundImageValue,
+          record.backgroundImagePriority,
+        );
+      }
+      if (record.opacityValue) {
+        record.element.style.setProperty(
+          "opacity",
+          record.opacityValue,
+          record.opacityPriority,
+        );
+      }
+      if (record.displayValue) {
+        record.element.style.setProperty(
+          "display",
+          record.displayValue,
+          record.displayPriority,
+        );
+      }
+    }
+  };
 }
 
 function waitForImageReady(image: HTMLImageElement) {
@@ -189,16 +298,24 @@ function createBadgeSnapshot(element: HTMLElement | null) {
   } satisfies ExportBadgeSnapshot;
 }
 
-async function prepareExportImages(node: HTMLElement) {
+async function prepareExportImages(
+  node: HTMLElement,
+  hideOriginalElements: boolean,
+) {
   const images = Array.from(node.querySelectorAll("img"));
   const snapshots: ExportImageSnapshot[] = [];
   const drawableBySource = new Map<
     string,
     Promise<{ image: HTMLImageElement; objectUrl: string }>
   >();
+  const objectUrls = new Set<string>();
+  let index = 0;
 
-  try {
-    for (const element of images) {
+  // A large board previously awaited every image in sequence. Limit parallel
+  // downloads/decodes to avoid long iOS exports without overloading Safari.
+  const worker = async () => {
+    while (index < images.length) {
+      const element = images[index++];
       const source = element.currentSrc || element.src;
       if (!source) continue;
 
@@ -209,39 +326,57 @@ async function prepareExportImages(node: HTMLElement) {
       }
 
       const { image: drawable, objectUrl } = await drawablePromise;
+      objectUrls.add(objectUrl);
       const style = window.getComputedStyle(element);
-      const quantityBadgeElement = getQuantityBadge(element);
-      const statusBadgeElement = getStatusBadge(element);
-
       snapshots.push({
         element,
         drawable,
         objectUrl,
         rect: element.getBoundingClientRect(),
         borderRadius: Number.parseFloat(style.borderTopLeftRadius) || 0,
-        quantityBadge: createBadgeSnapshot(quantityBadgeElement),
-        statusBadge: createBadgeSnapshot(statusBadgeElement),
+        quantityBadge: createBadgeSnapshot(getQuantityBadge(element)),
+        statusBadge: createBadgeSnapshot(getStatusBadge(element)),
         previousVisibility: element.style.visibility,
       });
     }
+  };
+
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(IMAGE_FETCH_CONCURRENCY, images.length) },
+        () => worker()),
+    );
   } catch (error) {
-    for (const snapshot of snapshots) {
-      URL.revokeObjectURL(snapshot.objectUrl);
+    // Pending workers may still resolve: revoke their object URLs as well.
+    await Promise.allSettled(Array.from(drawableBySource.values()));
+    for (const result of drawableBySource.values()) {
+      const resolved = await result.catch(() => null);
+      if (resolved) objectUrls.add(resolved.objectUrl);
     }
+    for (const url of objectUrls) URL.revokeObjectURL(url);
     throw error;
   }
 
-  for (const snapshot of snapshots) {
-    snapshot.element.style.visibility = "hidden";
+  // Promise completion order is not necessarily DOM order. Use the original
+  // image order for repeatable compositing and overlapping badges.
+  snapshots.sort(
+    (a, b) => images.indexOf(a.element) - images.indexOf(b.element),
+  );
+  if (hideOriginalElements) {
+    for (const snapshot of snapshots) {
+      snapshot.element.style.visibility = "hidden";
+    }
   }
 
   return {
     snapshots,
     restore() {
-      for (const snapshot of snapshots) {
-        snapshot.element.style.visibility = snapshot.previousVisibility;
-        URL.revokeObjectURL(snapshot.objectUrl);
+      if (hideOriginalElements) {
+        for (const snapshot of snapshots) {
+          snapshot.element.style.visibility = snapshot.previousVisibility;
+        }
       }
+      for (const url of objectUrls) URL.revokeObjectURL(url);
     },
   };
 }
@@ -249,8 +384,14 @@ async function prepareExportImages(node: HTMLElement) {
 async function ensureTradeFontReady() {
   if (typeof document === "undefined" || !("fonts" in document)) return;
 
-  await document.fonts.load(`900 22px ${TRADE_FONT_FAMILY}`);
-  await document.fonts.ready;
+  // Safari can leave a web-font promise pending. Do not block image export forever.
+  await Promise.race([
+    (async () => {
+      await document.fonts.load(`900 22px ${TRADE_FONT_FAMILY}`);
+      await document.fonts.ready;
+    })().catch(() => undefined),
+    timeoutAfter(IMAGE_READY_TIMEOUT_MS),
+  ]);
 }
 
 function getExportErrorMessage(error: unknown) {
@@ -260,6 +401,12 @@ function getExportErrorMessage(error: unknown) {
   if (typeof error === "string" && error.trim()) return error;
 
   return "미리보기 이미지 또는 글꼴 로딩이 완료되지 않았습니다.";
+}
+
+function formatExportFailure(stage: string, error: unknown) {
+  const detail = getExportErrorMessage(error);
+  const errorName = error instanceof Error ? error.name : "UnknownError";
+  return new Error(`[PNG ${stage}] ${errorName}: ${detail}`);
 }
 
 function createRoundedRectPath(
@@ -421,12 +568,19 @@ function drawRepeatedGoodsWatermark(
   context.restore();
 }
 
+type CompositeExportOptions = {
+  drawImages: boolean;
+  drawBadges: boolean;
+  drawWatermarks: boolean;
+};
+
 function compositeExportImages(
   canvas: HTMLCanvasElement,
   node: HTMLElement,
   snapshots: ExportImageSnapshot[],
   exportWidth: number,
   exportHeight: number,
+  options: CompositeExportOptions,
 ) {
   const context = canvas.getContext("2d");
   if (!context) {
@@ -443,33 +597,39 @@ function compositeExportImages(
   context.imageSmoothingQuality = "high";
 
   for (const snapshot of snapshots) {
-    drawContainedImage(
-      context,
-      snapshot.drawable,
-      snapshot.rect.left - nodeRect.left,
-      snapshot.rect.top - nodeRect.top,
-      snapshot.rect.width,
-      snapshot.rect.height,
-      snapshot.borderRadius,
-    );
-
-    drawRepeatedGoodsWatermark(
-      context,
-      snapshot.rect.left - nodeRect.left,
-      snapshot.rect.top - nodeRect.top,
-      snapshot.rect.width,
-      snapshot.rect.height,
-      snapshot.borderRadius,
-    );
-  }
-
-  for (const snapshot of snapshots) {
-    if (snapshot.statusBadge) {
-      drawExportBadge(context, snapshot.statusBadge, nodeRect);
+    if (options.drawImages) {
+      drawContainedImage(
+        context,
+        snapshot.drawable,
+        snapshot.rect.left - nodeRect.left,
+        snapshot.rect.top - nodeRect.top,
+        snapshot.rect.width,
+        snapshot.rect.height,
+        snapshot.borderRadius,
+      );
     }
 
-    if (snapshot.quantityBadge) {
-      drawExportBadge(context, snapshot.quantityBadge, nodeRect);
+    if (options.drawWatermarks) {
+      drawRepeatedGoodsWatermark(
+        context,
+        snapshot.rect.left - nodeRect.left,
+        snapshot.rect.top - nodeRect.top,
+        snapshot.rect.width,
+        snapshot.rect.height,
+        snapshot.borderRadius,
+      );
+    }
+  }
+
+  if (options.drawBadges) {
+    for (const snapshot of snapshots) {
+      if (snapshot.statusBadge) {
+        drawExportBadge(context, snapshot.statusBadge, nodeRect);
+      }
+
+      if (snapshot.quantityBadge) {
+        drawExportBadge(context, snapshot.quantityBadge, nodeRect);
+      }
     }
   }
 
@@ -489,9 +649,77 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
   });
 }
 
+// Safari can reject the very large SVG data: URL created internally by
+// html-to-image. A blob: URL avoids that URL decoding path while preserving
+// the exact same HTML snapshot, fonts and CSS.
+// Give the iOS renderer a clean, attached DOM rather than asking it to
+// clone the live screen protection overlays. The latter can escape their
+// card boundaries on Safari, producing large watermarks over the board.
+async function renderViaHtml2Canvas(
+  node: HTMLDivElement,
+  width: number,
+  height: number,
+  pixelRatio: number,
+): Promise<HTMLCanvasElement> {
+  const { default: html2canvas } = await import("html2canvas-pro");
+  const clone = node.cloneNode(true) as HTMLDivElement;
+  clone.removeAttribute("data-trade-png-export-root");
+  clone.querySelectorAll('[data-goods-image-protection-layer="true"]')
+    .forEach((element) => element.remove());
+  // Prevent SVG tiling layers inherited from old preview builds too.
+  clone.querySelectorAll<HTMLElement>("*").forEach((element) => {
+    const backgroundImage = element.style.backgroundImage;
+    if (backgroundImage.includes("data:image/svg+xml") &&
+        (backgroundImage.includes("BL") || backgroundImage.includes("EVENT"))) {
+      element.style.setProperty("background-image", "none", "important");
+    }
+  });
+
+  clone.style.transform = "none";
+  clone.style.transformOrigin = "top left";
+  clone.style.width = `${width}px`;
+  clone.style.height = `${height}px`;
+  clone.style.position = "fixed";
+  clone.style.left = "-100000px";
+  clone.style.top = "0px";
+  clone.style.margin = "0";
+  clone.style.pointerEvents = "none";
+  clone.style.zIndex = "-1";
+  document.body.appendChild(clone);
+
+  try {
+    return await html2canvas(clone, {
+      backgroundColor: null,
+      scale: pixelRatio,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      imageTimeout: IMAGE_READY_TIMEOUT_MS,
+      width,
+      height,
+      windowWidth: Math.max(document.documentElement.clientWidth, width),
+      windowHeight: Math.max(document.documentElement.clientHeight, height),
+      scrollX: 0,
+      scrollY: 0,
+      ignoreElements: (element) =>
+        element instanceof HTMLElement &&
+        element.dataset.goodsImageProtectionLayer === "true",
+      onclone: (clonedDocument) => {
+        // A second defensive exclusion in html2canvas-pro's internal clone.
+        clonedDocument.querySelectorAll(
+          '[data-goods-image-protection-layer="true"]',
+        ).forEach((element) => element.remove());
+      },
+    });
+  } finally {
+    clone.remove();
+  }
+}
+
 async function createTradePngBlob(
   node: HTMLDivElement,
   snapshots: ExportImageSnapshot[],
+  targetWidth: number = TRADE_EXPORT_WIDTH,
 ) {
   const nodeRect = node.getBoundingClientRect();
   const width = Math.max(node.offsetWidth, Math.ceil(nodeRect.width));
@@ -501,56 +729,131 @@ async function createTradePngBlob(
     throw new Error("미리보기 크기를 계산하지 못했습니다.");
   }
 
-  const canvas = await toCanvas(node, {
-    cacheBust: false,
-    pixelRatio: TRADE_EXPORT_SCALE,
-    width,
-    height,
-    backgroundColor: "transparent",
-    style: {
-      transform: "none",
-      transformOrigin: "top left",
-    },
-  });
+  const constrainedWidth = isIosWebKit()
+    ? Math.min(targetWidth, Math.floor(Math.sqrt(IOS_MAX_CANVAS_PIXELS * width / height)))
+    : targetWidth;
+  const pixelRatio = isIosWebKit()
+    ? constrainedWidth / width
+    : TRADE_EXPORT_SCALE;
 
-  compositeExportImages(canvas, node, snapshots, width, height);
-  return canvasToBlob(canvas);
+  let canvas: HTMLCanvasElement;
+  if (isIosWebKit()) {
+    try {
+      // Avoid html-to-image's SVG foreignObject renderer on iOS.
+      canvas = await renderViaHtml2Canvas(node, width, height, pixelRatio);
+    } catch (error) {
+      throw formatExportFailure("iOS HTML2Canvas 변환", error);
+    }
+  } else {
+    try {
+      canvas = await toCanvas(node, {
+        cacheBust: false,
+        pixelRatio,
+        skipFonts: false,
+        width,
+        height,
+        backgroundColor: "transparent",
+        style: { transform: "none", transformOrigin: "top left" },
+      });
+    } catch (error) {
+      throw formatExportFailure("PC HTML 변환", error);
+    }
+  }
+
+  try {
+    compositeExportImages(canvas, node, snapshots, width, height, {
+      drawImages: !isIosWebKit(),
+      drawBadges: !isIosWebKit(),
+      drawWatermarks: true,
+    });
+  } catch (error) {
+    throw formatExportFailure("굿즈 이미지·워터마크 합성", error);
+  }
+
+  try {
+    return await canvasToBlob(canvas);
+  } catch (error) {
+    throw formatExportFailure("PNG 파일 인코딩", error);
+  }
 }
 
 export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
   const previousTransform = node.style.transform;
   const previousTransformOrigin = node.style.transformOrigin;
+  const previousExportMarker = node.dataset.tradePngExportRoot;
+  node.dataset.tradePngExportRoot = "true";
   let restoreImages: (() => void) | undefined;
+  let restoreProtectionLayers: (() => void) | undefined;
 
   try {
     node.style.transform = "none";
     node.style.transformOrigin = "top left";
 
-    await Promise.all([ensureTradeFontReady(), ensurePreviewImagesReady(node)]);
-    const preparedImages = await prepareExportImages(node);
+    try {
+      await Promise.all([ensureTradeFontReady(), ensurePreviewImagesReady(node)]);
+    } catch (error) {
+      throw formatExportFailure("글꼴·미리보기 준비", error);
+    }
+
+    const ios = isIosWebKit();
+
+    let preparedImages: Awaited<ReturnType<typeof prepareExportImages>>;
+    try {
+      preparedImages = await prepareExportImages(node, !ios);
+    } catch (error) {
+      throw formatExportFailure("굿즈 원본 이미지 다운로드·디코딩", error);
+    }
     restoreImages = preparedImages.restore;
+
+    if (ios) {
+      restoreProtectionLayers = suppressGoodsProtectionLayers(node);
+    }
+
     await waitForNextPaint();
 
-    let lastError: unknown;
+    const attemptErrors: string[] = [];
 
-    for (let attempt = 0; attempt < 2; attempt += 1) {
+    const attempts = ios
+      ? IOS_EXPORT_WIDTHS.map((targetWidth) => ({ targetWidth }))
+      : [
+          { targetWidth: TRADE_EXPORT_WIDTH, skipFontEmbedding: false },
+          { targetWidth: TRADE_EXPORT_WIDTH, skipFontEmbedding: false },
+        ];
+
+    for (const attempt of attempts) {
       try {
-        return await createTradePngBlob(node, preparedImages.snapshots);
+        return await createTradePngBlob(
+          node,
+          preparedImages.snapshots,
+          attempt.targetWidth,
+        );
       } catch (error) {
-        lastError = error;
+        attemptErrors.push(getExportErrorMessage(error));
+        console.warn("교환판 PNG 생성 재시도:", error);
       }
 
-      await new Promise((resolve) =>
-        window.setTimeout(resolve, EXPORT_RETRY_DELAY_MS),
-      );
+      await timeoutAfter(EXPORT_RETRY_DELAY_MS);
       await waitForNextPaint();
     }
 
-    throw new Error(getExportErrorMessage(lastError));
+    // Show the first failure stage and whether subsequent size retries changed it.
+    // Avoid reporting a generic font/image error when Safari returns an empty exception.
+    throw new Error(
+      `${attemptErrors[0] || "PNG 변환 실패 (원인 메시지 없음)"} (총 ${attemptErrors.length}회 실패)` +
+      (attemptErrors.length > 1 && attemptErrors.at(-1) !== attemptErrors[0]
+        ? ` / 마지막: ${attemptErrors.at(-1)}`
+        : ""),
+    );
   } finally {
     restoreImages?.();
+    restoreProtectionLayers?.();
     node.style.transform = previousTransform;
     node.style.transformOrigin = previousTransformOrigin;
+    if (previousExportMarker === undefined) {
+      delete node.dataset.tradePngExportRoot;
+    } else {
+      node.dataset.tradePngExportRoot = previousExportMarker;
+    }
   }
 }
 
