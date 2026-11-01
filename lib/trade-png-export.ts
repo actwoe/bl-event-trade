@@ -541,7 +541,7 @@ async function renderViaHtml2Canvas(
   pixelRatio: number,
 ): Promise<HTMLCanvasElement> {
   // Loaded only on iOS: keep the existing PC export renderer unchanged.
-  const { default: html2canvas } = await import("html2canvas");
+  const { default: html2canvas } = await import("html2canvas-pro");
   return html2canvas(node, {
     backgroundColor: null,
     scale: pixelRatio,
