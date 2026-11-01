@@ -1,6 +1,6 @@
 "use client";
 
-import { toCanvas } from "html-to-image";
+import { toCanvas, toSvg } from "html-to-image";
 import {
   GOODS_WATERMARK_ANGLE_DEG,
   GOODS_WATERMARK_FILL,
@@ -531,6 +531,45 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
   });
 }
 
+// Safari can reject the very large SVG data: URL created internally by
+// html-to-image. A blob: URL avoids that URL decoding path while preserving
+// the exact same HTML snapshot, fonts and CSS.
+async function renderViaSvgBlob(
+  node: HTMLDivElement,
+  width: number,
+  height: number,
+  pixelRatio: number,
+): Promise<HTMLCanvasElement> {
+  const svgDataUrl = await toSvg(node, {
+    cacheBust: false,
+    skipFonts: false,
+    width,
+    height,
+    backgroundColor: "transparent",
+    style: { transform: "none", transformOrigin: "top left" },
+  });
+  const response = await fetch(svgDataUrl);
+  const svgBlob = await response.blob();
+  const svgObjectUrl = URL.createObjectURL(new Blob([svgBlob], { type: "image/svg+xml;charset=utf-8" }));
+  try {
+    const image = new Image();
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("Safari가 SVG 미리보기를 해석하지 못했습니다."));
+      image.src = svgObjectUrl;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(width * pixelRatio);
+    canvas.height = Math.round(height * pixelRatio);
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("SVG 변환용 캔버스를 생성할 수 없습니다.");
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  } finally {
+    URL.revokeObjectURL(svgObjectUrl);
+  }
+}
+
 async function createTradePngBlob(
   node: HTMLDivElement,
   snapshots: ExportImageSnapshot[],
@@ -566,7 +605,16 @@ async function createTradePngBlob(
       },
     });
   } catch (error) {
-    throw formatExportFailure(`HTML 변환 (${Math.round(width * pixelRatio)}x${Math.round(height * pixelRatio)})`, error);
+    if (!isIosWebKit()) {
+      throw formatExportFailure(`HTML 변환 (${Math.round(width * pixelRatio)}x${Math.round(height * pixelRatio)})`, error);
+    }
+    try {
+      canvas = await renderViaSvgBlob(node, width, height, pixelRatio);
+    } catch (fallbackError) {
+      throw new Error(
+        `${getExportErrorMessage(formatExportFailure("HTML 변환", error))} / SVG Blob 우회: ${getExportErrorMessage(fallbackError)}`,
+      );
+    }
   }
 
   try {
