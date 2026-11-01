@@ -585,6 +585,19 @@ async function renderViaHtml2Canvas(
 
       clonedNode.style.transform = "none";
       clonedNode.style.transformOrigin = "top left";
+
+      // Mobile html2canvas-pro may paint the repeated SVG protection tile
+      // across the entire board instead of clipping it to each goods image.
+      // Hide that screen-only layer in the cloned export DOM. The canvas
+      // compositor adds the same clipped watermark over each image below,
+      // matching the PC export without touching the live preview.
+      clonedNode
+        .querySelectorAll<HTMLElement>(
+          '[data-goods-image-protection-layer="true"]',
+        )
+        .forEach((layer) => {
+          layer.style.setProperty("display", "none", "important");
+        });
     },
   });
 }
