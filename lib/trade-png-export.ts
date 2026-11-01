@@ -202,7 +202,10 @@ function createBadgeSnapshot(element: HTMLElement | null) {
   } satisfies ExportBadgeSnapshot;
 }
 
-async function prepareExportImages(node: HTMLElement) {
+async function prepareExportImages(
+  node: HTMLElement,
+  hideOriginalElements: boolean,
+) {
   const images = Array.from(node.querySelectorAll("img"));
   const snapshots: ExportImageSnapshot[] = [];
   const drawableBySource = new Map<
@@ -263,13 +266,19 @@ async function prepareExportImages(node: HTMLElement) {
   snapshots.sort(
     (a, b) => images.indexOf(a.element) - images.indexOf(b.element),
   );
-  for (const snapshot of snapshots) snapshot.element.style.visibility = "hidden";
+  if (hideOriginalElements) {
+    for (const snapshot of snapshots) {
+      snapshot.element.style.visibility = "hidden";
+    }
+  }
 
   return {
     snapshots,
     restore() {
-      for (const snapshot of snapshots) {
-        snapshot.element.style.visibility = snapshot.previousVisibility;
+      if (hideOriginalElements) {
+        for (const snapshot of snapshots) {
+          snapshot.element.style.visibility = snapshot.previousVisibility;
+        }
       }
       for (const url of objectUrls) URL.revokeObjectURL(url);
     },
@@ -463,12 +472,19 @@ function drawRepeatedGoodsWatermark(
   context.restore();
 }
 
+type CompositeExportOptions = {
+  drawImages: boolean;
+  drawBadges: boolean;
+  drawWatermarks: boolean;
+};
+
 function compositeExportImages(
   canvas: HTMLCanvasElement,
   node: HTMLElement,
   snapshots: ExportImageSnapshot[],
   exportWidth: number,
   exportHeight: number,
+  options: CompositeExportOptions,
 ) {
   const context = canvas.getContext("2d");
   if (!context) {
@@ -485,33 +501,39 @@ function compositeExportImages(
   context.imageSmoothingQuality = "high";
 
   for (const snapshot of snapshots) {
-    drawContainedImage(
-      context,
-      snapshot.drawable,
-      snapshot.rect.left - nodeRect.left,
-      snapshot.rect.top - nodeRect.top,
-      snapshot.rect.width,
-      snapshot.rect.height,
-      snapshot.borderRadius,
-    );
-
-    drawRepeatedGoodsWatermark(
-      context,
-      snapshot.rect.left - nodeRect.left,
-      snapshot.rect.top - nodeRect.top,
-      snapshot.rect.width,
-      snapshot.rect.height,
-      snapshot.borderRadius,
-    );
-  }
-
-  for (const snapshot of snapshots) {
-    if (snapshot.statusBadge) {
-      drawExportBadge(context, snapshot.statusBadge, nodeRect);
+    if (options.drawImages) {
+      drawContainedImage(
+        context,
+        snapshot.drawable,
+        snapshot.rect.left - nodeRect.left,
+        snapshot.rect.top - nodeRect.top,
+        snapshot.rect.width,
+        snapshot.rect.height,
+        snapshot.borderRadius,
+      );
     }
 
-    if (snapshot.quantityBadge) {
-      drawExportBadge(context, snapshot.quantityBadge, nodeRect);
+    if (options.drawWatermarks) {
+      drawRepeatedGoodsWatermark(
+        context,
+        snapshot.rect.left - nodeRect.left,
+        snapshot.rect.top - nodeRect.top,
+        snapshot.rect.width,
+        snapshot.rect.height,
+        snapshot.borderRadius,
+      );
+    }
+  }
+
+  if (options.drawBadges) {
+    for (const snapshot of snapshots) {
+      if (snapshot.statusBadge) {
+        drawExportBadge(context, snapshot.statusBadge, nodeRect);
+      }
+
+      if (snapshot.quantityBadge) {
+        drawExportBadge(context, snapshot.quantityBadge, nodeRect);
+      }
     }
   }
 
@@ -563,32 +585,6 @@ async function renderViaHtml2Canvas(
 
       clonedNode.style.transform = "none";
       clonedNode.style.transformOrigin = "top left";
-
-      // Goods pictures are composited separately at their *measured* positions
-      // with object-fit: contain and their original watermark. html2canvas-pro
-      // must never paint the original <img> a second time: Safari may ignore
-      // its object-fit/aspect-ratio and draw the large intrinsic bitmap.
-      const originalImages = Array.from(node.querySelectorAll("img"));
-      const clonedImages = Array.from(clonedNode.querySelectorAll("img"));
-      clonedImages.forEach((image, index) => {
-        const original = originalImages[index];
-        if (!original) return;
-        const rect = original.getBoundingClientRect();
-        if (!rect.width || !rect.height) return;
-
-        // Preserve the image's layout box while making the clone bitmap-free.
-        image.style.setProperty("width", `${rect.width}px`, "important");
-        image.style.setProperty("height", `${rect.height}px`, "important");
-        image.style.setProperty("min-width", "0px", "important");
-        image.style.setProperty("max-width", "none", "important");
-        image.style.setProperty("aspect-ratio", "auto", "important");
-        image.style.setProperty("object-fit", "contain", "important");
-        image.style.setProperty("opacity", "0", "important");
-        image.style.setProperty("visibility", "hidden", "important");
-        image.removeAttribute("srcset");
-        image.removeAttribute("sizes");
-        image.removeAttribute("src");
-      });
     },
   });
 }
@@ -638,7 +634,11 @@ async function createTradePngBlob(
   }
 
   try {
-    compositeExportImages(canvas, node, snapshots, width, height);
+    compositeExportImages(canvas, node, snapshots, width, height, {
+      drawImages: !isIosWebKit(),
+      drawBadges: !isIosWebKit(),
+      drawWatermarks: true,
+    });
   } catch (error) {
     throw formatExportFailure("굿즈 이미지·워터마크 합성", error);
   }
@@ -667,9 +667,11 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
       throw formatExportFailure("글꼴·미리보기 준비", error);
     }
 
+    const ios = isIosWebKit();
+
     let preparedImages: Awaited<ReturnType<typeof prepareExportImages>>;
     try {
-      preparedImages = await prepareExportImages(node);
+      preparedImages = await prepareExportImages(node, !ios);
     } catch (error) {
       throw formatExportFailure("굿즈 원본 이미지 다운로드·디코딩", error);
     }
@@ -678,7 +680,6 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
 
     const attemptErrors: string[] = [];
 
-    const ios = isIosWebKit();
     const attempts = ios
       ? IOS_EXPORT_WIDTHS.map((targetWidth) => ({ targetWidth }))
       : [
