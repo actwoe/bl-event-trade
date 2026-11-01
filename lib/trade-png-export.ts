@@ -67,6 +67,102 @@ function waitForNextPaint() {
   });
 }
 
+const GOODS_WATERMARK_STYLE_MARKERS = [
+  "data:image/svg+xml",
+  "BL EVENT TRADE",
+  "BL%20EVENT%20TRADE",
+] as const;
+
+type ExportStyleOverrideRecord = {
+  element: HTMLElement;
+  styleValue: string;
+  stylePriority: string;
+  backgroundValue: string;
+  backgroundPriority: string;
+  backgroundImageValue: string;
+  backgroundImagePriority: string;
+  opacityValue: string;
+  opacityPriority: string;
+  displayValue: string;
+  displayPriority: string;
+};
+
+function isGoodsProtectionElement(element: HTMLElement) {
+  if (element.dataset.goodsImageProtectionLayer === "true") {
+    return true;
+  }
+
+  const inlineStyle = element.getAttribute("style") ?? "";
+  return GOODS_WATERMARK_STYLE_MARKERS.some((marker) =>
+    inlineStyle.includes(marker),
+  );
+}
+
+function suppressGoodsProtectionLayers(root: ParentNode) {
+  const records: ExportStyleOverrideRecord[] = [];
+  root.querySelectorAll<HTMLElement>("*").forEach((element) => {
+    if (!isGoodsProtectionElement(element)) return;
+
+    records.push({
+      element,
+      styleValue: element.getAttribute("style") ?? "",
+      stylePriority: "",
+      backgroundValue: element.style.getPropertyValue("background"),
+      backgroundPriority: element.style.getPropertyPriority("background"),
+      backgroundImageValue: element.style.getPropertyValue("background-image"),
+      backgroundImagePriority: element.style.getPropertyPriority("background-image"),
+      opacityValue: element.style.getPropertyValue("opacity"),
+      opacityPriority: element.style.getPropertyPriority("opacity"),
+      displayValue: element.style.getPropertyValue("display"),
+      displayPriority: element.style.getPropertyPriority("display"),
+    });
+
+    element.style.setProperty("background", "transparent", "important");
+    element.style.setProperty("background-image", "none", "important");
+    element.style.setProperty("opacity", "0", "important");
+    element.style.setProperty("display", "none", "important");
+  });
+
+  return () => {
+    for (const record of records) {
+      if (record.styleValue) {
+        record.element.setAttribute("style", record.styleValue);
+      } else {
+        record.element.removeAttribute("style");
+      }
+
+      if (record.backgroundValue) {
+        record.element.style.setProperty(
+          "background",
+          record.backgroundValue,
+          record.backgroundPriority,
+        );
+      }
+      if (record.backgroundImageValue) {
+        record.element.style.setProperty(
+          "background-image",
+          record.backgroundImageValue,
+          record.backgroundImagePriority,
+        );
+      }
+      if (record.opacityValue) {
+        record.element.style.setProperty(
+          "opacity",
+          record.opacityValue,
+          record.opacityPriority,
+        );
+      }
+      if (record.displayValue) {
+        record.element.style.setProperty(
+          "display",
+          record.displayValue,
+          record.displayPriority,
+        );
+      }
+    }
+  };
+}
+
 function waitForImageReady(image: HTMLImageElement) {
   if (image.complete && image.naturalWidth > 0) {
     return image.decode?.().catch(() => undefined) ?? Promise.resolve();
@@ -586,15 +682,9 @@ async function renderViaHtml2Canvas(
       clonedNode.style.transform = "none";
       clonedNode.style.transformOrigin = "top left";
 
-      // Mobile html2canvas-pro may paint the repeated SVG protection tile
-      // across the entire board instead of clipping it to each goods image.
-      // Hide that screen-only layer in the cloned export DOM. The canvas
-      // compositor adds the same clipped watermark over each image below,
-      // matching the PC export without touching the live preview.
-      // Remove the SVG-tiled overlay from the clone completely. The
-      // exporter paints its own clipped watermark after the HTML render.
+      suppressGoodsProtectionLayers(clonedNode);
       clonedNode
-        .querySelectorAll('[data-goods-image-protection-layer="true"]')
+        .querySelectorAll<HTMLElement>('[data-goods-image-protection-layer="true"]')
         .forEach((layer) => layer.remove());
     },
   });
@@ -667,11 +757,7 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
   const previousExportMarker = node.dataset.tradePngExportRoot;
   node.dataset.tradePngExportRoot = "true";
   let restoreImages: (() => void) | undefined;
-  const protectionLayers: Array<{
-    element: HTMLElement;
-    displayValue: string;
-    displayPriority: string;
-  }> = [];
+  let restoreProtectionLayers: (() => void) | undefined;
 
   try {
     node.style.transform = "none";
@@ -694,20 +780,9 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
     restoreImages = preparedImages.restore;
 
     if (ios) {
-      // Safari may paint this repeated SVG background outside its card when
-      // html2canvas-pro captures a transformed preview. Suppress only during
-      // export; the original protection layer is restored in `finally`.
-      node.querySelectorAll<HTMLElement>(
-        '[data-goods-image-protection-layer="true"]',
-      ).forEach((element) => {
-        protectionLayers.push({
-          element,
-          displayValue: element.style.getPropertyValue("display"),
-          displayPriority: element.style.getPropertyPriority("display"),
-        });
-        element.style.setProperty("display", "none", "important");
-      });
+      restoreProtectionLayers = suppressGoodsProtectionLayers(node);
     }
+
     await waitForNextPaint();
 
     const attemptErrors: string[] = [];
@@ -745,13 +820,7 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
     );
   } finally {
     restoreImages?.();
-    for (const { element, displayValue, displayPriority } of protectionLayers) {
-      if (displayValue) {
-        element.style.setProperty("display", displayValue, displayPriority);
-      } else {
-        element.style.removeProperty("display");
-      }
-    }
+    restoreProtectionLayers?.();
     node.style.transform = previousTransform;
     node.style.transformOrigin = previousTransformOrigin;
     if (previousExportMarker === undefined) {
