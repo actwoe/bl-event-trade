@@ -1,6 +1,6 @@
 "use client";
 
-import { toCanvas, toSvg } from "html-to-image";
+import { toCanvas } from "html-to-image";
 import {
   GOODS_WATERMARK_ANGLE_DEG,
   GOODS_WATERMARK_FILL,
@@ -534,40 +534,37 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
 // Safari can reject the very large SVG data: URL created internally by
 // html-to-image. A blob: URL avoids that URL decoding path while preserving
 // the exact same HTML snapshot, fonts and CSS.
-async function renderViaSvgBlob(
+async function renderViaHtml2Canvas(
   node: HTMLDivElement,
   width: number,
   height: number,
   pixelRatio: number,
 ): Promise<HTMLCanvasElement> {
-  const svgDataUrl = await toSvg(node, {
-    cacheBust: false,
-    skipFonts: false,
+  // Loaded only on iOS: keep the existing PC export renderer unchanged.
+  const { default: html2canvas } = await import("html2canvas");
+  return html2canvas(node, {
+    backgroundColor: null,
+    scale: pixelRatio,
+    useCORS: true,
+    allowTaint: false,
+    logging: false,
+    imageTimeout: IMAGE_READY_TIMEOUT_MS,
     width,
     height,
-    backgroundColor: "transparent",
-    style: { transform: "none", transformOrigin: "top left" },
+    windowWidth: Math.max(document.documentElement.clientWidth, width),
+    windowHeight: Math.max(document.documentElement.clientHeight, height),
+    scrollX: 0,
+    scrollY: -window.scrollY,
+    onclone: (clonedDocument) => {
+      const clonedNode = clonedDocument.querySelector(
+        '[data-trade-png-export-root="true"]',
+      ) as HTMLElement | null;
+      if (clonedNode) {
+        clonedNode.style.transform = "none";
+        clonedNode.style.transformOrigin = "top left";
+      }
+    },
   });
-  const response = await fetch(svgDataUrl);
-  const svgBlob = await response.blob();
-  const svgObjectUrl = URL.createObjectURL(new Blob([svgBlob], { type: "image/svg+xml;charset=utf-8" }));
-  try {
-    const image = new Image();
-    await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve();
-      image.onerror = () => reject(new Error("Safari가 SVG 미리보기를 해석하지 못했습니다."));
-      image.src = svgObjectUrl;
-    });
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(width * pixelRatio);
-    canvas.height = Math.round(height * pixelRatio);
-    const context = canvas.getContext("2d");
-    if (!context) throw new Error("SVG 변환용 캔버스를 생성할 수 없습니다.");
-    context.drawImage(image, 0, 0, canvas.width, canvas.height);
-    return canvas;
-  } finally {
-    URL.revokeObjectURL(svgObjectUrl);
-  }
 }
 
 async function createTradePngBlob(
@@ -591,29 +588,26 @@ async function createTradePngBlob(
     : TRADE_EXPORT_SCALE;
 
   let canvas: HTMLCanvasElement;
-  try {
-    canvas = await toCanvas(node, {
-      cacheBust: false,
-      pixelRatio,
-      skipFonts: false,
-      width,
-      height,
-      backgroundColor: "transparent",
-      style: {
-        transform: "none",
-        transformOrigin: "top left",
-      },
-    });
-  } catch (error) {
-    if (!isIosWebKit()) {
-      throw formatExportFailure(`HTML 변환 (${Math.round(width * pixelRatio)}x${Math.round(height * pixelRatio)})`, error);
-    }
+  if (isIosWebKit()) {
     try {
-      canvas = await renderViaSvgBlob(node, width, height, pixelRatio);
-    } catch (fallbackError) {
-      throw new Error(
-        `${getExportErrorMessage(formatExportFailure("HTML 변환", error))} / SVG Blob 우회: ${getExportErrorMessage(fallbackError)}`,
-      );
+      // Avoid html-to-image's SVG foreignObject renderer on iOS.
+      canvas = await renderViaHtml2Canvas(node, width, height, pixelRatio);
+    } catch (error) {
+      throw formatExportFailure("iOS HTML2Canvas 변환", error);
+    }
+  } else {
+    try {
+      canvas = await toCanvas(node, {
+        cacheBust: false,
+        pixelRatio,
+        skipFonts: false,
+        width,
+        height,
+        backgroundColor: "transparent",
+        style: { transform: "none", transformOrigin: "top left" },
+      });
+    } catch (error) {
+      throw formatExportFailure("PC HTML 변환", error);
     }
   }
 
@@ -633,6 +627,8 @@ async function createTradePngBlob(
 export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
   const previousTransform = node.style.transform;
   const previousTransformOrigin = node.style.transformOrigin;
+  const previousExportMarker = node.dataset.tradePngExportRoot;
+  node.dataset.tradePngExportRoot = "true";
   let restoreImages: (() => void) | undefined;
 
   try {
@@ -692,6 +688,11 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
     restoreImages?.();
     node.style.transform = previousTransform;
     node.style.transformOrigin = previousTransformOrigin;
+    if (previousExportMarker === undefined) {
+      delete node.dataset.tradePngExportRoot;
+    } else {
+      node.dataset.tradePngExportRoot = previousExportMarker;
+    }
   }
 }
 
