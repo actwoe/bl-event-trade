@@ -652,42 +652,68 @@ function canvasToBlob(canvas: HTMLCanvasElement) {
 // Safari can reject the very large SVG data: URL created internally by
 // html-to-image. A blob: URL avoids that URL decoding path while preserving
 // the exact same HTML snapshot, fonts and CSS.
+// Give the iOS renderer a clean, attached DOM rather than asking it to
+// clone the live screen protection overlays. The latter can escape their
+// card boundaries on Safari, producing large watermarks over the board.
 async function renderViaHtml2Canvas(
   node: HTMLDivElement,
   width: number,
   height: number,
   pixelRatio: number,
 ): Promise<HTMLCanvasElement> {
-  // Loaded only on iOS: keep the existing PC export renderer unchanged.
   const { default: html2canvas } = await import("html2canvas-pro");
-  return html2canvas(node, {
-    backgroundColor: null,
-    scale: pixelRatio,
-    useCORS: true,
-    allowTaint: false,
-    logging: false,
-    imageTimeout: IMAGE_READY_TIMEOUT_MS,
-    width,
-    height,
-    windowWidth: Math.max(document.documentElement.clientWidth, width),
-    windowHeight: Math.max(document.documentElement.clientHeight, height),
-    scrollX: 0,
-    scrollY: -window.scrollY,
-    onclone: (clonedDocument) => {
-      const clonedNode = clonedDocument.querySelector(
-        '[data-trade-png-export-root="true"]',
-      ) as HTMLElement | null;
-      if (!clonedNode) return;
-
-      clonedNode.style.transform = "none";
-      clonedNode.style.transformOrigin = "top left";
-
-      suppressGoodsProtectionLayers(clonedNode);
-      clonedNode
-        .querySelectorAll<HTMLElement>('[data-goods-image-protection-layer="true"]')
-        .forEach((layer) => layer.remove());
-    },
+  const clone = node.cloneNode(true) as HTMLDivElement;
+  clone.removeAttribute("data-trade-png-export-root");
+  clone.querySelectorAll('[data-goods-image-protection-layer="true"]')
+    .forEach((element) => element.remove());
+  // Prevent SVG tiling layers inherited from old preview builds too.
+  clone.querySelectorAll<HTMLElement>("*").forEach((element) => {
+    const backgroundImage = element.style.backgroundImage;
+    if (backgroundImage.includes("data:image/svg+xml") &&
+        (backgroundImage.includes("BL") || backgroundImage.includes("EVENT"))) {
+      element.style.setProperty("background-image", "none", "important");
+    }
   });
+
+  clone.style.transform = "none";
+  clone.style.transformOrigin = "top left";
+  clone.style.width = `${width}px`;
+  clone.style.height = `${height}px`;
+  clone.style.position = "fixed";
+  clone.style.left = "-100000px";
+  clone.style.top = "0px";
+  clone.style.margin = "0";
+  clone.style.pointerEvents = "none";
+  clone.style.zIndex = "-1";
+  document.body.appendChild(clone);
+
+  try {
+    return await html2canvas(clone, {
+      backgroundColor: null,
+      scale: pixelRatio,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      imageTimeout: IMAGE_READY_TIMEOUT_MS,
+      width,
+      height,
+      windowWidth: Math.max(document.documentElement.clientWidth, width),
+      windowHeight: Math.max(document.documentElement.clientHeight, height),
+      scrollX: 0,
+      scrollY: 0,
+      ignoreElements: (element) =>
+        element instanceof HTMLElement &&
+        element.dataset.goodsImageProtectionLayer === "true",
+      onclone: (clonedDocument) => {
+        // A second defensive exclusion in html2canvas-pro's internal clone.
+        clonedDocument.querySelectorAll(
+          '[data-goods-image-protection-layer="true"]',
+        ).forEach((element) => element.remove());
+      },
+    });
+  } finally {
+    clone.remove();
+  }
 }
 
 async function createTradePngBlob(
