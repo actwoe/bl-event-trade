@@ -559,10 +559,36 @@ async function renderViaHtml2Canvas(
       const clonedNode = clonedDocument.querySelector(
         '[data-trade-png-export-root="true"]',
       ) as HTMLElement | null;
-      if (clonedNode) {
-        clonedNode.style.transform = "none";
-        clonedNode.style.transformOrigin = "top left";
-      }
+      if (!clonedNode) return;
+
+      clonedNode.style.transform = "none";
+      clonedNode.style.transformOrigin = "top left";
+
+      // Goods pictures are composited separately at their *measured* positions
+      // with object-fit: contain and their original watermark. html2canvas-pro
+      // must never paint the original <img> a second time: Safari may ignore
+      // its object-fit/aspect-ratio and draw the large intrinsic bitmap.
+      const originalImages = Array.from(node.querySelectorAll("img"));
+      const clonedImages = Array.from(clonedNode.querySelectorAll("img"));
+      clonedImages.forEach((image, index) => {
+        const original = originalImages[index];
+        if (!original) return;
+        const rect = original.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+
+        // Preserve the image's layout box while making the clone bitmap-free.
+        image.style.setProperty("width", `${rect.width}px`, "important");
+        image.style.setProperty("height", `${rect.height}px`, "important");
+        image.style.setProperty("min-width", "0px", "important");
+        image.style.setProperty("max-width", "none", "important");
+        image.style.setProperty("aspect-ratio", "auto", "important");
+        image.style.setProperty("object-fit", "contain", "important");
+        image.style.setProperty("opacity", "0", "important");
+        image.style.setProperty("visibility", "hidden", "important");
+        image.removeAttribute("srcset");
+        image.removeAttribute("sizes");
+        image.removeAttribute("src");
+      });
     },
   });
 }
