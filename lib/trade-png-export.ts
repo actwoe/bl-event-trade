@@ -591,13 +591,11 @@ async function renderViaHtml2Canvas(
       // Hide that screen-only layer in the cloned export DOM. The canvas
       // compositor adds the same clipped watermark over each image below,
       // matching the PC export without touching the live preview.
+      // Remove the SVG-tiled overlay from the clone completely. The
+      // exporter paints its own clipped watermark after the HTML render.
       clonedNode
-        .querySelectorAll<HTMLElement>(
-          '[data-goods-image-protection-layer="true"]',
-        )
-        .forEach((layer) => {
-          layer.style.setProperty("display", "none", "important");
-        });
+        .querySelectorAll('[data-goods-image-protection-layer="true"]')
+        .forEach((layer) => layer.remove());
     },
   });
 }
@@ -669,6 +667,11 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
   const previousExportMarker = node.dataset.tradePngExportRoot;
   node.dataset.tradePngExportRoot = "true";
   let restoreImages: (() => void) | undefined;
+  const protectionLayers: Array<{
+    element: HTMLElement;
+    displayValue: string;
+    displayPriority: string;
+  }> = [];
 
   try {
     node.style.transform = "none";
@@ -689,6 +692,22 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
       throw formatExportFailure("굿즈 원본 이미지 다운로드·디코딩", error);
     }
     restoreImages = preparedImages.restore;
+
+    if (ios) {
+      // Safari may paint this repeated SVG background outside its card when
+      // html2canvas-pro captures a transformed preview. Suppress only during
+      // export; the original protection layer is restored in `finally`.
+      node.querySelectorAll<HTMLElement>(
+        '[data-goods-image-protection-layer="true"]',
+      ).forEach((element) => {
+        protectionLayers.push({
+          element,
+          displayValue: element.style.getPropertyValue("display"),
+          displayPriority: element.style.getPropertyPriority("display"),
+        });
+        element.style.setProperty("display", "none", "important");
+      });
+    }
     await waitForNextPaint();
 
     const attemptErrors: string[] = [];
@@ -726,6 +745,13 @@ export async function renderTradePreviewToPngBlob(node: HTMLDivElement) {
     );
   } finally {
     restoreImages?.();
+    for (const { element, displayValue, displayPriority } of protectionLayers) {
+      if (displayValue) {
+        element.style.setProperty("display", displayValue, displayPriority);
+      } else {
+        element.style.removeProperty("display");
+      }
+    }
     node.style.transform = previousTransform;
     node.style.transformOrigin = previousTransformOrigin;
     if (previousExportMarker === undefined) {
