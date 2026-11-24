@@ -283,26 +283,42 @@ function sortTradeItems(
       a.category === b.category &&
       getCategoryKind(a.category, categoryMap) === 'collection_photo_card' &&
       getCategoryKind(b.category, categoryMap) === 'collection_photo_card';
-    const workFirst = !isCollectionPhotoCard ||
-      (workTitlesByCategory.get(a.category)?.size ?? 0) > 1;
 
-    if (workFirst) {
+    // 일반 굿즈와 특전은 관리자가 지정한 표시 순서를 작품명보다 우선합니다.
+    // 컬렉션 포토카드는 기존 작품명 / A·B·C 정렬 규칙을 그대로 유지합니다.
+    if (!isCollectionPhotoCard) {
+      const displayDiff =
+        (a.display_order ?? Number.MAX_SAFE_INTEGER) -
+        (b.display_order ?? Number.MAX_SAFE_INTEGER);
+      if (displayDiff !== 0) return displayDiff;
+
       const titleDiff = a.work_title.localeCompare(b.work_title, 'ko-KR', {
         numeric: true,
         sensitivity: 'base',
       });
       if (titleDiff !== 0) return titleDiff;
-    }
+    } else {
+      const workFirst = (workTitlesByCategory.get(a.category)?.size ?? 0) > 1;
 
-    if (isCollectionPhotoCard) {
+      if (workFirst) {
+        const titleDiff = a.work_title.localeCompare(b.work_title, 'ko-KR', {
+          numeric: true,
+          sensitivity: 'base',
+        });
+        if (titleDiff !== 0) return titleDiff;
+      }
+
       const variantDiff =
         normalizeCollectionPhotoCardSortOrder(a.sort_order) -
         normalizeCollectionPhotoCardSortOrder(b.sort_order);
       if (variantDiff !== 0) return variantDiff;
+
+      const displayDiff =
+        (a.display_order ?? Number.MAX_SAFE_INTEGER) -
+        (b.display_order ?? Number.MAX_SAFE_INTEGER);
+      if (displayDiff !== 0) return displayDiff;
     }
 
-    const displayDiff = (a.display_order ?? Number.MAX_SAFE_INTEGER) - (b.display_order ?? Number.MAX_SAFE_INTEGER);
-    if (displayDiff !== 0) return displayDiff;
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
 }
@@ -1950,15 +1966,87 @@ export default function AdminEventManagePage() {
     }
   }
 
-  // 그룹 간 이동은 기존 작품/특전/A-B-C 정렬을 훼손하므로 허용하지 않습니다.
+  // 사용자 교환판의 실제 정렬 그룹과 동일한 범위에서만 순서를 바꿉니다.
   function getItemOrderGroup(item: TradeItemRow) {
     const kind = getCategoryKind(item.category, itemCategoryMap);
-    return JSON.stringify([
-      item.category,
-      kind === 'benefit' ? getBenefitSubcategoryLabel(item.benefit_subcategory) : '',
-      item.work_title.trim(),
-      kind === 'collection_photo_card' ? normalizeCollectionPhotoCardSortOrder(item.sort_order) : '',
-    ]);
+
+    if (kind === 'benefit') {
+      return JSON.stringify([
+        item.category,
+        getBenefitSubcategoryLabel(item.benefit_subcategory),
+      ]);
+    }
+
+    if (kind === 'collection_photo_card') {
+      return JSON.stringify([
+        item.category,
+        item.work_title.trim(),
+        normalizeCollectionPhotoCardSortOrder(item.sort_order),
+      ]);
+    }
+
+    return JSON.stringify([item.category]);
+  }
+
+  function getOrderedItemSiblings(item: TradeItemRow) {
+    return sortTradeItems(
+      items,
+      benefitSubcategoryOrderMap,
+      itemCategoryOrderMap,
+      itemCategoryMap,
+    ).filter((row) => getItemOrderGroup(row) === getItemOrderGroup(item));
+  }
+
+  async function saveItemOrder(reordered: TradeItemRow[]) {
+    setIsSavingItemOrder(true);
+    setMessage('');
+
+    try {
+      const updateResults = await Promise.all(
+        reordered.map((row, index) =>
+          supabase
+            .from('trade_items')
+            .update({ display_order: index })
+            .eq('id', row.id)
+            .select('id'),
+        ),
+      );
+      const failedResult = updateResults.find(
+        (result) => result.error || !result.data?.length,
+      );
+
+      if (failedResult) {
+        throw failedResult.error ?? new Error('굿즈 순서 저장 권한을 확인해 주세요.');
+      }
+
+      await loadItems();
+      setMessage('굿즈 순서가 저장되었습니다. 사용자 교환판에도 같은 순서가 적용됩니다.');
+    } catch (error) {
+      console.error(error);
+      await loadItems();
+      setMessage(
+        `순서 저장 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`,
+      );
+    } finally {
+      setIsSavingItemOrder(false);
+    }
+  }
+
+  async function handleMoveItem(item: TradeItemRow, direction: -1 | 1) {
+    if (isSavingItemOrder || editingItemId) return;
+
+    const siblings = getOrderedItemSiblings(item);
+    const currentIndex = siblings.findIndex((row) => row.id === item.id);
+    const targetIndex = currentIndex + direction;
+
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= siblings.length) {
+      return;
+    }
+
+    const reordered = [...siblings];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+    await saveItemOrder(reordered);
   }
 
   async function handleDropItem(target: TradeItemRow) {
@@ -1968,36 +2056,17 @@ export default function AdminEventManagePage() {
     const source = items.find((row) => row.id === sourceId);
     if (!source) return;
     if (getItemOrderGroup(source) !== getItemOrderGroup(target)) {
-      setMessage('같은 작품·굿즈 종류·그룹 안에서만 순서를 변경할 수 있습니다.');
+      setMessage('같은 정렬 그룹 안에서만 순서를 변경할 수 있습니다.');
       return;
     }
-    const siblings = sortTradeItems(items, benefitSubcategoryOrderMap, itemCategoryOrderMap, itemCategoryMap)
-      .filter((row) => getItemOrderGroup(row) === getItemOrderGroup(source));
+    const siblings = getOrderedItemSiblings(source);
     const from = siblings.findIndex((row) => row.id === sourceId);
     const to = siblings.findIndex((row) => row.id === target.id);
     if (from < 0 || to < 0) return;
     const reordered = [...siblings];
     const [moved] = reordered.splice(from, 1);
     reordered.splice(to, 0, moved);
-    setIsSavingItemOrder(true);
-    setMessage('');
-    try {
-      // 다른 그룹은 변경하지 않으며 순서를 영속적으로 저장합니다.
-      for (const [index, row] of reordered.entries()) {
-        const { data, error } = await supabase.from('trade_items')
-          .update({ display_order: index }).eq('id', row.id).select('id');
-        if (error) throw error;
-        if (!data?.length) throw new Error('굿즈 순서 저장 권한을 확인해 주세요.');
-      }
-      await loadItems();
-      setMessage('굿즈 순서가 저장되었습니다. 사용자 교환판에도 같은 순서가 적용됩니다.');
-    } catch (error) {
-      console.error(error);
-      await loadItems();
-      setMessage(`순서 저장 실패: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
-    } finally {
-      setIsSavingItemOrder(false);
-    }
+    await saveItemOrder(reordered);
   }
 
   function clearEditingItemImagePreview() {
@@ -3792,7 +3861,7 @@ export default function AdminEventManagePage() {
               등록된 굿즈
             </h2>
             <p className="mt-1 text-xs text-neutral-400">
-              총 {items.length}개 · 현재 표시 {filteredItems.length}개 · 같은 그룹 내에서 카드를 끌어 순서 변경
+              총 {items.length}개 · 현재 표시 {filteredItems.length}개 · 드래그 또는 앞/뒤 버튼으로 순서 변경
             </p>
           </div>
 
@@ -3902,6 +3971,14 @@ export default function AdminEventManagePage() {
                       (subcategory) =>
                         subcategory.name === editingItemBenefitSubcategory,
                     );
+                  const orderedSiblings = getOrderedItemSiblings(item);
+                  const itemOrderIndex = orderedSiblings.findIndex(
+                    (row) => row.id === item.id,
+                  );
+                  const canMoveEarlier = itemOrderIndex > 0;
+                  const canMoveLater =
+                    itemOrderIndex >= 0 &&
+                    itemOrderIndex < orderedSiblings.length - 1;
 
                   return (
                     <article
@@ -4215,6 +4292,34 @@ export default function AdminEventManagePage() {
                             </p>
 
                             <div className="mt-3 grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void handleMoveItem(item, -1)}
+                                disabled={
+                                  !canMoveEarlier ||
+                                  isSavingItemOrder ||
+                                  Boolean(editingItemId)
+                                }
+                                className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-black text-neutral-600 disabled:cursor-not-allowed disabled:opacity-30"
+                                aria-label={`${item.item_name || item.work_title || '굿즈'} 순서를 앞으로 이동`}
+                              >
+                                ← 앞으로
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => void handleMoveItem(item, 1)}
+                                disabled={
+                                  !canMoveLater ||
+                                  isSavingItemOrder ||
+                                  Boolean(editingItemId)
+                                }
+                                className="rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] font-black text-neutral-600 disabled:cursor-not-allowed disabled:opacity-30"
+                                aria-label={`${item.item_name || item.work_title || '굿즈'} 순서를 뒤로 이동`}
+                              >
+                                뒤로 →
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => handleStartEditItem(item)}
