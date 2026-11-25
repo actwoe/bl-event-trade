@@ -60,6 +60,7 @@ type TradeItemRow = {
   show_item_name: boolean | null;
   image_path: string;
   sort_order: number | null;
+  display_order: number | null;
   image_ratio: TradeImageRatio | null;
   benefit_subcategory: string | null;
 };
@@ -264,7 +265,7 @@ export default function MyTradesPage() {
         supabase
           .from("trade_items")
           .select(
-            "id, category, work_title, item_name, show_item_name, image_path, sort_order, image_ratio, benefit_subcategory",
+            "id, category, work_title, item_name, show_item_name, image_path, sort_order, display_order, image_ratio, benefit_subcategory",
           )
           .eq("collection_id", selectedCollectionId)
           .eq("is_visible", true)
@@ -365,7 +366,7 @@ export default function MyTradesPage() {
               getSafeImageRatio(item.image_ratio),
             ),
             sortOrder: item.sort_order ?? 0,
-            catalogOrder,
+            catalogOrder: item.display_order ?? catalogOrder,
             imageRatio: getSafeImageRatio(item.image_ratio),
             benefitSubcategory: item.benefit_subcategory ?? null,
             benefitSubcategorySortOrder: getBenefitSubcategorySortOrder(
