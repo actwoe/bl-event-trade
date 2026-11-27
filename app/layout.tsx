@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Script from 'next/script';
 import './globals.css';
 import { SiteHeader } from '@/components/shared/SiteHeader';
+import { BuyMeACoffeeWidget } from '@/components/shared/BuyMeACoffeeWidget';
 
 export const metadata: Metadata = {
   title: '팝업 & 콜카 굿즈 교환판',
@@ -31,6 +32,7 @@ export default function RootLayout({
         </Script>
         <SiteHeader />
         {children}
+        <BuyMeACoffeeWidget />
       </body>
     </html>
   );
